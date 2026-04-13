@@ -1,0 +1,320 @@
+/* 轮播图布局 */
+.carousel {
+  margin-bottom: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(224, 196, 152, 0.3);
+}
+
+.carousel-item {
+  height: 400px;
+  background-position: center;
+  background-size: cover;
+}
+
+.carousel-item img {
+  object-fit: cover;
+  height: 100%;
+  width: 100%;
+}
+
+.carousel-item.active,
+.carousel-item-next,
+.carousel-item-prev {
+  display: block;
+  transition: transform 0.6s ease-in-out;
+}
+
+.carousel-item-next:not(.carousel-item-start),
+.active.carousel-item-end {
+  transform: translateX(100%);
+}
+
+.carousel-item-prev:not(.carousel-item-end),
+.active.carousel-item-start {
+  transform: translateX(-100%);
+}
+
+.carousel-caption {
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  padding: 20px;
+  bottom: 40px;
+  max-width: 80%;
+  margin: 0 auto;
+  left: 0;
+  right: 0;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.3s ease;
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+  width: 5%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.carousel:hover .carousel-control-prev,
+.carousel:hover .carousel-control-next {
+  opacity: 0.8;
+}
+
+.carousel-indicators {
+  margin-bottom: 1rem;
+}
+
+.carousel-indicators button {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 5px;
+  background-color: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.carousel-indicators button.active {
+  width: 12px;
+  height: 12px;
+  background-color: #fff;
+}
+
+/* 商品网格布局 */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  margin: 20px auto;
+  max-width: 1400px;
+  padding: 0 40px; /* 增加左右padding */
+}
+
+@media (min-width: 1200px) {
+  .product-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 15px auto;
+    padding: 0 20px; /* 移动端使用较小的padding */
+  }
+
+  .container {
+    width: 98%;
+    padding: 0 10px;
+  }
+}
+
+/* 侧边栏布局 */
+.sidebar {
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(224, 196, 152, 0.2);
+}
+
+.category-title {
+  color: var(--color-zhuqing);
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.filter-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 2rem;
+}
+
+.filter-list li {
+  margin-bottom: 0.5rem;
+}
+
+.filter-list a {
+  color: var(--color-moyun);
+  text-decoration: none;
+  display: block;
+  padding: 8px 15px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.filter-list a:hover {
+  color: var(--color-zhuqing);
+  background-color: rgba(207, 176, 176, 0.1);
+  transform: translateX(5px);
+}
+
+.filter-list a.active {
+  color: var(--color-zhuqing);
+  background-color: rgba(207, 176, 176, 0.2);
+  font-weight: 600;
+  position: relative;
+}
+
+.filter-list a.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--color-zhuqing);
+  border-radius: 0 2px 2px 0;
+}
+
+.filter-title {
+  color: var(--color-zhuqing);
+  font-size: 1.1rem;
+  margin: 1.5rem 0 1rem;
+  font-weight: 600;
+}
+
+/* 表单容器 */
+.form-container {
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+}
+
+/* 文化专栏布局 */
+.culture-section {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(255, 255, 255, 0.85) 100%
+  );
+  padding: 50px 0;
+  margin: 50px 0;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.culture-section::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(224, 196, 152, 0.1) 35%,
+    rgba(46, 78, 126, 0.05) 50%,
+    rgba(224, 196, 152, 0.1) 65%,
+    transparent 100%
+  );
+  animation: waterFlow 15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes waterFlow {
+  0% {
+    transform: translate(-30%, -30%) rotate(0deg);
+  }
+  100% {
+    transform: translate(30%, 30%) rotate(360deg);
+  }
+}
+
+/* 商品详情布局 */
+.product-detail {
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+}
+
+/* 购物车布局 */
+.cart-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+/* 个人中心布局 */
+.profile-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 40px;
+}
+
+.profile-sidebar {
+  background-color: var(--color-daiqing);
+  padding: 30px 15px;
+  color: white;
+}
+
+.profile-main {
+  padding: 30px;
+}
+
+/* 侧边栏链接样式 */
+.profile-sidebar .list-group-item {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.profile-sidebar .list-group-item a {
+  color: rgba(255, 255, 255, 0.9); /* 更改为接近白色 */
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.profile-sidebar .list-group-item a:hover {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.profile-sidebar .list-group-item.active {
+  background-color: var(--color-zhuqing);
+  border-color: var(--color-zhuqing);
+}
+
+.profile-sidebar .list-group-item.active a {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.profile-sidebar .list-group-item:hover {
+  background-color: rgba(154, 31, 26, 0.9);
+  border-color: var(--color-zhuqing);
+}
+
+/* 用户名和邮箱样式 */
+.profile-sidebar-header h4 {
+  color: #ffffff;
+  margin-bottom: 5px;
+}
+
+.profile-sidebar-header p {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.container {
+  width: 95%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+}

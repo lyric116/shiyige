@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>拾遗阁 - 注册</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
+  </head>
+  <body>
+    <!-- 渐变背景斑点 -->
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <img src="images/logo.svg" alt="拾遗阁" height="50" />
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html"><span>首页</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="category.html"><span>分类</span></a>
+            </li>
+            <li class="nav-item">
+              <form class="d-flex">
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="search"
+                    placeholder="搜索商品"
+                    aria-label="搜索"
+                  />
+                  <button class="btn" type="submit">
+                    <i class="fas fa-search text-light"></i>
+                  </button>
+                </div>
+              </form>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link position-relative cart-link" href="cart.html">
+                <i class="fas fa-shopping-cart"></i>
+                <span>购物车</span>
+                <span
+                  id="cart-count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                >
+                  0
+                </span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="login.html"><span>登录</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="register.html"
+                ><span>注册</span></a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 闪现消息 -->
+    <div id="flash-messages" class="container mt-3"></div>
+
+    <!-- 主内容区域 -->
+    <main class="py-4">
+      <div class="container my-4">
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <div class="form-container">
+              <h2 class="form-title">用户注册</h2>
+
+              <form id="register-form">
+                <div class="mb-3">
+                  <label for="username" class="form-label">用户名</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="username"
+                    name="username"
+                    minlength="4"
+                    maxlength="64"
+                    required
+                  />
+                  <div class="invalid-feedback">用户名至少需要4个字符</div>
+                  <div class="form-text">用户名将作为您在网站上的显示名称</div>
+                </div>
+
+                <div class="mb-3">
+                  <label for="email" class="form-label">电子邮箱</label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="email"
+                    name="email"
+                    required
+                  />
+                  <div class="invalid-feedback">请输入有效的电子邮箱地址</div>
+                </div>
+
+                <div class="mb-3">
+                  <label for="password" class="form-label">密码</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="password"
+                    name="password"
+                    minlength="8"
+                    required
+                  />
+                  <div class="invalid-feedback">密码必须至少8个字符</div>
+                  <div class="form-text">
+                    密码必须至少8个字符，建议包含大小写字母、数字和特殊符号
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label for="confirm_password" class="form-label"
+                    >确认密码</label
+                  >
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="confirm_password"
+                    name="confirm_password"
+                    required
+                  />
+                  <div class="invalid-feedback">两次输入的密码必须一致</div>
+                </div>
+
+                <div class="mb-3 form-check">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="agree-terms"
+                    required
+                  />
+                  <label class="form-check-label" for="agree-terms">
+                    我已阅读并同意<a href="#" id="terms-link">服务条款</a>和<a
+                      href="#"
+                      id="privacy-link"
+                      >隐私政策</a
+                    >
+                  </label>
+                  <div class="invalid-feedback">您必须同意服务条款才能注册</div>
+                </div>
+
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-primary btn-lg">
+                    注册
+                  </button>
+                </div>
+              </form>
+
+              <div class="auth-options">
+                <p>已有账号？<a href="login.html">立即登录</a></p>
+
+                <p>或使用以下方式快速注册</p>
+                <div class="social-login">
+                  <a href="#" class="social-btn wechat-btn">
+                    <i class="fab fa-weixin"></i> 微信注册
+                  </a>
+                  <a href="#" class="social-btn alipay-btn">
+                    <i class="fab fa-alipay"></i> 支付宝注册
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4">
+            <h5 class="footer-title">关于拾遗阁</h5>
+            <p>
+              拾遗阁致力于弘扬中国传统文化，提供优质的汉服、文创产品和非遗手工艺品，让传统文化在现代生活中焕发新光彩。
+            </p>
+          </div>
+          <div class="col-md-2 mb-4">
+            <h5 class="footer-title">快速链接</h5>
+            <ul class="footer-links">
+              <li><a href="index.html">首页</a></li>
+              <li><a href="categories.html">分类</a></li>
+              <li><a href="login.html">登录</a></li>
+              <li><a href="register.html">注册</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">商品分类</h5>
+            <ul class="footer-links">
+              <li><a href="category.html?id=1">汉服</a></li>
+              <li><a href="category.html?id=2">文创产品</a></li>
+              <li><a href="category.html?id=3">非遗手工艺</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">联系我们</h5>
+            <ul class="footer-links">
+              <li><i class="fas fa-envelope me-2"></i> contact@shiyige.com</li>
+              <li><i class="fas fa-phone me-2"></i> (010) 8888-7777</li>
+              <li>
+                <i class="fas fa-map-marker-alt me-2"></i>
+                北京市东城区东华门街道
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            © <span id="current-year"></span> 拾遗阁 版权所有 |
+            <span id="current-date"></span>
+          </p>
+        </div>
+      </div>
+      <a href="#" class="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+      </a>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/petals.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/search.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // 如果用户已登录，则重定向到首页
+        if (isLoggedIn()) {
+          window.location.href = "index.html";
+          return;
+        }
+
+        // 初始化表单验证
+        const registerForm = document.getElementById("register-form");
+        if (registerForm) {
+          registerForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            // 验证表单
+            let isValid = true;
+            const username = document.getElementById("username");
+            const email = document.getElementById("email");
+            const password = document.getElementById("password");
+            const confirmPassword = document.getElementById("confirm_password");
+            const agreeTerms = document.getElementById("agree-terms");
+
+            // 验证用户名
+            if (!validateUsername(username)) {
+              isValid = false;
+            }
+
+            // 验证邮箱
+            if (!validateEmail(email)) {
+              isValid = false;
+            }
+
+            // 验证密码
+            if (!validatePassword(password)) {
+              isValid = false;
+            }
+
+            // 验证确认密码
+            if (!validateConfirmPassword(confirmPassword, password.value)) {
+              isValid = false;
+            }
+
+            // 验证服务条款
+            if (!agreeTerms.checked) {
+              agreeTerms.classList.add("is-invalid");
+              isValid = false;
+            } else {
+              agreeTerms.classList.remove("is-invalid");
+            }
+
+            if (isValid) {
+              // 模拟注册成功
+              const registerData = {
+                username: username.value,
+                email: email.value,
+                isLoggedIn: true,
+                registerTime: new Date().toISOString(),
+                loginMethod: "email",
+              };
+
+              // 保存用户信息
+              localStorage.setItem(
+                "shiyige_user",
+                JSON.stringify(registerData)
+              );
+
+              // 显示成功消息
+              showNotification("注册成功！正在跳转...", "success");
+
+              // 更新导航栏
+              updateNavigation();
+
+              // 延迟后重定向到首页
+              setTimeout(() => {
+                window.location.href = "index.html";
+              }, 1500);
+            }
+          });
+        }
+
+        // 初始化第三方注册按钮
+        document.querySelectorAll(".social-btn").forEach((btn) => {
+          btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            const provider = this.classList.contains("wechat-btn")
+              ? "微信"
+              : "支付宝";
+
+            // 模拟第三方注册
+            const registerData = {
+              username: `${provider}用户`,
+              email: `${provider.toLowerCase()}@example.com`,
+              isLoggedIn: true,
+              registerTime: new Date().toISOString(),
+              loginMethod: provider,
+            };
+
+            // 保存用户信息
+            localStorage.setItem("shiyige_user", JSON.stringify(registerData));
+
+            // 显示成功消息
+            showNotification(`${provider}注册成功！正在跳转...`, "success");
+
+            // 更新导航栏
+            updateNavigation();
+
+            // 延迟后重定向到首页
+            setTimeout(() => {
+              window.location.href = "index.html";
+            }, 1500);
+          });
+        });
+
+        // 服务条款和隐私政策链接处理
+        document
+          .getElementById("terms-link")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            showNotification("服务条款内容正在完善中，敬请期待！", "info");
+          });
+
+        document
+          .getElementById("privacy-link")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            showNotification("隐私政策内容正在完善中，敬请期待！", "info");
+          });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,39 @@
+/* 页脚样式 */
+footer {
+  background-color: var(--color-daiqing);
+  color: var(--color-mihuang);
+  padding: 50px 0 20px;
+}
+
+.footer-title {
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--color-xinghuang);
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+}
+
+.footer-links li {
+  margin-bottom: 10px;
+}
+
+.footer-links a {
+  color: var(--color-mihuang);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.footer-links a:hover {
+  color: var(--color-xinghuang);
+  padding-left: 5px;
+}
+
+.copyright {
+  text-align: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}

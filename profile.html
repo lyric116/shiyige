@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>拾遗阁 - 个人中心</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- 渐变背景斑点 -->
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <img src="images/logo.svg" alt="拾遗阁" height="50" />
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html"><span>首页</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="category.html"><span>分类</span></a>
+            </li>
+            <li class="nav-item">
+              <form class="d-flex">
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="search"
+                    placeholder="搜索商品"
+                    aria-label="搜索"
+                  />
+                  <button class="btn" type="submit">
+                    <i class="fas fa-search text-light"></i>
+                  </button>
+                </div>
+              </form>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link position-relative cart-link" href="cart.html">
+                <i class="fas fa-shopping-cart"></i>
+                <span>购物车</span>
+                <span
+                  id="cart-count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                >
+                  0
+                </span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 闪现消息 -->
+    <div id="flash-messages" class="container mt-3"></div>
+
+    <!-- 主内容区域 -->
+    <main class="py-4">
+      <div class="container my-4">
+        <div class="row">
+          <!-- 侧边栏 -->
+          <div class="col-md-3 mb-4">
+            <div class="profile-sidebar">
+              <div class="profile-sidebar-header text-center mb-4">
+                <div class="profile-avatar">
+                  <i class="fas fa-user-circle fa-5x"></i>
+                </div>
+                <h4 class="mt-3" id="sidebar-username">用户名</h4>
+                <p class="text-muted" id="sidebar-email">邮箱地址</p>
+              </div>
+              <div class="profile-sidebar-menu">
+                <ul class="list-group">
+                  <li class="list-group-item active">
+                    <a href="profile.html" class="text-decoration-none">
+                      <i class="fas fa-user me-2"></i> 个人信息
+                    </a>
+                  </li>
+                  <li class="list-group-item">
+                    <a href="orders.html" class="text-decoration-none">
+                      <i class="fas fa-shopping-bag me-2"></i> 我的订单
+                    </a>
+                  </li>
+                  <li class="list-group-item">
+                    <a href="favorites.html" class="text-decoration-none">
+                      <i class="fas fa-heart me-2"></i> 我的收藏
+                    </a>
+                  </li>
+                  <li class="list-group-item">
+                    <a
+                      href="#"
+                      id="logout-sidebar-btn"
+                      class="text-decoration-none"
+                    >
+                      <i class="fas fa-sign-out-alt me-2"></i> 退出登录
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- 主内容 -->
+          <div class="col-md-9">
+            <div class="profile-content">
+              <h2 class="mb-4">个人信息</h2>
+
+              <div class="card mb-4">
+                <div class="card-body">
+                  <form id="profile-form" class="row g-3">
+                    <div class="col-md-6">
+                      <label for="username" class="form-label">用户名</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="username"
+                        name="username"
+                        required
+                      />
+                    </div>
+
+                    <div class="col-md-6">
+                      <label for="email" class="form-label">电子邮箱</label>
+                      <input
+                        type="email"
+                        class="form-control"
+                        id="email"
+                        name="email"
+                        required
+                      />
+                    </div>
+
+                    <div class="col-md-6">
+                      <label for="phone" class="form-label">手机号码</label>
+                      <input
+                        type="tel"
+                        class="form-control"
+                        id="phone"
+                        name="phone"
+                        placeholder="选填"
+                      />
+                    </div>
+
+                    <div class="col-md-6">
+                      <label for="birthday" class="form-label">出生日期</label>
+                      <input
+                        type="date"
+                        class="form-control"
+                        id="birthday"
+                        name="birthday"
+                        placeholder="选填"
+                      />
+                    </div>
+
+                    <div class="col-12">
+                      <label for="address" class="form-label">收货地址</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="address"
+                        name="address"
+                        placeholder="选填"
+                      />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                      <button type="submit" class="btn btn-primary">
+                        保存修改
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">修改密码</div>
+                <div class="card-body">
+                  <form id="password-form" class="row g-3">
+                    <div class="col-md-6">
+                      <label for="current-password" class="form-label"
+                        >当前密码</label
+                      >
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="current-password"
+                        name="current-password"
+                        required
+                      />
+                    </div>
+
+                    <div class="col-md-6"></div>
+
+                    <div class="col-md-6">
+                      <label for="new-password" class="form-label"
+                        >新密码</label
+                      >
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="new-password"
+                        name="new-password"
+                        required
+                      />
+                    </div>
+
+                    <div class="col-md-6">
+                      <label for="confirm-password" class="form-label"
+                        >确认新密码</label
+                      >
+                      <input
+                        type="password"
+                        class="form-control"
+                        id="confirm-password"
+                        name="confirm-password"
+                        required
+                      />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                      <button type="submit" class="btn btn-primary">
+                        修改密码
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4">
+            <h5 class="footer-title">关于拾遗阁</h5>
+            <p>
+              拾遗阁致力于弘扬中国传统文化，提供优质的汉服、文创产品和非遗手工艺品，让传统文化在现代生活中焕发新光彩。
+            </p>
+          </div>
+          <div class="col-md-2 mb-4">
+            <h5 class="footer-title">快速链接</h5>
+            <ul class="footer-links">
+              <li><a href="index.html">首页</a></li>
+              <li><a href="category.html">分类</a></li>
+              <li><a href="login.html">登录</a></li>
+              <li><a href="register.html">注册</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">商品分类</h5>
+            <ul class="footer-links">
+              <li><a href="category.html?id=1">汉服</a></li>
+              <li><a href="category.html?id=2">文创产品</a></li>
+              <li><a href="category.html?id=3">非遗手工艺</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">联系我们</h5>
+            <ul class="footer-links">
+              <li><i class="fas fa-envelope me-2"></i> contact@shiyige.com</li>
+              <li><i class="fas fa-phone me-2"></i> (010) 8888-7777</li>
+              <li>
+                <i class="fas fa-map-marker-alt me-2"></i>
+                北京市东城区东华门街道
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            © <span id="current-year"></span> 拾遗阁 版权所有 |
+            <span id="current-date"></span>
+          </p>
+        </div>
+      </div>
+      <a href="#" class="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+      </a>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/petals.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // 检查是否已登录，未登录则重定向到登录页
+        if (!isLoggedIn()) {
+          window.location.href = "login.html";
+          return;
+        }
+
+        // 获取用户信息
+        const user = getCurrentUser();
+
+        // 更新页面用户信息
+        document.getElementById("sidebar-username").textContent = user.username;
+        document.getElementById("sidebar-email").textContent = user.email;
+
+        // 表单填入用户信息
+        document.getElementById("username").value = user.username;
+        document.getElementById("email").value = user.email;
+
+        // 绑定退出登录事件
+        document
+          .getElementById("logout-sidebar-btn")
+          .addEventListener("click", function (e) {
+            e.preventDefault();
+            logout();
+          });
+
+        // 绑定表单提交事件
+        document
+          .getElementById("profile-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            // 获取表单数据
+            const username = document.getElementById("username").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const birthday = document.getElementById("birthday").value;
+            const address = document.getElementById("address").value;
+
+            // 更新用户信息
+            user.username = username;
+            user.email = email;
+            user.phone = phone;
+            user.birthday = birthday;
+            user.address = address;
+
+            // 保存到localStorage
+            localStorage.setItem("shiyige_user", JSON.stringify(user));
+
+            // 更新侧边栏信息
+            document.getElementById("sidebar-username").textContent = username;
+            document.getElementById("sidebar-email").textContent = email;
+
+            // 更新导航栏
+            updateNavigation();
+
+            // 显示成功消息
+            showNotification("个人信息已更新", "success");
+          });
+
+        // 绑定密码修改表单提交事件
+        document
+          .getElementById("password-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const currentPassword =
+              document.getElementById("current-password").value;
+            const newPassword = document.getElementById("new-password").value;
+            const confirmPassword =
+              document.getElementById("confirm-password").value;
+
+            // 简单验证
+            if (!currentPassword) {
+              showNotification("请输入当前密码", "error");
+              return;
+            }
+
+            if (!newPassword) {
+              showNotification("请输入新密码", "error");
+              return;
+            }
+
+            if (newPassword !== confirmPassword) {
+              showNotification("两次输入的密码不一致", "error");
+              return;
+            }
+
+            // 假设验证成功（实际应用中需要发送请求到服务器验证）
+            showNotification("密码修改成功", "success");
+
+            // 清空表单
+            document.getElementById("current-password").value = "";
+            document.getElementById("new-password").value = "";
+            document.getElementById("confirm-password").value = "";
+          });
+      });
+    </script>
+  </body>
+</html>

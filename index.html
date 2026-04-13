@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>拾遗阁 - 传统文化购物网站</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap"
+      rel="stylesheet"
+    />
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- 渐变背景斑点 -->
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <!-- 古风诗句 - 上部分 -->
+    <div class="ancient-poem top">
+      <p>拾韵千年藏锦绣</p>
+      <p>遗风未改汉衣冠</p>
+    </div>
+    <!-- 古风诗句 - 下部分 -->
+    <div class="ancient-poem bottom">
+      <p>阁中自有琳琅色</p>
+      <p>一袭风华照夜寒</p>
+    </div>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <img src="images/logo.svg" alt="拾遗阁" height="50" />
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link active" href="index.html"><span>首页</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="category.html"><span>分类</span></a>
+            </li>
+            <li class="nav-item">
+              <form class="d-flex search-form">
+                <div class="input-group">
+                  <input
+                    class="form-control search-input"
+                    type="search"
+                    placeholder="搜索商品"
+                    aria-label="搜索"
+                  />
+                  <button class="btn" type="submit">
+                    <i class="fas fa-search text-light"></i>
+                  </button>
+                </div>
+              </form>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link position-relative" href="cart.html">
+                <i class="fas fa-shopping-cart"></i> <span>购物车</span>
+                <span
+                  id="cart-count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                  >0</span
+                >
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="login.html"><span>登录</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="register.html"><span>注册</span></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 闪现消息 -->
+    <div id="flash-messages" class="container mt-3"></div>
+
+    <!-- 主内容区域 -->
+    <main class="py-4">
+      <!-- 节气专题窗口 -->
+      <div class="seasonal-theme">
+        <div class="seasonal-content">
+          <div class="seasonal-header">
+            <h3>端午特辑</h3>
+            <p class="seasonal-date">2025年端午节 | 农历五月初五</p>
+          </div>
+          <div class="seasonal-products">
+            <div class="seasonal-product">
+              <img src="images/文创产品/故宫宫廷香囊1.jpg" alt="端午香囊" />
+              <div class="seasonal-product-info">
+                <h4>端午香囊</h4>
+                <p>驱邪纳福，芳香四溢</p>
+                <a
+                  href="product.html?id=4"
+                  class="btn btn-outline-primary btn-sm"
+                  >立即选购</a
+                >
+              </div>
+            </div>
+            <div class="seasonal-product">
+              <img src="images/非遗手工艺/竹编龙舟1.jpg" alt="竹编龙舟" />
+              <div class="seasonal-product-info">
+                <h4>竹编龙舟</h4>
+                <p>巧夺天工，匠心之作</p>
+                <a
+                  href="product.html?id=8"
+                  class="btn btn-outline-primary btn-sm"
+                  >立即选购</a
+                >
+              </div>
+            </div>
+          </div>
+          <div class="seasonal-footer">
+            <p>端午安康 品味传统</p>
+          </div>
+        </div>
+      </div>
+      <!-- 轮播图 -->
+      <section class="container mt-4">
+        <div
+          id="mainCarousel"
+          class="carousel slide"
+          data-bs-ride="carousel"
+          data-bs-interval="5000"
+        >
+          <div class="carousel-indicators">
+            <button
+              type="button"
+              data-bs-target="#mainCarousel"
+              data-bs-slide-to="0"
+              class="active"
+              aria-current="true"
+              aria-label="Slide 1"
+            ></button>
+            <button
+              type="button"
+              data-bs-target="#mainCarousel"
+              data-bs-slide-to="1"
+              aria-label="Slide 2"
+            ></button>
+            <button
+              type="button"
+              data-bs-target="#mainCarousel"
+              data-bs-slide-to="2"
+              aria-label="Slide 3"
+            ></button>
+          </div>
+          <div class="carousel-inner">
+            <div class="carousel-item active">
+              <img
+                src="images/hanfu2.jpg"
+                class="d-block w-100 center-imag"
+                alt="汉服"
+              />
+              <div class="carousel-caption d-none d-md-block">
+                <h3>汉服专区</h3>
+                <p>传承千年服饰文化，彰显东方气韵</p>
+                <a href="category.html?id=1" class="btn btn-primary"
+                  >浏览汉服</a
+                >
+              </div>
+            </div>
+            <div class="carousel-item">
+              <img
+                src="images/wenchuang.jpg"
+                class="d-block w-100 center-imag"
+                alt="文创产品"
+              />
+              <div class="carousel-caption d-none d-md-block">
+                <h3>文创产品</h3>
+                <p>匠心融合传统与现代，品味生活美学</p>
+                <a href="category.html?id=2" class="btn btn-primary"
+                  >探索文创</a
+                >
+              </div>
+            </div>
+            <div class="carousel-item">
+              <img
+                src="images/feiyi.jpg"
+                class="d-block center-imag w-100"
+                alt="非遗手工艺"
+              />
+              <div class="carousel-caption d-none d-md-block">
+                <h3>非遗手工艺</h3>
+                <p>守护匠人技艺，传承文化瑰宝</p>
+                <a href="category.html?id=3" class="btn btn-primary"
+                  >了解非遗</a
+                >
+              </div>
+            </div>
+          </div>
+          <button
+            class="carousel-control-prev"
+            type="button"
+            data-bs-target="#mainCarousel"
+            data-bs-slide="prev"
+          >
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">上一个</span>
+          </button>
+          <button
+            class="carousel-control-next"
+            type="button"
+            data-bs-target="#mainCarousel"
+            data-bs-slide="next"
+          >
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">下一个</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 满减活动展示 -->
+      <section class="container mt-4">
+        <div class="promotion-banner mb-4">
+          <!-- 促销信息将由 JavaScript 动态填充 -->
+        </div>
+      </section>
+
+      <!-- 商品分类 -->
+      <section class="container mt-5">
+        <div class="section-title">
+          <h2>商品分类</h2>
+        </div>
+        <div class="row">
+          <div class="col-md-4 mb-4 animate-on-scroll">
+            <div class="product-card" style="height: 100%">
+              <div class="product-img category-img">
+                <img src="images/汉服/明制襦裙1.jpg" alt="汉服" />
+              </div>
+              <div class="product-info">
+                <h4 class="product-name">汉服</h4>
+                <p>传统汉服服饰，包括襦裙、对襟等多种款式</p>
+                <a
+                  href="category.html?id=1"
+                  class="btn btn-outline-primary category-browse-btn"
+                  >浏览商品</a
+                >
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 mb-4 animate-on-scroll">
+            <div class="product-card" style="height: 100%">
+              <div class="product-img category-img">
+                <img src="images/文创产品/故宫花神口红1.jpg" alt="文创产品" />
+              </div>
+              <div class="product-info">
+                <h4 class="product-name">文创产品</h4>
+                <p>各类文化创意产品，融合传统元素与现代设计</p>
+                <a
+                  href="category.html?id=2"
+                  class="btn btn-outline-primary category-browse-btn"
+                  >浏览商品</a
+                >
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 mb-4 animate-on-scroll">
+            <div class="product-card" style="height: 100%">
+              <div class="product-img category-img">
+                <img src="images/非遗手工艺/景泰蓝花瓶1.jpg" alt="非遗手工艺" />
+              </div>
+              <div class="product-info">
+                <h4 class="product-name">非遗手工艺</h4>
+                <p>非物质文化遗产手工艺品，展现传统技艺魅力</p>
+                <a
+                  href="category.html?id=3"
+                  class="btn btn-outline-primary category-browse-btn"
+                  >浏览商品</a
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 热门商品 -->
+      <section class="container mt-5">
+        <div class="section-title">
+          <h2>精选商品</h2>
+        </div>
+        <div class="row">
+          <div class="col-lg-4 col-md-6 mb-4 animate-on-scroll">
+            <div class="product-card">
+              <div class="product-img">
+                <img src="images/汉服/汉元素对襟1.jpg" alt="汉元素对襟" />
+              </div>
+              <div class="product-info">
+                <div class="product-name-row">
+                  <h5 class="product-name">汉元素对襟</h5>
+                  <a
+                    href="product.html?id=2"
+                    class="btn btn-sm btn-outline-primary view-details-btn"
+                    >查看详情</a
+                  >
+                </div>
+                <div class="product-price">¥459.00</div>
+                <div class="product-category">汉服</div>
+              </div>
+              <div class="add-to-cart">
+                <a href="product.html?id=2" class="text-white">
+                  <i class="fas fa-shopping-cart me-1"></i> 加入购物车
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4 col-md-6 mb-4 animate-on-scroll">
+            <div class="product-card">
+              <div class="product-img">
+                <img
+                  src="images/非遗手工艺/天官赐福皮影戏礼盒1.jpg"
+                  alt="天官赐福皮影戏礼盒"
+                />
+              </div>
+              <div class="product-info">
+                <div class="product-name-row">
+                  <h5 class="product-name">天官赐福皮影戏礼盒</h5>
+                  <a
+                    href="product.html?id=7"
+                    class="btn btn-sm btn-outline-primary view-details-btn"
+                    >查看详情</a
+                  >
+                </div>
+                <div class="product-price">¥368.00</div>
+                <div class="product-category">非遗手工艺</div>
+              </div>
+              <div class="add-to-cart">
+                <a href="product.html?id=7" class="text-white">
+                  <i class="fas fa-shopping-cart me-1"></i> 加入购物车
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-4 col-md-6 mb-4 animate-on-scroll">
+            <div class="product-card">
+              <div class="product-img">
+                <img
+                  src="images/文创产品/故宫星空折扇1.jpg"
+                  alt="故宫星空折扇"
+                />
+              </div>
+              <div class="product-info">
+                <div class="product-name-row">
+                  <h5 class="product-name">故宫星空折扇</h5>
+                  <a
+                    href="product.html?id=11"
+                    class="btn btn-sm btn-outline-primary view-details-btn"
+                    >查看详情</a
+                  >
+                </div>
+                <div class="product-price">¥158.00</div>
+                <div class="product-category">文创产品</div>
+              </div>
+              <div class="add-to-cart">
+                <a href="product.html?id=11" class="text-white">
+                  <i class="fas fa-shopping-cart me-1"></i> 加入购物车
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="text-center mt-4">
+          <a href="category.html" class="btn btn-primary">查看更多商品</a>
+        </div>
+      </section>
+
+      <!-- 文化专栏 -->
+      <section class="culture-section mt-5">
+        <div class="container">
+          <div class="section-title">
+            <h2>文化传承</h2>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-4 animate-on-scroll">
+              <div class="culture-card">
+                <h4 class="culture-title">汉服文化</h4>
+                <p>
+                  汉服，全称是"汉民族传统服饰"，是汉族的民族服饰，是华夏文明的重要组成部分，承载着深厚的礼仪文化和美学观念。
+                </p>
+              </div>
+            </div>
+            <div class="col-md-4 mb-4 animate-on-scroll">
+              <div class="culture-card">
+                <h4 class="culture-title">茶道之美</h4>
+                <p>
+                  中国茶文化源远流长，从饮茶、赏茶到品茶，融入了文人雅士的诗情画意，承载着中华民族的精神追求与生活智慧。
+                </p>
+              </div>
+            </div>
+            <div class="col-md-4 mb-4 animate-on-scroll">
+              <div class="culture-card">
+                <h4 class="culture-title">传统工艺</h4>
+                <p>
+                  中国传统工艺是劳动人民智慧的结晶，包括陶瓷、刺绣、漆器等，每一项技艺都蕴含着匠人的心血与坚守。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4">
+            <h5 class="footer-title">关于拾遗阁</h5>
+            <p>
+              拾遗阁致力于弘扬中国传统文化，提供优质的汉服、文创产品和非遗手工艺品，让传统文化在现代生活中焕发新光彩。
+            </p>
+          </div>
+          <div class="col-md-2 mb-4">
+            <h5 class="footer-title">快速链接</h5>
+            <ul class="footer-links">
+              <li><a href="index.html">首页</a></li>
+              <li><a href="categories.html">分类</a></li>
+              <li><a href="login.html">登录</a></li>
+              <li><a href="register.html">注册</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">商品分类</h5>
+            <ul class="footer-links">
+              <li><a href="category.html?id=1">汉服</a></li>
+              <li><a href="category.html?id=2">文创产品</a></li>
+              <li><a href="category.html?id=3">非遗手工艺</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">联系我们</h5>
+            <ul class="footer-links">
+              <li><i class="fas fa-envelope me-2"></i> contact@shiyige.com</li>
+              <li><i class="fas fa-phone me-2"></i> (010) 8888-7777</li>
+              <li>
+                <i class="fas fa-map-marker-alt me-2"></i>
+                北京市东城区东华门街道
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            © <span id="current-year"></span> 拾遗阁 版权所有 |
+            <span id="current-date"></span>
+          </p>
+        </div>
+      </div>
+      <a href="#" class="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+      </a>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/petals.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/carousel.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/promotion.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // 初始化满减活动显示
+        window.promotion.updatePromotionProgress(0);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>拾遗阁 - 商品详情</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap"
+      rel="stylesheet"
+    />
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- 渐变背景斑点 -->
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <!-- 古风诗句 - 上部分 -->
+    <div class="ancient-poem top">
+      <p>拾韵千年藏锦绣</p>
+      <p>遗风未改汉衣冠</p>
+    </div>
+    <!-- 古风诗句 - 下部分 -->
+    <div class="ancient-poem bottom">
+      <p>阁中自有琳琅色</p>
+      <p>一袭风华照夜寒</p>
+    </div>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <img src="images/logo.svg" alt="拾遗阁" height="50" />
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html"><span>首页</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="category.html"><span>分类</span></a>
+            </li>
+            <li class="nav-item">
+              <form class="d-flex">
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="search"
+                    placeholder="搜索商品"
+                    aria-label="搜索"
+                  />
+                  <button class="btn" type="submit">
+                    <i class="fas fa-search text-light"></i>
+                  </button>
+                </div>
+              </form>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link position-relative cart-link" href="cart.html">
+                <i class="fas fa-shopping-cart"></i>
+                <span>购物车</span>
+                <span
+                  id="cart-count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                >
+                  0
+                </span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="login.html"><span>登录</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="register.html"><span>注册</span></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 闪现消息 -->
+    <div id="flash-messages" class="container mt-3"></div>
+
+    <!-- 主内容区域 -->
+    <main class="py-4">
+      <div class="container my-4">
+        <div class="product-detail" id="product-container">
+          <div class="row">
+            <!-- 商品图片 -->
+            <div class="col-lg-6 mb-4">
+              <div class="magnifier-container">
+                <img src="" alt="" class="product-main-img" id="mainImage" />
+                <div class="magnifier-lens"></div>
+              </div>
+              <div class="product-thumbs" id="product-thumbs">
+                <!-- 缩略图将通过JavaScript动态生成 -->
+              </div>
+            </div>
+
+            <!-- 商品信息 -->
+            <div class="col-lg-6">
+              <h1 class="product-title" id="product-name">明制襦裙</h1>
+              <div class="product-detail-price" id="product-price">¥899.00</div>
+
+              <!-- 添加会员价格显示 -->
+              <div class="member-price mb-3" id="member-price">
+                <span class="text-muted">会员价：</span>
+                <span class="text-danger fw-bold">-</span>
+              </div>
+
+              <div class="product-meta mb-3">
+                <div class="meta-item mb-2">
+                  <strong>类别:</strong>
+                  <span id="product-category">汉服</span>
+                </div>
+                <div class="meta-item mb-2">
+                  <strong>库存:</strong>
+                  <span id="product-stock">15</span> 件
+                </div>
+              </div>
+
+              <!-- 商品详情标签页 -->
+              <ul class="nav nav-tabs mb-3" id="productTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button
+                    class="nav-link active"
+                    id="description-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#description"
+                    type="button"
+                    role="tab"
+                    aria-controls="description"
+                    aria-selected="true"
+                  >
+                    商品介绍
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button
+                    class="nav-link"
+                    id="specs-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#specs"
+                    type="button"
+                    role="tab"
+                    aria-controls="specs"
+                    aria-selected="false"
+                  >
+                    规格参数
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button
+                    class="nav-link"
+                    id="reviews-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#reviews"
+                    type="button"
+                    role="tab"
+                    aria-controls="reviews"
+                    aria-selected="false"
+                  >
+                    用户评价
+                  </button>
+                </li>
+              </ul>
+
+              <div class="tab-content" id="productTabContent">
+                <!-- 商品介绍 -->
+                <div
+                  class="tab-pane fade show active"
+                  id="description"
+                  role="tabpanel"
+                  aria-labelledby="description-tab"
+                >
+                  <div
+                    class="product-description mb-4"
+                    id="product-description"
+                  >
+                    <p>
+                      明代风格的传统襦裙，采用优质真丝面料，刺绣工艺精湛，色彩典雅。襦为上衣，裙为下装，二者搭配穿着，既展现东方女性的婉约之美，又不失气质风韵。
+                    </p>
+                  </div>
+
+                  <div class="cultural-background mb-4">
+                    <h4>文化背景</h4>
+                    <p id="product-culture">
+                      襦裙是汉服的基本形制之一，已有两千多年历史，明代襦裙在秉承传统的基础上更加追求华美、繁复的审美风格，展现了当时社会的富足与文人雅士的精致审美取向。
+                    </p>
+                  </div>
+                </div>
+
+                <!-- 规格参数 -->
+                <div
+                  class="tab-pane fade"
+                  id="specs"
+                  role="tabpanel"
+                  aria-labelledby="specs-tab"
+                >
+                  <div class="specs-table">
+                    <table class="table">
+                      <tbody id="product-specs">
+                        <tr>
+                          <th>面料材质</th>
+                          <td>上等真丝</td>
+                        </tr>
+                        <tr>
+                          <th>尺码</th>
+                          <td>S、M、L、XL</td>
+                        </tr>
+                        <tr>
+                          <th>颜色</th>
+                          <td>暮霭青、海棠红、素雅白</td>
+                        </tr>
+                        <tr>
+                          <th>工艺</th>
+                          <td>手工刺绣、传统裁剪</td>
+                        </tr>
+                        <tr>
+                          <th>适用场合</th>
+                          <td>日常、活动、拍照、节日</td>
+                        </tr>
+                        <tr>
+                          <th>保养说明</th>
+                          <td>建议干洗、避免暴晒、悬挂保存</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- 用户评价 -->
+                <div
+                  class="tab-pane fade"
+                  id="reviews"
+                  role="tabpanel"
+                  aria-labelledby="reviews-tab"
+                >
+                  <div class="reviews-summary mb-4">
+                    <div class="row align-items-center">
+                      <div class="col-md-3 text-center">
+                        <div class="overall-rating">
+                          <h2>4.8</h2>
+                          <div class="stars">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star-half-alt"></i>
+                          </div>
+                          <p class="text-muted">基于 26 条评价</p>
+                        </div>
+                      </div>
+                      <div class="col-md-9">
+                        <div class="rating-bars">
+                          <div class="rating-bar-item">
+                            <span>5星</span>
+                            <div class="progress">
+                              <div
+                                class="progress-bar"
+                                role="progressbar"
+                                style="width: 75%"
+                                aria-valuenow="75"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                            <span>18</span>
+                          </div>
+                          <div class="rating-bar-item">
+                            <span>4星</span>
+                            <div class="progress">
+                              <div
+                                class="progress-bar"
+                                role="progressbar"
+                                style="width: 20%"
+                                aria-valuenow="20"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                            <span>5</span>
+                          </div>
+                          <div class="rating-bar-item">
+                            <span>3星</span>
+                            <div class="progress">
+                              <div
+                                class="progress-bar"
+                                role="progressbar"
+                                style="width: 5%"
+                                aria-valuenow="5"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                            <span>2</span>
+                          </div>
+                          <div class="rating-bar-item">
+                            <span>2星</span>
+                            <div class="progress">
+                              <div
+                                class="progress-bar"
+                                role="progressbar"
+                                style="width: 0%"
+                                aria-valuenow="0"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                            <span>0</span>
+                          </div>
+                          <div class="rating-bar-item">
+                            <span>1星</span>
+                            <div class="progress">
+                              <div
+                                class="progress-bar"
+                                role="progressbar"
+                                style="width: 0%"
+                                aria-valuenow="0"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                              ></div>
+                            </div>
+                            <span>1</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="reviews-list" id="reviews-container">
+                    <!-- 示例评价 -->
+                    <div class="review-item">
+                      <div class="review-header">
+                        <div class="reviewer-info">
+                          <img
+                            src="https://ui-avatars.com/api/?name=李月&background=random"
+                            alt="用户头像"
+                            class="reviewer-avatar"
+                          />
+                          <div>
+                            <h5 class="reviewer-name">李月</h5>
+                            <div class="review-stars">
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="review-date">2025-04-15</div>
+                      </div>
+                      <div class="review-content">
+                        <p>
+                          面料非常舒服，穿着很合身，而且刺绣工艺很精致。拍照效果特别好，朋友们都说很美。快递也很给力，包装得当，没有褶皱。
+                        </p>
+                        <div class="review-images">
+                          <img
+                            src="images/汉服/明制襦裙2.jpg"
+                            alt="用户评价图片"
+                            onclick="showFullImage(this.src)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="review-item">
+                      <div class="review-header">
+                        <div class="reviewer-info">
+                          <img
+                            src="https://ui-avatars.com/api/?name=王晓&background=random"
+                            alt="用户头像"
+                            class="reviewer-avatar"
+                          />
+                          <div>
+                            <h5 class="reviewer-name">王晓</h5>
+                            <div class="review-stars">
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="fas fa-star"></i>
+                              <i class="far fa-star"></i>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="review-date">2025-04-10</div>
+                      </div>
+                      <div class="review-content">
+                        <p>
+                          整体很满意，就是觉得价格稍微有点小贵。不过考虑到是真丝面料，还是值这个价的。希望商家能多出一些新款。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 查看更多评价按钮 -->
+                  <div class="text-center mt-4">
+                    <button
+                      class="btn btn-outline-primary"
+                      onclick="loadMoreReviews()"
+                    >
+                      查看更多评价
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <form id="add-to-cart-form" class="mb-4">
+                <input type="hidden" id="product-id" value="1" />
+                <div class="quantity-input mb-3">
+                  <label for="quantity">数量:</label>
+                  <div class="input-group" style="width: 160px">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary quantity-btn"
+                      onclick="changeQuantity(-1)"
+                      style="
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      id="quantity"
+                      name="quantity"
+                      class="form-control text-center"
+                      value="1"
+                      min="1"
+                      max="15"
+                      style="
+                        width: 70px;
+                        flex: none;
+                        font-size: 18px;
+                        height: 40px;
+                      "
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary quantity-btn"
+                      onclick="changeQuantity(1)"
+                      style="
+                        width: 40px;
+                        height: 40px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      "
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div class="d-grid">
+                  <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-shopping-cart me-2"></i> 加入购物车
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- 相关推荐 -->
+        <section class="mt-5">
+          <div class="section-title">
+            <h2>相关推荐</h2>
+          </div>
+          <div class="row" id="related-products">
+            <!-- 相关推荐商品将通过JavaScript动态生成 -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4">
+            <h5 class="footer-title">关于拾遗阁</h5>
+            <p>
+              拾遗阁致力于弘扬中国传统文化，提供优质的汉服、文创产品和非遗手工艺品，让传统文化在现代生活中焕发新光彩。
+            </p>
+          </div>
+          <div class="col-md-2 mb-4">
+            <h5 class="footer-title">快速链接</h5>
+            <ul class="footer-links">
+              <li><a href="index.html">首页</a></li>
+              <li><a href="categories.html">分类</a></li>
+              <li><a href="login.html">登录</a></li>
+              <li><a href="register.html">注册</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">商品分类</h5>
+            <ul class="footer-links">
+              <li><a href="category.html?id=1">汉服</a></li>
+              <li><a href="category.html?id=2">文创产品</a></li>
+              <li><a href="category.html?id=3">非遗手工艺</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">联系我们</h5>
+            <ul class="footer-links">
+              <li><i class="fas fa-envelope me-2"></i> contact@shiyige.com</li>
+              <li><i class="fas fa-phone me-2"></i> (010) 8888-7777</li>
+              <li>
+                <i class="fas fa-map-marker-alt me-2"></i>
+                北京市东城区东华门街道
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            © <span id="current-year"></span> 拾遗阁 版权所有 |
+            <span id="current-date"></span>
+          </p>
+        </div>
+      </div>
+      <a href="#" class="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+      </a>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/petals.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/product.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/search.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // 获取URL中的商品ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const productId = urlParams.get("id");
+
+        if (productId) {
+          loadProductDetails(productId);
+        }
+
+        // 初始化购物车表单
+        document
+          .getElementById("add-to-cart-form")
+          .addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const productId = document.getElementById("product-id").value;
+            const quantity = document.getElementById("quantity").value;
+
+            addToCart(productId, quantity);
+          });
+
+        // 初始化动画
+        const animatedElements =
+          document.querySelectorAll(".animate-on-scroll");
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("animate-fade-in");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          {
+            threshold: 0.1,
+          }
+        );
+
+        animatedElements.forEach((element) => {
+          observer.observe(element);
+        });
+
+        // 初始化放大镜效果
+        initMagnifier();
+      });
+
+      // 更改商品图片
+      function changeImage(thumb) {
+        const mainImage = document.getElementById("mainImage");
+        mainImage.src = thumb.dataset.img;
+
+        // 更新缩略图选中状态
+        document.querySelectorAll(".product-thumb").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        thumb.classList.add("active");
+      }
+
+      // 修改商品数量
+      function changeQuantity(delta) {
+        const quantityInput = document.getElementById("quantity");
+        let newValue = parseInt(quantityInput.value) + delta;
+
+        const maxStock = parseInt(
+          document.getElementById("product-stock").textContent
+        );
+
+        if (newValue < 1) {
+          newValue = 1;
+        } else if (newValue > maxStock) {
+          newValue = maxStock;
+        }
+
+        quantityInput.value = newValue;
+      }
+
+      // 初始化放大镜效果
+      function initMagnifier() {
+        const magnifierContainer = document.querySelector(
+          ".magnifier-container"
+        );
+        const mainImage = document.getElementById("mainImage");
+        const magnifierLens = document.querySelector(".magnifier-lens");
+
+        if (!magnifierContainer || !mainImage || !magnifierLens) return;
+
+        magnifierContainer.addEventListener("mousemove", function (e) {
+          const rect = this.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // 计算鼠标在图片上的相对位置（百分比）
+          const xPercent = (x / rect.width) * 100;
+          const yPercent = (y / rect.height) * 100;
+
+          // 设置放大镜位置和大小
+          magnifierLens.style.left = x - 100 + "px";
+          magnifierLens.style.top = y - 100 + "px";
+          magnifierLens.style.width = "200px";
+          magnifierLens.style.height = "200px";
+          magnifierLens.style.backgroundImage = `url(${mainImage.src})`;
+          magnifierLens.style.backgroundPosition = `${xPercent}% ${yPercent}%`;
+          magnifierLens.style.backgroundSize = `${mainImage.width * 2}px ${
+            mainImage.height * 2
+          }px`;
+          magnifierLens.style.opacity = "1";
+        });
+
+        magnifierContainer.addEventListener("mouseleave", function () {
+          magnifierLens.style.opacity = "0";
+        });
+      }
+
+      // 产品数据 - 供整个脚本使用
+      const productData = {
+        1: {
+          name: "明制襦裙",
+          price: "899.00",
+          description:
+            "明代风格的传统襦裙，采用优质真丝面料，刺绣工艺精湛，色彩典雅。襦为上衣，裙为下装，二者搭配穿着，既展现东方女性的婉约之美，又不失气质风韵。",
+          category: "汉服",
+          stock: 15,
+          culture:
+            "襦裙是汉服的基本形制之一，已有两千多年历史，明代襦裙在秉承传统的基础上更加追求华美、繁复的审美风格，展现了当时社会的富足与文人雅士的精致审美取向。",
+          images: ["images/汉服/明制襦裙1.jpg", "images/汉服/明制襦裙2.jpg"],
+        },
+        2: {
+          name: "汉元素对襟",
+          price: "459.00",
+          description:
+            "汉元素对襟上衣，融合传统与现代元素，采用棉麻材质，舒适透气，适合日常穿着。前襟交叠设计，彰显中国传统服饰特色。",
+          category: "汉服",
+          stock: 20,
+          culture:
+            "对襟是中国传统服饰的经典样式之一，前襟左右交叠，体现了中国传统美学中的对称与和谐理念，是汉族服饰文化的重要组成部分。",
+          images: [
+            "images/汉服/汉元素对襟1.jpg",
+            "images/汉服/汉元素对襟2.jpg",
+          ],
+        },
+        3: {
+          name: "唐制交领袍",
+          price: "759.00",
+          description:
+            "唐朝风格的交领袍，宽袖大袍，气度非凡。采用优质棉麻材质，舒适透气，精致盘扣设计，彰显东方古典美学。",
+          category: "汉服",
+          stock: 10,
+          culture:
+            "唐朝是中国历史上最为开放和繁荣的朝代之一，其服饰文化融合了多种民族元素，交领袍是唐代男性常穿的服饰，象征着唐朝的包容与开放。",
+          images: [
+            "images/汉服/唐制交领袍1.jpg",
+            "images/汉服/唐制交领袍2.jpg",
+          ],
+        },
+        4: {
+          name: "故宫宫廷香囊",
+          price: "128.00",
+          description:
+            "以故宫传统图案为设计元素的香囊，内含天然中草药，香气怡人，驱虫提神。采用真丝面料和传统刺绣工艺，色彩鲜艳，图案精美。",
+          category: "文创产品",
+          stock: 30,
+          culture:
+            "香囊在中国有悠久的历史，尤其在宫廷中被广泛使用，不仅有装饰作用，还有驱邪避秽、保平安的象征意义，是传统文化中重要的吉祥物之一。",
+          images: [
+            "images/文创产品/故宫宫廷香囊1.jpg",
+            "images/文创产品/故宫宫廷香囊2.jpg",
+          ],
+        },
+        5: {
+          name: "景泰蓝花瓶",
+          price: "1280.00",
+          description:
+            "传统景泰蓝工艺制作的花瓶，采用铜胎掐丝珐琅工艺，色彩绚丽，图案精美，展现非凡的东方艺术魅力。",
+          category: "非遗手工艺",
+          stock: 5,
+          culture:
+            "景泰蓝是中国传统的掐丝珐琅工艺，始于明代，因景泰年间（1450-1457年）盛行而得名，是中国非物质文化遗产的重要组成部分，体现了中国传统工艺的精湛技艺和审美理念。",
+          images: [
+            "images/非遗手工艺/景泰蓝花瓶1.jpg",
+            "images/非遗手工艺/景泰蓝花瓶2.jpg",
+          ],
+        },
+        6: {
+          name: "绒花胸针",
+          price: "198.00",
+          description:
+            "传统绒花工艺制作的胸针，色彩艳丽，造型精美，既可作为服饰配件，又富有传统文化特色。",
+          category: "非遗手工艺",
+          stock: 15,
+          culture:
+            "绒花是中国传统手工艺品，采用丝绒、棉绒等材料制作，工艺复杂精细，是非物质文化遗产中的珍贵技艺。",
+          images: [
+            "images/非遗手工艺/绒花胸针1.jpg",
+            "images/非遗手工艺/绒花胸针2.jpg",
+          ],
+        },
+        7: {
+          name: "天官赐福皮影戏礼盒",
+          price: "368.00",
+          description:
+            "结合传统皮影戏艺术与现代设计的礼盒，内含精美皮影人偶、LED投影灯和详细的操作说明。",
+          category: "非遗手工艺",
+          stock: 20,
+          culture:
+            "皮影戏是中国最古老的戏剧形式之一，被联合国教科文组织列入人类非物质文化遗产名录。这款礼盒让传统艺术以现代方式走入生活。",
+          images: [
+            "images/非遗手工艺/天官赐福皮影戏礼盒1.jpg",
+            "images/非遗手工艺/天官赐福皮影戏礼盒2.jpg",
+          ],
+        },
+        8: {
+          name: "竹编龙舟",
+          price: "458.00",
+          description:
+            "精美的竹编工艺品，以传统竹编技艺制作的龙舟摆件，细节精致，做工考究。",
+          category: "非遗手工艺",
+          stock: 10,
+          culture:
+            "竹编是中国传统手工艺术，龙舟则象征着端午节的文化传统，这件作品将两种文化元素完美结合。",
+          images: [
+            "images/非遗手工艺/竹编龙舟1.jpg",
+            "images/非遗手工艺/竹编龙舟2.jpg",
+          ],
+        },
+        9: {
+          name: "故宫百喜毯",
+          price: "299.00",
+          description:
+            "采用优质材料制作的地毯，融入故宫传统纹样，既实用又富有艺术美感。",
+          category: "文创产品",
+          stock: 25,
+          culture:
+            "百喜纹样源自宫廷装饰艺术，寓意百事皆喜，这款地毯将传统图案以现代方式重新诠释。",
+          images: [
+            "images/文创产品/故宫百喜毯1.jpg",
+            "images/文创产品/故宫百喜毯2.jpg",
+          ],
+        },
+        10: {
+          name: "故宫花神口红",
+          price: "199.00",
+          description:
+            "与故宫文化合作开发的彩妆产品，包装设计融入传统花卉纹样，色号灵感源自宫廷。",
+          category: "文创产品",
+          stock: 50,
+          culture:
+            "花神是中国传统文化中的重要意象，此系列口红将传统美学与现代彩妆完美结合。",
+          images: [
+            "images/文创产品/故宫花神口红1.jpg",
+            "images/文创产品/故宫花神口红2.jpg",
+          ],
+        },
+        11: {
+          name: "故宫星空折扇",
+          price: "158.00",
+          description:
+            "以故宫建筑为元素，结合星空主题设计的折扇，扇面采用特殊工艺制作，在光线下闪烁星光。",
+          category: "文创产品",
+          stock: 30,
+          culture:
+            "折扇在中国有着悠久的历史，不仅是实用物品，更是文人雅士表达艺术的载体。这款折扇将传统与现代设计巧妙融合。",
+          images: [
+            "images/文创产品/故宫星空折扇1.jpg",
+            "images/文创产品/故宫星空折扇2.jpg",
+          ],
+        },
+        12: {
+          name: "喜上眉梢梳镜套装",
+          price: "368.00",
+          description:
+            "传统工艺打造的梳妆套装，包含铜镜和红木梳，镜面采用精细雕刻工艺，梳子选用优质红木，既实用又富有传统美感。",
+          category: "文创产品",
+          stock: 20,
+          culture:
+            "梳妆用具在中国传统文化中具有重要地位，不仅是日常生活用品，更寄托着美好祝愿。'喜上眉梢'寓意喜庆吉祥，这套梳镜既传承了传统文化，又满足现代人对精致生活的追求。",
+          images: [
+            "images/文创产品/喜上眉梢梳镜套装1.jpg",
+            "images/文创产品/喜上眉梢梳镜套装2.jpg",
+          ],
+        },
+      };
+
+      // 加载商品详情
+      function loadProductDetails(productId) {
+        const product = productData[productId];
+        if (!product) return;
+
+        // 更新商品信息
+        document.getElementById("product-name").textContent = product.name;
+        document.getElementById(
+          "product-price"
+        ).textContent = `¥${product.price}`;
+        document.getElementById("product-description").textContent =
+          product.description;
+        document.getElementById("product-category").textContent =
+          product.category;
+        document.getElementById("product-stock").textContent = product.stock;
+        document.getElementById("product-culture").textContent =
+          product.culture;
+        document.getElementById("product-id").value = productId;
+        document.title = `拾遗阁 - ${product.name}`;
+
+        // 更新数量输入框最大值
+        document.getElementById("quantity").max = product.stock;
+
+        // 更新商品图片
+        if (product.images && product.images.length > 0) {
+          // 更新主图
+          const mainImage = document.getElementById("mainImage");
+          mainImage.src = product.images[0];
+          mainImage.alt = product.name;
+
+          // 更新缩略图
+          const thumbsContainer = document.getElementById("product-thumbs");
+          thumbsContainer.innerHTML = ""; // 清空现有缩略图
+
+          product.images.forEach((imgSrc, index) => {
+            const thumbImg = document.createElement("img");
+            thumbImg.src = imgSrc;
+            thumbImg.alt = `${product.name} - 图片${index + 1}`;
+            thumbImg.className =
+              index === 0 ? "product-thumb active" : "product-thumb";
+            thumbImg.dataset.img = imgSrc;
+            thumbImg.onclick = function () {
+              changeImage(this);
+            };
+
+            thumbsContainer.appendChild(thumbImg);
+          });
+        }
+
+        // 加载相关推荐商品（不包括当前商品）
+        loadRelatedProducts(productId);
+      }
+
+      // 加载相关推荐商品
+      function loadRelatedProducts(currentProductId) {
+        const relatedContainer = document.getElementById("related-products");
+        relatedContainer.innerHTML = ""; // 清空容器
+
+        // 获取所有商品ID，并排除当前商品
+        const allProductIds = Object.keys(productData);
+        const relatedProductIds = allProductIds.filter(
+          (id) => id !== currentProductId
+        );
+
+        // 随机打乱排序
+        relatedProductIds.sort(() => Math.random() - 0.5);
+
+        // 最多取3个相关商品
+        const displayCount = Math.min(3, relatedProductIds.length);
+
+        for (let i = 0; i < displayCount; i++) {
+          const productId = relatedProductIds[i];
+          const product = productData[productId];
+
+          const productCard = document.createElement("div");
+          productCard.className = "col-lg-4 col-md-6 mb-4 animate-on-scroll";
+          productCard.innerHTML = `
+            <div class="product-card">
+              <div class="product-img">
+                <img src="${product.images[0]}" alt="${product.name}" />
+              </div>
+              <div class="product-info">
+                <div class="product-name-row">
+                  <h5 class="product-name">${product.name}</h5>
+                  <a href="product.html?id=${productId}" class="btn btn-sm btn-outline-primary view-details-btn">查看详情</a>
+                </div>
+                <div class="product-price">¥${product.price}</div>
+                <div class="product-category">${product.category}</div>
+              </div>
+              <div class="add-to-cart">
+                <a href="product.html?id=${productId}" class="text-white">
+                  <i class="fas fa-shopping-cart me-1"></i> 加入购物车
+                </a>
+              </div>
+            </div>
+          `;
+
+          relatedContainer.appendChild(productCard);
+        }
+
+        // 重新初始化动画
+        const animatedElements =
+          document.querySelectorAll(".animate-on-scroll");
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("animate-fade-in");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          {
+            threshold: 0.1,
+          }
+        );
+
+        animatedElements.forEach((element) => {
+          observer.observe(element);
+        });
+      }
+
+      // 加入购物车
+      function addToCart(productId, quantity) {
+        // 在实际项目中，这里应该发送请求到服务器
+        // 这里使用localStorage模拟购物车功能
+        let cart = JSON.parse(localStorage.getItem("shiyige_cart")) || [];
+
+        // 检查商品是否已在购物车中
+        const existingItem = cart.find((item) => item.productId === productId);
+
+        if (existingItem) {
+          existingItem.quantity =
+            parseInt(existingItem.quantity) + parseInt(quantity);
+        } else {
+          // 从全局商品数据中获取商品信息
+          const product = productData[productId];
+
+          cart.push({
+            productId: productId,
+            name: product.name,
+            price: product.price,
+            quantity: parseInt(quantity),
+            image: product.images[0], // 使用第一张图片作为购物车图片
+          });
+        }
+
+        localStorage.setItem("shiyige_cart", JSON.stringify(cart));
+
+        // 更新购物车计数
+        updateCartCount(cart.length);
+
+        // 显示成功消息
+        showNotification("商品已成功加入购物车！", "success");
+      }
+
+      // 更新购物车计数
+      function updateCartCount(count) {
+        const cartCount = document.getElementById("cart-count");
+        if (count > 0) {
+          cartCount.textContent = count;
+          cartCount.classList.remove("d-none");
+        } else {
+          cartCount.classList.add("d-none");
+        }
+      }
+
+      // 显示通知
+      function showNotification(message, type) {
+        const notification = document.createElement("div");
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = message;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          notification.classList.add("show");
+        }, 10);
+
+        setTimeout(() => {
+          notification.classList.remove("show");
+          setTimeout(() => {
+            notification.remove();
+          }, 300);
+        }, 3000);
+      }
+    </script>
+  </body>
+</html>
