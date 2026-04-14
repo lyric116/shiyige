@@ -1,0 +1,377 @@
+/* 拾遗阁 - 中国传统文化购物网站主样式文件 */
+
+/* 导入基础样式 */
+@import "base.css";
+
+/* 导入导航栏样式 */
+@import "navbar.css";
+
+/* 导入布局样式 */
+@import "layout.css";
+
+/* 导入组件样式 */
+@import "components.css";
+
+/* 导入页脚样式 */
+@import "footer.css";
+
+/* 导入响应式样式 */
+@import "responsive.css";
+
+/* 添加字体引用 */
+@import url("https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap");
+
+/* 商品详情标签页样式 */
+.nav-tabs .nav-link {
+  color: var(--color-zhuqing) !important;
+  font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--color-zhuqing) !important;
+  font-weight: 600;
+  border-bottom-color: var(--color-zhuqing);
+}
+
+.tab-content h4 {
+  color: var(--color-zhuqing);
+  margin-bottom: 1rem;
+}
+
+.specs-table th {
+  color: var(--color-zhuqing);
+}
+
+/* 商品评价样式 */
+.reviews-summary {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.overall-rating h2 {
+  color: #ff6b6b;
+  font-size: 3rem;
+  margin: 0;
+}
+
+.stars {
+  color: #ffd700;
+  margin: 10px 0;
+}
+
+.rating-bars {
+  padding: 10px;
+}
+
+.rating-bar-item {
+  display: flex;
+  align-items: center;
+  margin: 5px 0;
+}
+
+.rating-bar-item span {
+  min-width: 40px;
+}
+
+.rating-bar-item .progress {
+  flex: 1;
+  margin: 0 10px;
+  height: 8px;
+}
+
+.rating-bar-item .progress-bar {
+  background-color: #ffd700;
+}
+
+.reviews-list {
+  margin-top: 30px;
+}
+
+.review-item {
+  border-bottom: 1px solid #eee;
+  padding: 20px 0;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.reviewer-info {
+  display: flex;
+  align-items: center;
+}
+
+.reviewer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 15px;
+}
+
+.reviewer-name {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.review-stars {
+  color: #ffd700;
+  font-size: 0.9rem;
+}
+
+.review-date {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.review-content p {
+  margin-bottom: 15px;
+}
+
+.review-images {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-images img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.review-images img:hover {
+  transform: scale(1.05);
+}
+
+/* 花瓣容器 */
+.petals-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+/* 花瓣样式 */
+.petal {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  background-size: 100% 100%;
+  pointer-events: none;
+  opacity: 0.6;
+  transform-origin: center;
+}
+
+/* 花瓣飘落动画 */
+@keyframes falling {
+  0% {
+    transform: translate(0, -10%) rotate(0deg);
+  }
+  100% {
+    transform: translate(100px, 100vh) rotate(720deg);
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    margin-left: 0;
+  }
+  50% {
+    margin-left: 30px;
+  }
+}
+
+/* 古风诗句样式 */
+.ancient-poem {
+  position: fixed;
+  z-index: 1;
+  color: #9a1f1a;
+  font-family: "Ma Shan Zheng", cursive;
+  font-size: 1.8rem;
+  text-align: center;
+  width: 100%;
+  padding: 1rem;
+  margin-top: 2rem;
+}
+
+.ancient-poem.top {
+  top: 150px; /* 增加与顶部的距离 */
+  margin-top: 4rem;
+}
+
+.ancient-poem.bottom {
+  top: 480px;
+}
+
+.ancient-poem p {
+  margin: 0.5rem 0;
+  line-height: 1.8;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8); /* 添加白色文字阴影提高可读性 */
+}
+
+.section-title h2 {
+  font-family: "Ma Shan Zheng", cursive;
+}
+
+/* 节气专题窗口样式 */
+.seasonal-theme {
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 260px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--color-zhuqing);
+}
+
+.seasonal-content {
+  padding: 20px;
+}
+
+.seasonal-header {
+  text-align: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid var(--color-zhuqing);
+  padding-bottom: 10px;
+}
+
+.seasonal-header h3 {
+  font-family: "Ma Shan Zheng", cursive;
+  color: var(--color-zhuqing);
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.seasonal-date {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 5px 0 0;
+}
+
+.seasonal-products {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.seasonal-product {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.seasonal-product:hover {
+  background: rgba(var(--color-zhuqing-rgb), 0.05);
+  transform: translateX(5px);
+}
+
+.seasonal-product img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.seasonal-product-info {
+  flex: 1;
+}
+
+.seasonal-product-info h4 {
+  font-size: 1rem;
+  margin: 0 0 5px;
+  color: var(--color-zhuqing);
+}
+
+.seasonal-product-info p {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0 0 8px;
+}
+
+.seasonal-footer {
+  text-align: center;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.seasonal-footer p {
+  font-family: "Ma Shan Zheng", cursive;
+  color: var(--color-zhuqing);
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.order-stat-card .display-6 {
+  color: var(--color-zhuqing);
+  font-weight: 700;
+}
+
+.order-list-item {
+  border-left: 0;
+  border-right: 0;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.order-list-item:hover {
+  background: rgba(var(--color-zhuqing-rgb), 0.05);
+  transform: translateX(2px);
+}
+
+.order-list-item.active {
+  background: rgba(var(--color-zhuqing-rgb), 0.12);
+  color: inherit;
+  border-color: rgba(var(--color-zhuqing-rgb), 0.18);
+}
+
+.order-list-item.active .text-muted {
+  color: rgba(0, 0, 0, 0.62) !important;
+}
+
+.order-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.order-detail-item:last-child {
+  border-bottom: none;
+}
+
+.order-payment-record + .order-payment-record {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+#selected-address-card .badge {
+  align-self: flex-start;
+}
+
+/* 在小屏幕上隐藏节气专题窗口 */
+@media (max-width: 1200px) {
+  .seasonal-theme {
+    display: none;
+  }
+}

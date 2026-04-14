@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>拾遗阁 - 登录</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- 渐变背景斑点 -->
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <div class="gradient-spot"></div>
+    <!-- 古风诗句 - 上部分 -->
+    <div class="ancient-poem top">
+      <p>拾韵千年藏锦绣</p>
+      <p>遗风未改汉衣冠</p>
+    </div>
+    <!-- 古风诗句 - 下部分 -->
+    <div class="ancient-poem bottom">
+      <p>阁中自有琳琅色</p>
+      <p>一袭风华照夜寒</p>
+    </div>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+      <div class="container">
+        <a class="navbar-brand" href="index.html">
+          <img src="images/logo.svg" alt="拾遗阁" height="50" />
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="index.html"><span>首页</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="category.html"><span>分类</span></a>
+            </li>
+            <li class="nav-item">
+              <form class="d-flex">
+                <div class="input-group">
+                  <input
+                    class="form-control"
+                    type="search"
+                    placeholder="搜索商品"
+                    aria-label="搜索"
+                  />
+                  <button class="btn" type="submit">
+                    <i class="fas fa-search text-light"></i>
+                  </button>
+                </div>
+              </form>
+            </li>
+          </ul>
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link position-relative cart-link" href="cart.html">
+                <i class="fas fa-shopping-cart"></i>
+                <span>购物车</span>
+                <span
+                  id="cart-count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                >
+                  0
+                </span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="login.html"><span>登录</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="register.html"><span>注册</span></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 闪现消息 -->
+    <div id="flash-messages" class="container mt-3"></div>
+
+    <!-- 主内容区域 -->
+    <main class="py-4">
+      <div class="container my-4">
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <div class="form-container">
+              <h2 class="form-title">用户登录</h2>
+
+              <form id="login-form">
+                <div class="mb-3">
+                  <label for="email" class="form-label">电子邮箱</label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    id="email"
+                    name="email"
+                    required
+                  />
+                  <div class="invalid-feedback">请输入有效的电子邮箱地址</div>
+                </div>
+
+                <div class="mb-3">
+                  <label for="password" class="form-label">密码</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="password"
+                    name="password"
+                    required
+                  />
+                  <div class="invalid-feedback">请输入密码</div>
+                </div>
+
+                <div class="mb-3 form-check">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="remember-me"
+                  />
+                  <label class="form-check-label" for="remember-me"
+                    >记住我</label
+                  >
+                </div>
+
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-primary btn-lg">
+                    登录
+                  </button>
+                </div>
+              </form>
+
+              <div class="auth-options">
+                <p>还没有账号？<a href="register.html">立即注册</a></p>
+                <p>忘记密码？<a href="#" id="forgot-password">找回密码</a></p>
+
+                <p>或使用以下方式登录</p>
+                <div class="social-login">
+                  <a href="#" class="social-btn wechat-btn">
+                    <i class="fab fa-weixin"></i> 微信登录
+                  </a>
+                  <a href="#" class="social-btn alipay-btn">
+                    <i class="fab fa-alipay"></i> 支付宝登录
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-4 mb-4">
+            <h5 class="footer-title">关于拾遗阁</h5>
+            <p>
+              拾遗阁致力于弘扬中国传统文化，提供优质的汉服、文创产品和非遗手工艺品，让传统文化在现代生活中焕发新光彩。
+            </p>
+          </div>
+          <div class="col-md-2 mb-4">
+            <h5 class="footer-title">快速链接</h5>
+            <ul class="footer-links">
+              <li><a href="index.html">首页</a></li>
+              <li><a href="categories.html">分类</a></li>
+              <li><a href="login.html">登录</a></li>
+              <li><a href="register.html">注册</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">商品分类</h5>
+            <ul class="footer-links">
+              <li><a href="category.html?id=1">汉服</a></li>
+              <li><a href="category.html?id=2">文创产品</a></li>
+              <li><a href="category.html?id=3">非遗手工艺</a></li>
+            </ul>
+          </div>
+          <div class="col-md-3 mb-4">
+            <h5 class="footer-title">联系我们</h5>
+            <ul class="footer-links">
+              <li><i class="fas fa-envelope me-2"></i> contact@shiyige.com</li>
+              <li><i class="fas fa-phone me-2"></i> (010) 8888-7777</li>
+              <li>
+                <i class="fas fa-map-marker-alt me-2"></i>
+                北京市东城区东华门街道
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="copyright">
+          <p>
+            © <span id="current-year"></span> 拾遗阁 版权所有 |
+            <span id="current-date"></span>
+          </p>
+        </div>
+      </div>
+      <a href="#" class="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+      </a>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/petals.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/session.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/auth-pages.js"></script>
+    <script src="js/search.js"></script>
+  </body>
+</html>
