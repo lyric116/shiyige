@@ -64,6 +64,15 @@ def seed_paid_order(live_server, access_token: str) -> dict:
     product = product_detail_response.json()["data"]["product"]
     default_sku = next(sku for sku in product["skus"] if sku["is_default"])
 
+    search_response = httpx.get(
+        f"{live_server}/api/v1/search",
+        headers=headers,
+        params={"q": "古风发簪"},
+        timeout=5.0,
+        trust_env=False,
+    )
+    assert search_response.status_code == 200
+
     add_cart_response = httpx.post(
         f"{live_server}/api/v1/cart/items",
         headers=headers,
@@ -156,5 +165,16 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
         timeout=5000,
     )
     assert "local" in page.locator("#reindex-result").text_content()
+
+    page.goto(f"{live_server}/admin/recommendation-debug.html", wait_until="domcontentloaded")
+    page.locator("#debug-user-email").fill(user_email)
+    page.locator("#debug-limit").fill("3")
+    page.locator("#recommendation-debug-submit").click()
+    page.locator("#debug-recommendation-list .debug-card").first.wait_for(timeout=5000)
+
+    assert user_email in page.locator("#debug-user-profile-grid").text_content()
+    assert "点翠发簪" in page.locator("#debug-user-profile-grid").text_content()
+    assert "add_to_cart" in page.locator("#debug-behavior-table-body").text_content()
+    assert "向量相似度" in page.locator("#debug-recommendation-list").text_content()
 
     context.close()

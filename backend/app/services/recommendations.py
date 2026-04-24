@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
@@ -11,8 +12,11 @@ from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import build_embedding_content_hash, normalize_text_piece
-from backend.app.services.vector_search import VectorSearchResult, cosine_similarity, ensure_product_embeddings
-
+from backend.app.services.vector_search import (
+    VectorSearchResult,
+    cosine_similarity,
+    ensure_product_embeddings,
+)
 
 BEHAVIOR_WEIGHTS = {
     "view_product": 1,
@@ -21,6 +25,17 @@ BEHAVIOR_WEIGHTS = {
     "create_order": 5,
     "pay_order": 5,
 }
+
+
+@dataclass
+class RecommendationCandidate:
+    product: Product
+    score: float
+    reason: str
+    matched_terms: list[str]
+    similarity: float
+    vector_score: float
+    term_bonus: float
 
 
 def load_user_behavior_logs(db: Session, user_id: int) -> list[UserBehaviorLog]:
@@ -55,6 +70,19 @@ def load_products_for_interest_profile(db: Session, product_ids: set[int]) -> di
         .where(Product.id.in_(sorted(product_ids)))
     ).unique().all()
     return {product.id: product for product in products}
+
+
+def load_active_products_for_recommendations(db: Session) -> list[Product]:
+    return db.scalars(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.tags),
+            selectinload(Product.skus),
+            selectinload(Product.embedding),
+        )
+        .where(Product.status == 1)
+    ).unique().all()
 
 
 def build_profile_segments(
@@ -174,6 +202,84 @@ def build_recommendation_reason(matched_terms: list[str]) -> str:
     return "基于你近期兴趣偏好推荐"
 
 
+def extract_profile_terms(profile: UserInterestProfile) -> tuple[list[str], set[int]]:
+    if not profile.ext_json:
+        return [], set()
+
+    top_terms = list(profile.ext_json.get("top_terms", []))
+    consumed_product_ids = {
+        int(product_id)
+        for product_id in profile.ext_json.get("consumed_product_ids", [])
+    }
+    return top_terms, consumed_product_ids
+
+
+def score_recommendation_candidate(
+    profile: UserInterestProfile,
+    product: Product,
+    *,
+    top_terms: list[str],
+    consumed_product_ids: set[int],
+) -> RecommendationCandidate | None:
+    if product.id in consumed_product_ids:
+        return None
+    if product.embedding is None or not product.embedding.embedding_vector:
+        return None
+
+    if profile.embedding_vector:
+        similarity = cosine_similarity(profile.embedding_vector, product.embedding.embedding_vector)
+        vector_score = ((similarity + 1) / 2) * 0.35
+    else:
+        similarity = 0.0
+        vector_score = product.id / 1000
+
+    product_tags = {tag.tag for tag in product.tags}
+    matched_terms: list[str] = []
+    for term in top_terms:
+        if product.category and product.category.name == term and term not in matched_terms:
+            matched_terms.append(term)
+        if term in product_tags and term not in matched_terms:
+            matched_terms.append(term)
+        if term == product.dynasty_style and term not in matched_terms:
+            matched_terms.append(term)
+        if term == product.scene_tag and term not in matched_terms:
+            matched_terms.append(term)
+        if term == product.craft_type and term not in matched_terms:
+            matched_terms.append(term)
+
+    term_bonus = min(len(matched_terms) * 0.18, 0.54)
+    return RecommendationCandidate(
+        product=product,
+        score=vector_score + term_bonus,
+        reason=build_recommendation_reason(matched_terms),
+        matched_terms=matched_terms,
+        similarity=similarity,
+        vector_score=vector_score,
+        term_bonus=term_bonus,
+    )
+
+
+def rank_recommendation_candidates(
+    products: list[Product],
+    profile: UserInterestProfile,
+) -> list[RecommendationCandidate]:
+    top_terms, consumed_product_ids = extract_profile_terms(profile)
+
+    results: list[RecommendationCandidate] = []
+    for product in products:
+        scored_candidate = score_recommendation_candidate(
+            profile,
+            product,
+            top_terms=top_terms,
+            consumed_product_ids=consumed_product_ids,
+        )
+        if scored_candidate is not None:
+            results.append(scored_candidate)
+
+    results.sort(key=lambda item: (item.score, item.product.id), reverse=True)
+    return results
+
+
 def recommend_products_for_user(
     db: Session,
     *,
@@ -185,55 +291,13 @@ def recommend_products_for_user(
     profile = build_user_interest_profile(db, user_id=user_id, provider=embedding_provider)
     db.expire_all()
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus),
-            selectinload(Product.embedding),
+    products = load_active_products_for_recommendations(db)
+    candidates = rank_recommendation_candidates(products, profile)
+    return [
+        VectorSearchResult(
+            product=candidate.product,
+            score=candidate.score,
+            reason=candidate.reason,
         )
-        .where(Product.status == 1)
-    ).unique().all()
-
-    top_terms = profile.ext_json.get("top_terms", []) if profile.ext_json else []
-    consumed_product_ids = set(profile.ext_json.get("consumed_product_ids", [])) if profile.ext_json else set()
-
-    results: list[VectorSearchResult] = []
-    for product in products:
-        if product.id in consumed_product_ids:
-            continue
-        if product.embedding is None or not product.embedding.embedding_vector:
-            continue
-
-        if profile.embedding_vector:
-            similarity = cosine_similarity(profile.embedding_vector, product.embedding.embedding_vector)
-            score = ((similarity + 1) / 2) * 0.35
-        else:
-            score = product.id / 1000
-
-        product_tags = {tag.tag for tag in product.tags}
-        matched_terms: list[str] = []
-        for term in top_terms:
-            if product.category and product.category.name == term and term not in matched_terms:
-                matched_terms.append(term)
-            if term in product_tags and term not in matched_terms:
-                matched_terms.append(term)
-            if term == product.dynasty_style and term not in matched_terms:
-                matched_terms.append(term)
-            if term == product.scene_tag and term not in matched_terms:
-                matched_terms.append(term)
-            if term == product.craft_type and term not in matched_terms:
-                matched_terms.append(term)
-
-        score += min(len(matched_terms) * 0.18, 0.54)
-        results.append(
-            VectorSearchResult(
-                product=product,
-                score=score,
-                reason=build_recommendation_reason(matched_terms),
-            )
-        )
-
-    results.sort(key=lambda item: (item.score, item.product.id), reverse=True)
-    return results[:limit]
+        for candidate in candidates[:limit]
+    ]

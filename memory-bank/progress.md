@@ -1692,3 +1692,41 @@ Step 14:
 当前状态：
 
 * 实施计划已全部完成。
+
+### 同日继续推进记录（三十六）
+
+已继续完成：
+
+* 后台推荐调试证据页
+
+新增与修改：
+
+* `backend/app/services/recommendations.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/app/api/v1/router.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-debug.html`
+* `admin/js/app.js`
+* `admin/css/admin.css`
+* `tests/e2e/test_admin_basic.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/api/test_admin_reindex.py tests/e2e/test_admin_basic.py -q`
+
+结果：
+
+* 已新增后台推荐调试接口 `GET /api/v1/admin/recommendations/debug`，管理员可按用户邮箱查看真实推荐画像、最近行为、候选商品分数拆解、embedding 文本片段和向量预览。
+* 已新增后台页面 `admin/recommendation-debug.html`，可直接输入用户邮箱并渲染 PPT 可截图的推荐证据，不再需要只看接口返回 JSON。
+* 推荐调试页展示的候选商品分数复用了 `backend/app/services/recommendations.py` 中与首页“猜你喜欢”相同的打分逻辑，而不是单独拼装一份展示用假数据。
+* 已新增 `backend/tests/api/test_admin_recommendation_debug.py`，锁定管理员查询推荐调试数据的接口结构、候选分数信息和操作日志写入。
+* 已扩展 `tests/e2e/test_admin_basic.py`，锁定后台最小链路现在不仅能看仪表盘/商品/订单/重建，还能真实渲染推荐调试页。
+* 本轮验证结果为：4 个聚焦测试全部通过。
+
+交接提醒：
+
+* 当前推荐调试页查询入口是“前台用户邮箱”，不是用户 ID，目的是方便答辩时直接对照账号切换。
+* 调试页里展示的是“向量检索与兴趣词加权”的真实拆解结果：`vector_similarity`、`vector_score`、`term_bonus`、`matched_terms` 和 `reason` 都来自同一套后端推荐逻辑。
+* 如果后续再调整首页推荐公式，必须同步关注 `backend/app/services/recommendations.py` 的共享候选打分函数，否则后台调试页和前台“猜你喜欢”会失真。

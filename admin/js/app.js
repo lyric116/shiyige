@@ -6,6 +6,7 @@
     { page: "dashboard", href: "index.html", label: "仪表盘" },
     { page: "products", href: "products.html", label: "商品管理" },
     { page: "orders", href: "orders.html", label: "订单管理" },
+    { page: "recommendation-debug", href: "recommendation-debug.html", label: "推荐调试" },
     { page: "reindex", href: "reindex.html", label: "推荐重建" },
   ];
 
@@ -40,6 +41,224 @@
     }
 
     return String(value).replace("T", " ").slice(0, 16);
+  }
+
+  function formatScore(value, digits = 6) {
+    const score = Number(value);
+    if (Number.isNaN(score)) {
+      return "-";
+    }
+    return score.toFixed(digits);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function renderTagList(values) {
+    if (!Array.isArray(values) || values.length === 0) {
+      return '<span class="empty-state">-</span>';
+    }
+
+    return `
+      <div class="admin-tag-list">
+        ${values.map((value) => `<span class="admin-tag">${escapeHtml(value)}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  function renderRecommendationDebug(snapshot) {
+    const emptyState = document.getElementById("recommendation-debug-empty");
+    const content = document.getElementById("recommendation-debug-content");
+    const metrics = document.getElementById("debug-metrics");
+    const userProfileGrid = document.getElementById("debug-user-profile-grid");
+    const behaviorTableBody = document.getElementById("debug-behavior-table-body");
+    const recommendationList = document.getElementById("debug-recommendation-list");
+
+    if (!content || !metrics || !userProfileGrid || !behaviorTableBody || !recommendationList) {
+      return;
+    }
+
+    if (emptyState) {
+      emptyState.classList.add("d-none");
+    }
+    content.classList.remove("d-none");
+
+    metrics.innerHTML = `
+      <article class="metric-card">
+        <span class="metric-label">向量模型</span>
+        <div class="metric-value" style="font-size: 1.15rem">${escapeHtml(snapshot.provider.model_name)}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">已建索引商品</span>
+        <div class="metric-value">${snapshot.metrics.indexed_products}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">用户行为数</span>
+        <div class="metric-value">${snapshot.profile.behavior_count}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">候选商品数</span>
+        <div class="metric-value">${snapshot.metrics.candidate_count}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">向量维度</span>
+        <div class="metric-value">${snapshot.profile.vector_dimension}</div>
+      </article>
+    `;
+
+    const providerSource = [
+      `provider=${snapshot.provider.provider}`,
+      `source=${snapshot.provider.source}`,
+      `revision=${snapshot.provider.revision}`,
+      `device=${snapshot.provider.device}`,
+      `normalize=${snapshot.provider.normalize}`,
+    ].join("\n");
+
+    const consumedProducts = (snapshot.profile.consumed_products || []).map((item) => item.name);
+
+    userProfileGrid.innerHTML = `
+      <article class="admin-metadata-card">
+        <h3>用户摘要</h3>
+        <div class="admin-kv-grid">
+          <div class="admin-kv-item">
+            <strong>用户邮箱</strong>
+            <span>${escapeHtml(snapshot.user.email)}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>用户名</strong>
+            <span>${escapeHtml(snapshot.user.username)}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>展示名</strong>
+            <span>${escapeHtml(snapshot.user.display_name || "-")}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>最近事件时间</strong>
+            <span>${escapeHtml(formatDateTime(snapshot.profile.last_event_at))}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>画像重建时间</strong>
+            <span>${escapeHtml(formatDateTime(snapshot.profile.last_built_at))}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>画像内容哈希</strong>
+            <span>${escapeHtml(snapshot.profile.content_hash || "-")}</span>
+          </div>
+        </div>
+        <div class="debug-card-section">
+          <strong>模型说明</strong>
+          <pre class="admin-code-block">${escapeHtml(providerSource)}</pre>
+        </div>
+      </article>
+      <article class="admin-metadata-card">
+        <h3>兴趣画像</h3>
+        <div class="debug-card-section">
+          <strong>Top Terms</strong>
+          ${renderTagList(snapshot.profile.top_terms)}
+        </div>
+        <div class="debug-card-section">
+          <strong>已消费/已排除商品</strong>
+          ${renderTagList(consumedProducts)}
+        </div>
+        <div class="debug-card-section">
+          <strong>画像向量预览</strong>
+          <pre class="admin-code-block">${escapeHtml((snapshot.profile.vector_preview || []).join(", ") || "-")}</pre>
+        </div>
+        <div class="debug-card-section">
+          <strong>画像文本</strong>
+          <pre class="admin-code-block">${escapeHtml(snapshot.profile.profile_text || "-")}</pre>
+        </div>
+      </article>
+    `;
+
+    if (!snapshot.recent_behaviors || snapshot.recent_behaviors.length === 0) {
+      behaviorTableBody.innerHTML = `
+        <tr>
+          <td colspan="4" class="empty-state">当前用户还没有可展示的行为日志。</td>
+        </tr>
+      `;
+    } else {
+      behaviorTableBody.innerHTML = snapshot.recent_behaviors.map((item) => {
+        const subject = item.query || item.product_names.join(" / ") || "-";
+        return `
+          <tr>
+            <td>${escapeHtml(formatDateTime(item.created_at))}</td>
+            <td><span class="admin-status">${escapeHtml(item.behavior_type)}</span></td>
+            <td>
+              <strong>${escapeHtml(subject)}</strong>
+              <div><small>${escapeHtml(item.target_type || "-")}</small></div>
+            </td>
+            <td>
+              <pre class="admin-code-block">${escapeHtml(JSON.stringify(item.ext_json || {}, null, 2))}</pre>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    if (!snapshot.recommendations || snapshot.recommendations.length === 0) {
+      recommendationList.innerHTML = '<div class="result-card">当前没有可展示的推荐候选。</div>';
+      return;
+    }
+
+    recommendationList.innerHTML = snapshot.recommendations.map((item) => `
+      <article class="debug-card">
+        <div class="debug-card-header">
+          <div>
+            <p class="admin-eyebrow">Rank ${item.rank}</p>
+            <h3>${escapeHtml(item.name)}</h3>
+            <p class="page-copy">${escapeHtml(item.category || "未分类")} · ${escapeHtml(item.reason)}</p>
+          </div>
+          <span class="admin-status">总分 ${formatScore(item.score)}</span>
+        </div>
+        <div class="debug-card-section">
+          <div class="admin-kv-grid">
+            <div class="admin-kv-item">
+              <strong>向量相似度</strong>
+              <span>${formatScore(item.vector_similarity)}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>向量基础分</strong>
+              <span>${formatScore(item.vector_score)}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>兴趣词加分</strong>
+              <span>${formatScore(item.term_bonus)}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>向量维度</strong>
+              <span>${item.embedding_dimension}</span>
+            </div>
+          </div>
+        </div>
+        <div class="debug-card-section">
+          <strong>命中兴趣词</strong>
+          ${renderTagList(item.matched_terms)}
+        </div>
+        <div class="debug-card-section">
+          <strong>商品标签</strong>
+          ${renderTagList(item.tags)}
+        </div>
+        <div class="debug-card-section">
+          <strong>Embedding 文本片段</strong>
+          <pre class="admin-code-block">${escapeHtml(item.embedding_text_preview || "-")}</pre>
+        </div>
+        <div class="debug-card-section">
+          <strong>向量预览</strong>
+          <pre class="admin-code-block">${escapeHtml((item.embedding_vector_preview || []).join(", ") || "-")}</pre>
+        </div>
+        <div class="debug-card-section">
+          <strong>内容哈希</strong>
+          <pre class="admin-code-block">${escapeHtml(item.content_hash || "-")}</pre>
+        </div>
+      </article>
+    `).join("");
   }
 
   function showFlash(message, type = "info") {
@@ -255,6 +474,40 @@
     });
   }
 
+  function bindRecommendationDebugPage() {
+    const form = document.getElementById("recommendation-debug-form");
+    const emailInput = document.getElementById("debug-user-email");
+    const limitInput = document.getElementById("debug-limit");
+    const submitButton = document.getElementById("recommendation-debug-submit");
+    if (!form || !emailInput || !limitInput || !submitButton) return;
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+
+      const email = emailInput.value.trim().toLowerCase();
+      const limit = limitInput.value.trim() || "5";
+      if (!email) {
+        showFlash("请输入要查询的前台用户邮箱。", "warning");
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = "加载中...";
+
+      try {
+        const params = new URLSearchParams({ email, limit });
+        const payload = await request(`/api/v1/admin/recommendations/debug?${params.toString()}`);
+        renderRecommendationDebug(payload.data);
+        showFlash(`已加载 ${email} 的推荐调试信息。`, "success");
+      } catch (error) {
+        showFlash(error?.payload?.message || "推荐调试信息加载失败。", "danger");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "加载推荐证据";
+      }
+    });
+  }
+
   async function handleLoginPage() {
     if (getToken()) {
       try {
@@ -323,6 +576,8 @@
         await loadProducts();
       } else if (page === "orders") {
         await loadOrders();
+      } else if (page === "recommendation-debug") {
+        bindRecommendationDebugPage();
       } else if (page === "reindex") {
         bindReindexAction();
       }
