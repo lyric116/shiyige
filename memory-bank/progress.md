@@ -1880,3 +1880,62 @@ Step 14:
 * 当前 collection 只完成 schema 与 payload index 初始化，还没有写入商品 points；真正的商品全量/增量索引属于下一阶段 Phase 5。
 * `backend/tests/test_qdrant_connection.py` 的断言已经调整为和真实 collections 列表对齐，因为从 Phase 3 开始，`shiyige_products_v1` 可能在 API 启动后自动存在。
 * 目前仍保留 `embedding_vector` JSON 字段，以免 baseline 和现有推荐链路在 Phase 3 就被切断；后续如果完全迁移到 Qdrant，再考虑是否彻底弃用。
+
+### 同日继续推进记录（四十）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 4：升级 Embedding 服务
+
+新增与修改：
+
+* `backend/app/services/embedding.py`
+* `backend/app/services/embedding_dense.py`
+* `backend/app/services/embedding_sparse.py`
+* `backend/app/services/embedding_colbert.py`
+* `backend/app/services/embedding_registry.py`
+* `backend/app/services/embedding_text.py`
+* `backend/app/core/config.py`
+* `backend/app/services/vector_schema.py`
+* `backend/app/tasks/embedding_tasks.py`
+* `backend/requirements.txt`
+* `.env.example`
+* `docker-compose.yml`
+* `backend/tests/test_embedding_providers.py`
+* `backend/tests/services/test_embedding_text_builder.py`
+* `backend/tests/unit/test_settings.py`
+* `backend/tests/conftest.py`
+* `backend/tests/api/conftest.py`
+* `tests/e2e/conftest.py`
+* `docs/embedding_model_design.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/embedding.py backend/app/services/embedding_dense.py backend/app/services/embedding_sparse.py backend/app/services/embedding_colbert.py backend/app/services/embedding_registry.py backend/app/services/embedding_text.py backend/app/core/config.py backend/app/services/vector_schema.py backend/app/tasks/embedding_tasks.py backend/tests/test_embedding_providers.py backend/tests/services/test_embedding_text_builder.py backend/tests/unit/test_settings.py backend/tests/conftest.py backend/tests/api/conftest.py tests/e2e/conftest.py`
+* `./.venv/bin/python -m pytest backend/tests/test_embedding_providers.py -q`
+* `./.venv/bin/python -m pytest backend/tests/services/test_embedding_text_builder.py -q`
+* `./.venv/bin/python -m pytest backend/tests/unit/test_embedding_provider.py -q`
+* `./.venv/bin/python -m pytest backend/tests/unit/test_settings.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `docker compose config --quiet`
+* `./.venv/bin/python - <<'PY' ... get_embedding_provider(AppSettings(...fastembed_dense...)) ... PY`
+
+结果：
+
+* 已把默认 dense provider 从 `local_hash` 切换为 `fastembed_dense + BAAI/bge-small-zh-v1.5(512)`，并新增 `fastembed_sparse + Qdrant/bm25`、`fastembed_colbert + answerdotai/answerai-colbert-small-v1(96)` 的独立配置。
+* 已新增 `backend/app/services/embedding_dense.py`、`embedding_sparse.py`、`embedding_colbert.py` 和 `embedding_registry.py`，把 dense、sparse、ColBERT 三类 provider 的实现和注册缓存拆开；`backend/app/services/embedding.py` 现在只保留公共契约和兼容 facade。
+* 已把商品文本构建升级为四路输出：`title_text`、`semantic_text`、`keyword_text`、`rerank_text`；现有 `embedding_text` 继续作为 `semantic_text` 别名，避免旧搜索/推荐链路在 Phase 4 被打断。
+* 已在文本构建中显式纳入类目、文化说明、朝代风格、工艺、节令、场景、标签，以及从价格、礼赠和搭配语义推导出的补充字段。
+* 已把 Qdrant schema 中的 ColBERT 维度从硬编码常量改为配置驱动，并把 Compose 环境补齐 embedding 配置和 `api-model-cache` volume。
+* 已把后端测试和 e2e 测试环境固定为 `local_hash` dense/sparse/colbert，保证测试环境不依赖真实模型下载；生产默认值仍保持为真实模型配置。
+* 已新增 `docs/embedding_model_design.md`，记录默认模型、维度、用途、测试环境覆写方式和文本构建规则。
+* 真实模型验证中，`BAAI/bge-small-zh-v1.5` 对“宋代茶具”和“宋韵点茶器具”的相似度为 `0.821397`，明显高于与“现代蓝牙耳机”的 `0.320658`，说明默认 dense 语义模型已可在本地演示环境运行。
+* 本轮最终验证结果为：新增 provider 测试、文本构建测试、原有 embedding 单测、配置单测、后端全量测试和 Compose 配置检查全部通过。
+
+交接提醒：
+
+* 当前 Phase 4 只负责“生成哪三类 embedding、用什么模型、文本怎么构造”，还没有把商品真正写入 Qdrant；Qdrant point 写入、状态查询和失败重试属于下一阶段 Phase 5。
+* `backend/tests/conftest.py`、`backend/tests/api/conftest.py` 和 `tests/e2e/conftest.py` 现在会在导入 `create_app()` 之前先注入测试 embedding 环境变量，后续不要把这些覆盖逻辑移到 fixture 内部，否则全局 `AppSettings` 缓存会重新暴露真实模型默认值。
+* `backend/app/services/embedding_text.py` 目前会根据现有商品字段推导价格带、礼赠属性和搭配属性；如果后续商品模型新增显式字段，应优先改成读取真实字段，而不是继续扩大启发式推导。

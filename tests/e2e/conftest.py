@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 import time
@@ -9,11 +10,22 @@ from fastapi.staticfiles import StaticFiles
 from playwright.sync_api import Browser, sync_playwright
 from sqlalchemy.orm import Session
 
+os.environ.setdefault("EMBEDDING_PROVIDER", "local_hash")
+os.environ.setdefault("EMBEDDING_MODEL_NAME", "shiyige-local-hash-zh")
+os.environ.setdefault("EMBEDDING_DIMENSION", "64")
+os.environ.setdefault("EMBEDDING_MODEL_SOURCE", "Deterministic local hash fallback for tests")
+os.environ.setdefault("EMBEDDING_MODEL_REVISION", "test")
+os.environ.setdefault("SPARSE_EMBEDDING_PROVIDER", "local_hash")
+os.environ.setdefault("SPARSE_EMBEDDING_MODEL_NAME", "shiyige-local-sparse")
+os.environ.setdefault("SPARSE_EMBEDDING_DIMENSION", "0")
+os.environ.setdefault("COLBERT_EMBEDDING_PROVIDER", "local_hash")
+os.environ.setdefault("COLBERT_EMBEDDING_MODEL_NAME", "shiyige-local-colbert")
+os.environ.setdefault("COLBERT_EMBEDDING_DIMENSION", "16")
+
 from backend.app.core.database import create_app_engine, reset_database_state
 from backend.app.main import create_app
 from backend.app.models.base import Base
 from backend.scripts.seed_base_data import seed_base_data
-
 
 ROOT = Path(__file__).resolve().parents[2]
 

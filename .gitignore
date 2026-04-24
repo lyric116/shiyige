@@ -15,6 +15,7 @@ htmlcov/
 # Local virtualenv and uv cache
 .venv/
 .uv-cache/
+backend/.cache/
 
 # Local environment files
 .env

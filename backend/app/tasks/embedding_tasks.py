@@ -19,6 +19,7 @@ def build_product_embedding_query(product_ids: Iterable[int] | None = None):
         .options(
             selectinload(Product.category),
             selectinload(Product.tags),
+            selectinload(Product.skus),
             selectinload(Product.embedding),
         )
         .order_by(Product.id.asc())
@@ -41,11 +42,11 @@ def upsert_product_embedding(
 
     should_reindex = force or existing is None
     if existing is not None and not force:
-      should_reindex = (
-          existing.model_name != provider.descriptor.model_name
-          or existing.content_hash != payload["content_hash"]
-          or not existing.embedding_vector
-      )
+        should_reindex = (
+            existing.model_name != provider.descriptor.model_name
+            or existing.content_hash != payload["content_hash"]
+            or not existing.embedding_vector
+        )
 
     if not should_reindex and existing is not None:
         return existing, False

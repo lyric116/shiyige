@@ -903,3 +903,39 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在它不再被设计成主向量检索库，而是负责保存 embedding 文本、content hash、Qdrant point id、索引状态和同步错误，这样后续 Phase 5 的增量索引、失败重试和状态查询才有落点。
 * “API 启动就确保 collection 存在”是比赛型项目里比“完全手工初始化”更稳的选择。
   对答辩和演示环境而言，保证 API 启动后立刻能看到 `shiyige_products_v1` 的 schema，比要求评委或开发者额外手工跑一次初始化脚本更不容易出错。
+
+### 9.39 Embedding 层现在已经分成“公共契约层 + provider 实现层 + 注册缓存层 + 多文本构建层”
+
+第 63 次同日推进把 Phase 4 的 embedding 服务升级完整落到了代码和配置层：
+
+* `backend/app/services/embedding.py`：公共契约与兼容 facade。
+  当前集中保存 `EmbeddingModelDescriptor`、dense/sparse/colbert 三类 provider 的抽象接口、向量归一化工具和向后兼容的 `get_embedding_provider()` 入口；现有业务代码仍从这里取 dense provider，但底层实现已经改为注册中心分发。
+* `backend/app/services/embedding_dense.py`：dense provider 实现层。
+  当前同时承载 `LocalHashEmbeddingProvider`、`SentenceTransformerEmbeddingProvider` 和新的 `FastEmbedDenseEmbeddingProvider`，其中默认生产配置已切到 `fastembed_dense + BAAI/bge-small-zh-v1.5(512)`。
+* `backend/app/services/embedding_sparse.py`：sparse provider 实现层。
+  当前提供 `LocalHashSparseEmbeddingProvider` 和 `FastEmbedSparseEmbeddingProvider`，把关键词召回所需的 sparse vector 独立出来，不再试图用 dense 向量兼任精确关键词匹配。
+* `backend/app/services/embedding_colbert.py`：late interaction provider 实现层。
+  当前提供 `LocalHashColbertEmbeddingProvider` 和 `FastEmbedColbertEmbeddingProvider`，输出 token-level multivector，为后续 ColBERT 重排预留统一接口。
+* `backend/app/services/embedding_registry.py`：provider 注册与缓存层。
+  它负责根据 `AppSettings` 构造 dense/sparse/colbert descriptor，并用 `lru_cache` 复用真实模型实例，避免每次请求都重新加载 ONNX 模型。
+* `backend/app/services/embedding_text.py`：多文本构建层。
+  当前不再只产出一个 `embedding_text`，而是显式生成 `title_text`、`semantic_text`、`keyword_text` 和 `rerank_text` 四路文本；`embedding_text` 只是对 `semantic_text` 的兼容别名。
+* `backend/app/core/config.py`：embedding 运行时配置入口。
+  现在除了 dense 配置，还显式暴露 `SPARSE_EMBEDDING_*` 和 `COLBERT_EMBEDDING_*` 配置，并新增 `EMBEDDING_CACHE_DIR` 与 `EMBEDDING_THREADS`。
+* `.env.example` 与 `docker-compose.yml`：本地演示环境配置模板。
+  当前 Compose 会给 API 容器注入三类 embedding 的默认模型配置，并把 `/app/backend/.cache/fastembed` 挂到 `api-model-cache` volume，避免模型重复下载。
+* `backend/tests/conftest.py`、`backend/tests/api/conftest.py`、`tests/e2e/conftest.py`：测试环境的 embedding 覆写入口。
+  这三处会在导入 `create_app()` 之前先把 dense/sparse/colbert provider 固定到 `local_hash`，确保单元测试、API 测试和 e2e 不依赖真实模型下载。
+* `backend/tests/test_embedding_providers.py`：Phase 4 provider 验收测试。
+  当前覆盖 dense/sparse/colbert 的 fake model 转换、本地 hash fallback 和注册中心分发。
+* `docs/embedding_model_design.md`：embedding 设计说明。
+  当前记录默认模型、维度、用途、测试环境覆写方式和四路文本构建规则，是后续搜索/推荐升级的重要引用文档。
+
+这里有三个新的关键架构洞察：
+
+* embedding 层必须把“接口稳定性”和“模型实现替换”拆开。
+  现在业务代码继续依赖 `get_embedding_provider()` 这一稳定入口，但真正的默认模型已经从 `local_hash` 切到 `fastembed_dense`，这说明只要 facade 稳定，就可以逐阶段替换底层 provider 而不必一次性重写整条搜索/推荐链路。
+* 测试环境和演示环境必须显式分离，而不能共享同一组默认值。
+  当前 `AppSettings` 的生产默认值已经是真实模型，但测试夹具会在模块导入前覆写成 `local_hash`；这种“导入前固定环境 + 缓存后稳定运行”的方式，是在保留真实默认值的同时避免回归测试变慢或失败的关键。
+* 商品 embedding 文本不应再是单字符串黑盒。
+  现在 `semantic_text`、`keyword_text` 和 `rerank_text` 已经对应 dense、sparse 和 ColBERT 三条后续链路，这意味着 Phase 5 的索引任务和 Phase 6 的混合搜索可以直接消费结构化文本，而不需要在检索逻辑里临时拼接字段。

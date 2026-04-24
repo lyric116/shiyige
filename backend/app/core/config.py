@@ -19,15 +19,29 @@ class AppSettings(BaseSettings):
     docs_url: str = "/docs"
     redoc_url: str = "/redoc"
     enable_startup_checks: bool = False
-    embedding_provider: str = "local_hash"
-    embedding_model_name: str = "shiyige-local-hash-zh"
-    embedding_dimension: int = 384
-    embedding_model_source: str = (
-        "Deterministic local hash fallback for offline development and tests"
-    )
-    embedding_model_revision: str = "local"
+    embedding_provider: str = "fastembed_dense"
+    embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
+    embedding_dimension: int = 512
+    embedding_model_source: str = "FastEmbed ONNX runtime for Chinese semantic retrieval"
+    embedding_model_revision: str = "qdrant-fastembed"
     embedding_device: str = "cpu"
     embedding_normalize: bool = True
+    embedding_cache_dir: str = "./backend/.cache/fastembed"
+    embedding_threads: int | None = None
+    sparse_embedding_provider: str = "fastembed_sparse"
+    sparse_embedding_model_name: str = "Qdrant/bm25"
+    sparse_embedding_dimension: int = 0
+    sparse_embedding_model_source: str = "FastEmbed sparse BM25 for keyword retrieval"
+    sparse_embedding_model_revision: str = "qdrant-bm25"
+    sparse_embedding_device: str = "cpu"
+    sparse_embedding_normalize: bool = False
+    colbert_embedding_provider: str = "fastembed_colbert"
+    colbert_embedding_model_name: str = "answerdotai/answerai-colbert-small-v1"
+    colbert_embedding_dimension: int = 96
+    colbert_embedding_model_source: str = "FastEmbed late interaction reranker"
+    colbert_embedding_model_revision: str = "answerai-colbert-small-v1"
+    colbert_embedding_device: str = "cpu"
+    colbert_embedding_normalize: bool = True
     vector_db_provider: str = "qdrant"
     qdrant_url: str = "http://qdrant:6333"
     qdrant_api_key: str | None = None

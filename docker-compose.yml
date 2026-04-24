@@ -65,6 +65,28 @@ services:
       MINIO_SECURE: "false"
       SECRET_KEY: shiyige-compose-secret
       ENABLE_STARTUP_CHECKS: "false"
+      EMBEDDING_PROVIDER: fastembed_dense
+      EMBEDDING_MODEL_NAME: BAAI/bge-small-zh-v1.5
+      EMBEDDING_DIMENSION: "512"
+      EMBEDDING_MODEL_SOURCE: FastEmbed ONNX runtime for Chinese semantic retrieval
+      EMBEDDING_MODEL_REVISION: qdrant-fastembed
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_NORMALIZE: "true"
+      EMBEDDING_CACHE_DIR: /app/backend/.cache/fastembed
+      SPARSE_EMBEDDING_PROVIDER: fastembed_sparse
+      SPARSE_EMBEDDING_MODEL_NAME: Qdrant/bm25
+      SPARSE_EMBEDDING_DIMENSION: "0"
+      SPARSE_EMBEDDING_MODEL_SOURCE: FastEmbed sparse BM25 for keyword retrieval
+      SPARSE_EMBEDDING_MODEL_REVISION: qdrant-bm25
+      SPARSE_EMBEDDING_DEVICE: cpu
+      SPARSE_EMBEDDING_NORMALIZE: "false"
+      COLBERT_EMBEDDING_PROVIDER: fastembed_colbert
+      COLBERT_EMBEDDING_MODEL_NAME: answerdotai/answerai-colbert-small-v1
+      COLBERT_EMBEDDING_DIMENSION: "96"
+      COLBERT_EMBEDDING_MODEL_SOURCE: FastEmbed late interaction reranker
+      COLBERT_EMBEDDING_MODEL_REVISION: answerai-colbert-small-v1
+      COLBERT_EMBEDDING_DEVICE: cpu
+      COLBERT_EMBEDDING_NORMALIZE: "true"
       VECTOR_DB_PROVIDER: qdrant
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ""
@@ -72,6 +94,8 @@ services:
       QDRANT_COLLECTION_USERS: shiyige_users_v1
       QDRANT_COLLECTION_CF: shiyige_collaborative_v1
       RECOMMENDATION_PIPELINE_VERSION: v1
+    volumes:
+      - api-model-cache:/app/backend/.cache/fastembed
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,3 +124,4 @@ volumes:
   redis-data:
   minio-data:
   qdrant-data:
+  api-model-cache:

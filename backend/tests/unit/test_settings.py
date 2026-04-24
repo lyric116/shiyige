@@ -4,12 +4,33 @@ from pydantic import ValidationError
 from backend.app.core.config import AppSettings, InfrastructureSettings
 
 
-def test_app_settings_use_safe_defaults() -> None:
+def test_app_settings_use_safe_defaults(monkeypatch) -> None:
+    for key in (
+        "EMBEDDING_PROVIDER",
+        "EMBEDDING_MODEL_NAME",
+        "EMBEDDING_DIMENSION",
+        "EMBEDDING_MODEL_SOURCE",
+        "EMBEDDING_MODEL_REVISION",
+        "SPARSE_EMBEDDING_PROVIDER",
+        "SPARSE_EMBEDDING_MODEL_NAME",
+        "SPARSE_EMBEDDING_DIMENSION",
+        "COLBERT_EMBEDDING_PROVIDER",
+        "COLBERT_EMBEDDING_MODEL_NAME",
+        "COLBERT_EMBEDDING_DIMENSION",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
     settings = AppSettings()
 
     assert settings.app_name == "Shiyige API"
     assert settings.api_v1_prefix == "/api/v1"
     assert settings.log_level == "INFO"
+    assert settings.embedding_provider == "fastembed_dense"
+    assert settings.embedding_model_name == "BAAI/bge-small-zh-v1.5"
+    assert settings.embedding_dimension == 512
+    assert settings.sparse_embedding_provider == "fastembed_sparse"
+    assert settings.colbert_embedding_provider == "fastembed_colbert"
+    assert settings.colbert_embedding_dimension == 96
     assert settings.vector_db_provider == "qdrant"
     assert settings.qdrant_url == "http://qdrant:6333"
     assert settings.recommendation_pipeline_version == "v1"

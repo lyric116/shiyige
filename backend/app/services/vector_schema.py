@@ -6,8 +6,6 @@ from qdrant_client import models
 
 from backend.app.core.config import AppSettings, get_app_settings
 
-DEFAULT_COLBERT_DIMENSION = 128
-
 
 @dataclass(frozen=True)
 class ProductCollectionSchema:
@@ -39,14 +37,14 @@ def build_product_collection_schema(
     return ProductCollectionSchema(
         collection_name=app_settings.qdrant_collection_products,
         dense_dimension=app_settings.embedding_dimension,
-        colbert_dimension=DEFAULT_COLBERT_DIMENSION,
+        colbert_dimension=app_settings.colbert_embedding_dimension,
         vectors_config={
             "dense": models.VectorParams(
                 size=app_settings.embedding_dimension,
                 distance=models.Distance.COSINE,
             ),
             "colbert": models.VectorParams(
-                size=DEFAULT_COLBERT_DIMENSION,
+                size=app_settings.colbert_embedding_dimension,
                 distance=models.Distance.COSINE,
                 multivector_config=models.MultiVectorConfig(
                     comparator=models.MultiVectorComparator.MAX_SIM,
