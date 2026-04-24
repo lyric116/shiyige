@@ -11,6 +11,14 @@ from backend.app.models.product import (
     ProductTag,
 )
 from backend.app.models.recommendation import ProductEmbedding, UserInterestProfile
+from backend.app.models.recommendation_analytics import (
+    RecommendationClickLog,
+    RecommendationConversionLog,
+    RecommendationImpressionLog,
+    RecommendationRequestLog,
+    SearchRequestLog,
+    SearchResultLog,
+)
 from backend.app.models.recommendation_experiment import RecommendationExperiment
 from backend.app.models.review import Review, ReviewImage
 from backend.app.models.user import User, UserAddress, UserBehaviorLog, UserProfile
@@ -33,9 +41,15 @@ __all__ = [
     "OrderItem",
     "PaymentRecord",
     "ProductEmbedding",
+    "RecommendationClickLog",
+    "RecommendationConversionLog",
+    "RecommendationImpressionLog",
+    "RecommendationRequestLog",
     "RecommendationExperiment",
     "Review",
     "ReviewImage",
+    "SearchRequestLog",
+    "SearchResultLog",
     "User",
     "UserProfile",
     "UserAddress",

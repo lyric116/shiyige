@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -12,10 +13,10 @@ from backend.app.models.order import Order, OrderItem, PaymentRecord
 from backend.app.models.product import ProductSku
 from backend.app.models.user import User, UserAddress
 from backend.app.schemas.order import CreateOrderRequest, PayOrderRequest
+from backend.app.services.behavior import BEHAVIOR_CREATE_ORDER, BEHAVIOR_PAY_ORDER, log_behavior
 from backend.app.services.cache import invalidate_recommendation_cache_for_user
 from backend.app.services.member import accrue_points_for_paid_order
-from backend.app.services.behavior import BEHAVIOR_CREATE_ORDER, BEHAVIOR_PAY_ORDER, log_behavior
-
+from backend.app.services.recommendation_logging import log_recommendation_action
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -143,7 +144,10 @@ def create_order(
 ):
     idempotency_key = payload.idempotency_key.strip()
     if not idempotency_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="idempotency key is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="idempotency key is required",
+        )
 
     existing_order = load_existing_order_by_idempotency(
         db,
@@ -185,7 +189,10 @@ def create_order(
         sku = cart_item.sku
         product = cart_item.product
         if sku is None or product is None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="cart item unavailable")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="cart item unavailable",
+            )
 
         subtotal_amount = sku.price * cart_item.quantity
         goods_amount += subtotal_amount
@@ -220,6 +227,14 @@ def create_order(
             "product_ids": [item.product_id for item in order.items],
         },
     )
+    for item in order.items:
+        log_recommendation_action(
+            db,
+            user_id=current_user.id,
+            product_id=item.product_id,
+            action_type="create_order",
+            order_id=order.id,
+        )
     for cart_item in list(cart.items):
         db.delete(cart_item)
     invalidate_recommendation_cache_for_user(current_user.id)
@@ -248,7 +263,10 @@ def pay_order(
 ):
     payment_method = payload.payment_method.strip().lower()
     if not payment_method:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payment method is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="payment method is required",
+        )
 
     order = get_user_order(db, user_id=current_user.id, order_id=order_id)
     if order is None:
@@ -262,7 +280,10 @@ def pay_order(
         if sku is None or not sku.is_active:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="sku unavailable")
         if sku.inventory is None or sku.inventory.quantity < item.quantity:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="inventory insufficient")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="inventory insufficient",
+            )
         inventory_snapshots.append((item, sku))
 
     paid_at = datetime.now(UTC)
@@ -301,6 +322,14 @@ def pay_order(
             "product_ids": [item.product_id for item in order.items],
         },
     )
+    for item in order.items:
+        log_recommendation_action(
+            db,
+            user_id=current_user.id,
+            product_id=item.product_id,
+            action_type="pay_order",
+            order_id=order.id,
+        )
     invalidate_recommendation_cache_for_user(current_user.id)
     db.commit()
     db.expire_all()

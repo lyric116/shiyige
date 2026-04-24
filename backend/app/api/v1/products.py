@@ -22,6 +22,11 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
+from backend.app.services.recommendation_logging import (
+    RequestTimer,
+    log_recommendation_action,
+    log_recommendation_request,
+)
 from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
 from backend.app.services.recommendations import recommend_products_for_user
 from backend.app.services.vector_search import find_related_products
@@ -157,6 +162,27 @@ def get_product_recommendations(
     cache_key = build_cache_key("products", "recommendations", current_user.id, limit)
     cached_items = get_cached_json(cache_key)
     if not debug and isinstance(cached_items, list):
+        log_recommendation_request(
+            db,
+            request=request,
+            user_id=current_user.id,
+            slot=slot,
+            pipeline_version=str(pipeline["recommendation_pipeline_version"]),
+            model_version=str(pipeline.get("active_ranker", "cache")),
+            candidate_count=len(cached_items),
+            final_items=[
+                {
+                    "product_id": item["id"],
+                    "score": item.get("score", 0.0),
+                    "reason": item.get("reason", ""),
+                    "recall_channels": item.get("recall_channels", []),
+                }
+                for item in cached_items
+            ],
+            latency_ms=0.0,
+            fallback_used=bool(pipeline["degraded_to_baseline"]),
+        )
+        db.commit()
         return build_response(
             request=request,
             code=0,
@@ -165,6 +191,7 @@ def get_product_recommendations(
             status_code=200,
         )
 
+    timer = RequestTimer.start()
     runtime = probe_vector_store_runtime()
     if runtime.active_recommendation_backend == "multi_recall":
         pipeline_run = run_recommendation_pipeline(
@@ -205,6 +232,32 @@ def get_product_recommendations(
             items,
             ttl_seconds=RECOMMENDATIONS_CACHE_TTL,
         )
+    log_recommendation_request(
+        db,
+        request=request,
+        user_id=current_user.id,
+        slot=slot,
+        pipeline_version=str(pipeline["recommendation_pipeline_version"]),
+        model_version=str(
+            pipeline.get(
+                "ranker_model_version",
+                pipeline.get("active_ranker", "baseline"),
+            )
+        ),
+        candidate_count=len(items),
+        final_items=[
+            {
+                "product_id": item["id"],
+                "score": item.get("score", 0.0),
+                "reason": item.get("reason", ""),
+                "recall_channels": item.get("recall_channels", []),
+            }
+            for item in items
+        ],
+        latency_ms=timer.elapsed_ms(),
+        fallback_used=bool(pipeline["degraded_to_baseline"]),
+    )
+    db.commit()
     return build_response(
         request=request,
         code=0,
@@ -237,6 +290,12 @@ def get_product_detail(
             },
         )
         if current_user is not None:
+            log_recommendation_action(
+                db,
+                user_id=current_user.id,
+                product_id=product_id,
+                action_type="click",
+            )
             invalidate_recommendation_cache_for_user(current_user.id)
             db.commit()
 
@@ -282,6 +341,12 @@ def get_product_detail(
         },
     )
     if current_user is not None:
+        log_recommendation_action(
+            db,
+            user_id=current_user.id,
+            product_id=product.id,
+            action_type="click",
+        )
         invalidate_recommendation_cache_for_user(current_user.id)
         db.commit()
 

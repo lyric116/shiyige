@@ -2225,3 +2225,56 @@ Step 14:
 * 当前 `ltr_ranker` 只完成了模型加载接口和回退机制，默认仍会使用 `weighted_ranker`；后续如果进入 Phase 10 的离线评估与训练，优先补 `recommendation_request_log` 等日志表，再生成真实 LTR 训练样本。
 * `ranking_features.py` 里部分业务特征仍是基于现有表结构推导出的启发式近似值，例如后台精选和 ColBERT 对齐分；如果后续新增了更明确的数据源，应直接替换这些推导逻辑，而不是再新增一套并行特征。
 * 下一阶段应进入 Phase 10 的日志、离线评估和性能压测，把现在的多路召回与排序结果转化成可量化指标，而不是只停留在 debug 可解释层。
+
+### 同日继续推进记录（四十六）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 10：补齐日志、离线评估与性能压测
+
+新增与修改：
+
+* `backend/app/models/recommendation_analytics.py`
+* `backend/alembic/versions/20260424_12_recommendation_logging.py`
+* `backend/app/models/__init__.py`
+* `backend/app/services/recommendation_logging.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/search.py`
+* `backend/app/api/v1/cart.py`
+* `backend/app/api/v1/orders.py`
+* `backend/scripts/generate_synthetic_catalog.py`
+* `backend/scripts/evaluate_recommendations.py`
+* `backend/scripts/benchmark_recommendations.py`
+* `backend/tests/api/test_recommendation_logging.py`
+* `docs/recommendation_evaluation.md`
+* `docs/performance_benchmark.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/models/recommendation_analytics.py backend/app/models/__init__.py backend/app/services/recommendation_logging.py backend/app/api/v1/products.py backend/app/api/v1/search.py backend/app/api/v1/cart.py backend/app/api/v1/orders.py backend/alembic/versions/20260424_12_recommendation_logging.py backend/tests/api/test_recommendation_logging.py backend/scripts/generate_synthetic_catalog.py backend/scripts/evaluate_recommendations.py backend/scripts/benchmark_recommendations.py`
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendation_logging.py -q`
+* `DATABASE_URL=sqlite:////tmp/shiyige_phase10_eval2.db QDRANT_URL=http://127.0.0.1:6333 QDRANT_COLLECTION_PRODUCTS=shiyige_phase10_eval2_products QDRANT_COLLECTION_CF=shiyige_phase10_eval2_cf ./.venv/bin/python backend/scripts/evaluate_recommendations.py --scenario all`
+* `DATABASE_URL=sqlite:////tmp/shiyige_phase10_bench_full3.db QDRANT_URL=http://127.0.0.1:6333 QDRANT_COLLECTION_PRODUCTS=shiyige_phase10_bench_full3_products QDRANT_COLLECTION_CF=shiyige_phase10_bench_full3_cf ./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 1000`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已新增 `recommendation_request_log`、`recommendation_impression_log`、`recommendation_click_log`、`recommendation_conversion_log`、`search_request_log` 和 `search_result_log` 六张日志表，并通过迁移 `20260424_12_recommendation_logging.py` 接入正式 schema。
+* 已新增 `backend/app/services/recommendation_logging.py`，把推荐请求、曝光、详情点击、加购、下单、支付以及搜索请求与结果的落库逻辑统一收敛到单一服务层；接口层不再自己拼装日志记录。
+* 已把 `backend/app/api/v1/products.py`、`backend/app/api/v1/search.py`、`backend/app/api/v1/cart.py` 和 `backend/app/api/v1/orders.py` 接到新日志服务上，形成“推荐曝光 -> 商品点击 -> 加购 -> 下单 -> 支付”的完整归因链。
+* 已新增 `backend/tests/api/test_recommendation_logging.py`，覆盖推荐请求/曝光日志、点击与转化日志，以及关键词/语义搜索日志；专项测试结果为 `3 passed`。
+* 已新增 `backend/scripts/evaluate_recommendations.py`，可生成 `docs/recommendation_evaluation.md`；当前对比表已覆盖 `baseline`、`dense_only`、`dense_sparse`、`dense_sparse_colbert`、`multi_recall_weighted`、`multi_recall_ltr` 和 `multi_recall_ltr_diversity` 七种方案。
+* 离线评估报告显示：在当前三组评测场景下，`multi_recall_ltr` 的 `Precision@5=0.6`、`Recall@5=1.0`、`NDCG@5=1.0`，优于 `baseline` 的 `0.4667 / 0.7778 / 0.6763`；而 `multi_recall_ltr_diversity` 的多样性提升到 `0.8333`，但精确率回落到 `0.4`，说明探索/多样性规则已经开始显著影响排序收益。
+* 已新增 `backend/scripts/generate_synthetic_catalog.py`，支持直接从仓库根目录执行 `python backend/scripts/generate_synthetic_catalog.py --products ...` 扩容商品集，并固定只从非 synthetic 模板商品复制，避免后续数据越滚越脏。
+* 已新增 `backend/scripts/benchmark_recommendations.py`，可输出 `p50/p95/p99 latency`、`QPS`、`error_rate` 和平均候选数量，并把结果写入 `docs/performance_benchmark.md`。
+* 为了让 `10000` 商品级别的合成压测在当前仓库里可稳定完成，压测脚本显式切到了 `local_hash` dense/sparse/colbert provider；报告中已把该 embedding 模式写明，避免后续开发者误把这份报告当成 FastEmbed 编码成本。
+* 当前 10k 商品 / 1k 用户压测结果显示：`search_keyword` 的 `p95=3214.436ms`，`search_semantic` 的 `p95=5484.978ms`，`recommend_home` 的 `p95=38565.256ms`，`related_products` 的 `p95=65666.73ms`；`sync_products_to_qdrant(mode=full)` 全量重建耗时 `230869.141ms`。这说明 Phase 10 已经能量化证明系统行为，但也明确暴露出首页推荐和相似商品接口在 10k 规模下仍然过慢。
+* 后端全量测试结果为 `137 passed`；结合专项测试、离线评估脚本和正式压测脚本，Phase 10 的代码与文档已经形成完整交付物。
+
+交接提醒：
+
+* `docs/performance_benchmark.md` 当前是“合成数据 + local_hash embedding”基准，不是 FastEmbed 真实编码成本报告；如果后续要展示模型真实推理时延，需要额外跑一版保留 `fastembed_*` provider 的报告。
+* `backend/app/api/v1/products.py` 的 `related_products` 仍沿用全量 SQL embedding 相似度计算，10k 规模下已经成为明显瓶颈；如果继续推进 Phase 11 之前的性能优化，应优先把相似商品接口接到 Qdrant 或缓存层。
+* `recommend_home` 在 10k 商品压测下 `p95` 已接近 39 秒，说明多路召回和排序层虽然功能完整，但候选构建与画像计算还没有做缓存分层；后续如果要进入前后台展示改造，建议先补 profile cache / candidate cache，再继续放大演示数据。

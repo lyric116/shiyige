@@ -1111,3 +1111,41 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在无论是加权排序还是未来 LTR，都消费 `RecommendationRankingFeatures`；这意味着后续训练、离线评估和线上推理都可以围绕同一份特征定义展开，而不会出现“训练特征”和“线上特征”两套体系逐渐漂移。
 * 排序 debug 必须同时出现在公开接口和后台接口，而不能只留在管理员视角。
   当前 `/api/v1/recommendations?slot=home&debug=true` 和后台 debug 都能看到 `feature_summary` 与 `score_breakdown`，这让“推荐为什么这样排”不再只能靠后台解释；对演示、联调和后续日志验证都更有价值。
+
+### 9.45 评估层现在已经形成“行为埋点层 + 评测脚本层 + 压测脚本层 + 报告产出层”的 Phase 10 形态
+
+第 69 次同日推进把推荐系统从“能调试解释”推进到了“能量化评估和压测”：
+
+* `backend/app/models/recommendation_analytics.py`：推荐与搜索分析日志模型层。
+  当前集中定义 `recommendation_request_log`、`recommendation_impression_log`、`recommendation_click_log`、`recommendation_conversion_log`、`search_request_log` 和 `search_result_log` 六张表，使请求、曝光、点击、转化和搜索结果有了正式持久化落点。
+* `backend/alembic/versions/20260424_12_recommendation_logging.py`：Phase 10 迁移层。
+  当前把上述六张日志表正式纳入 Alembic 迁移链，后续开发者不需要手工补表就能接着用埋点数据做报表、训练集或答辩演示。
+* `backend/app/services/recommendation_logging.py`：埋点编排层。
+  当前统一处理请求计时、推荐请求/曝光写入、搜索请求/结果写入，以及“根据最近曝光反查 request_id 再记录点击/加购/下单/支付”的归因逻辑；接口层只需要调用服务，不再自己处理日志主键和去重。
+* `backend/app/api/v1/products.py`：推荐请求与点击归因入口。
+  当前首页推荐接口会在返回结果后写入 request/impression 日志；商品详情接口则会在用户点进推荐商品时把动作回填成 `click`，从而把曝光和点击串起来。
+* `backend/app/api/v1/search.py`：搜索日志入口。
+  当前关键词搜索和语义搜索都会记录 `query`、`mode`、`pipeline_version`、过滤条件、延迟和返回结果列表，使搜索效果评估不再只能依赖行为日志推断。
+* `backend/app/api/v1/cart.py` 与 `backend/app/api/v1/orders.py`：转化归因入口。
+  当前加购、下单和支付接口都会尝试沿着最近曝光记录回填 `add_to_cart`、`create_order` 和 `pay_order`，这意味着推荐链路终于具备了完整的曝光到支付归因闭环。
+* `backend/scripts/generate_synthetic_catalog.py`：合成商品集生成层。
+  当前支持把商品量扩到指定规模，并明确只从非 synthetic 模板复制，避免压测多次后 synthetic 商品再去复制 synthetic 商品导致数据质量失控。
+* `backend/scripts/evaluate_recommendations.py`：离线评测执行层。
+  当前会准备 Qdrant 商品索引和协同过滤索引，构造三组用户场景，并输出 `baseline`、`dense_only`、`dense_sparse`、`dense_sparse_colbert`、`multi_recall_weighted`、`multi_recall_ltr` 和 `multi_recall_ltr_diversity` 七组对比指标到 `docs/recommendation_evaluation.md`。
+* `backend/scripts/benchmark_recommendations.py`：性能压测执行层。
+  当前会扩容商品集、生成合成用户、重建 Qdrant 索引、预热接口，并测量 `search_keyword`、`search_semantic`、`recommend_home`、`related_products`、`reindex_products_qdrant` 和 `build_collaborative_index` 的 p50/p95/p99、QPS、错误率与候选数量，再输出到 `docs/performance_benchmark.md`。
+* `docs/recommendation_evaluation.md` 与 `docs/performance_benchmark.md`：报告产出层。
+  当前已经不只是“脚本打印 JSON”，而是有了可以直接提交和答辩展示的 Markdown 报告文件；Phase 10 之后，推荐系统第一次具备了正式的评测文档资产。
+* `backend/tests/api/test_recommendation_logging.py`：Phase 10 验收测试层。
+  当前固定了推荐请求/曝光、点击与转化、搜索日志的关键行为，确保后续继续改推荐接口时不会把归因链静默打断。
+
+这里有四个新的关键架构洞察：
+
+* 埋点必须跟请求链路同构，而不是等行为日志事后推断。
+  当前推荐请求、曝光、点击、加购、下单和支付都显式落在分析表里，意味着后续做 CTR、CVR、Add-to-cart Rate 时不需要再从 `user_behavior_log` 里猜测“这个订单是不是来自推荐”。
+* 评估脚本和线上接口必须共享同一份运行时能力，而不是另起一套“论文版”逻辑。
+  现在 `evaluate_recommendations.py` 直接复用了推荐主流水线、排序器、Qdrant 索引和协同过滤构建步骤，所以离线指标对线上实现是有约束力的，不是脱离主代码的平行实验。
+* 压测结果已经明确暴露出系统边界，而不是只证明“脚本跑通”。
+  当前 10k 商品基准下，`recommend_home` 的 `p95` 达到 38 秒级，`related_products` 的 `p95` 达到 65 秒级，这说明真正的瓶颈已经从“模型能不能接上”转移到“画像、候选和相似商品是否有缓存/索引化”。
+* `related_products` 现在是整个推荐链里最不适合继续放大的旧边界。
+  它仍使用全库 embedding 相似度计算，而首页推荐和语义搜索已经进入 Qdrant / 多路召回时代；如果后续 Phase 11 要展示更大规模演示数据，优先级最高的技术债就是把相似商品接口从全量扫描迁到向量库或缓存层。

@@ -21,6 +21,7 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
+from backend.app.services.recommendation_logging import RequestTimer, log_search_request
 from backend.app.services.search_filters import build_search_filters, serialize_search_filters
 from backend.app.services.vector_search import semantic_search_products
 from backend.app.services.vector_store import build_runtime_marker
@@ -188,6 +189,7 @@ def search_products(
     sort: str = "default",
 ):
     keyword = normalize_keyword(q)
+    timer = RequestTimer.start()
     if not keyword:
         return build_response(
             request=request,
@@ -229,9 +231,33 @@ def search_products(
             "sort": sort,
         },
     )
+    log_search_request(
+        db,
+        request=request,
+        user_id=current_user.id if current_user is not None else None,
+        query=keyword,
+        mode="keyword",
+        pipeline_version="keyword_search",
+        total_results=total,
+        latency_ms=timer.elapsed_ms(),
+        filters_json={
+            "category_id": category_id,
+            "min_price": str(min_price) if min_price is not None else None,
+            "max_price": str(max_price) if max_price is not None else None,
+            "sort": sort,
+        },
+        items=[
+            {
+                "product_id": product.id,
+                "score": round(1.0 / float(index), 6),
+                "reason": f"keyword:{sort}",
+            }
+            for index, product in enumerate(items, start=1)
+        ],
+    )
     if current_user is not None:
         invalidate_recommendation_cache_for_user(current_user.id)
-        db.commit()
+    db.commit()
 
     return build_response(
         request=request,
@@ -255,6 +281,7 @@ def semantic_search(
     db: Session = Depends(get_db),
 ):
     query = normalize_keyword(payload.query)
+    timer = RequestTimer.start()
     pipeline = build_runtime_marker()
     filters = build_search_filters(
         category_id=payload.category_id,
@@ -303,9 +330,36 @@ def semantic_search(
             "filters": serialize_search_filters(filters),
         },
     )
+    serialized_items = [
+        {
+            **serialize_product_list_item(result.product),
+            "score": round(result.score, 6),
+            "reason": result.reason,
+        }
+        for result in results
+    ]
+    log_search_request(
+        db,
+        request=request,
+        user_id=current_user.id if current_user is not None else None,
+        query=query,
+        mode="semantic",
+        pipeline_version=str(pipeline["active_search_backend"]),
+        total_results=len(results),
+        latency_ms=timer.elapsed_ms(),
+        filters_json=serialize_search_filters(filters),
+        items=[
+            {
+                "product_id": item["id"],
+                "score": item["score"],
+                "reason": item["reason"],
+            }
+            for item in serialized_items
+        ],
+    )
     if current_user is not None:
         invalidate_recommendation_cache_for_user(current_user.id)
-        db.commit()
+    db.commit()
 
     return build_response(
         request=request,
@@ -313,14 +367,7 @@ def semantic_search(
         message="ok",
         data={
             "query": query,
-            "items": [
-                {
-                    **serialize_product_list_item(result.product),
-                    "score": round(result.score, 6),
-                    "reason": result.reason,
-                }
-                for result in results
-            ],
+            "items": serialized_items,
             "total": len(results),
             "pipeline": pipeline,
         },

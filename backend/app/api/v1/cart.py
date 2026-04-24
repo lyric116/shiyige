@@ -11,9 +11,9 @@ from backend.app.models.cart import Cart, CartItem
 from backend.app.models.product import Product, ProductSku
 from backend.app.models.user import User
 from backend.app.schemas.cart import AddCartItemRequest, UpdateCartItemRequest
-from backend.app.services.cache import invalidate_recommendation_cache_for_user
 from backend.app.services.behavior import BEHAVIOR_ADD_TO_CART, log_behavior
-
+from backend.app.services.cache import invalidate_recommendation_cache_for_user
+from backend.app.services.recommendation_logging import log_recommendation_action
 
 router = APIRouter(prefix="/cart", tags=["cart"])
 
@@ -106,7 +106,12 @@ def load_product_for_cart(db: Session, product_id: int) -> Product:
 
 
 def load_sku_for_cart(db: Session, product_id: int, sku_id: int) -> ProductSku:
-    sku = db.scalar(select(ProductSku).where(ProductSku.id == sku_id, ProductSku.product_id == product_id))
+    sku = db.scalar(
+        select(ProductSku).where(
+            ProductSku.id == sku_id,
+            ProductSku.product_id == product_id,
+        )
+    )
     if sku is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="sku not found")
     if not sku.is_active:
@@ -192,6 +197,12 @@ def add_cart_item(
             "quantity": cart_item.quantity,
             "cart_id": cart.id,
         },
+    )
+    log_recommendation_action(
+        db,
+        user_id=current_user.id,
+        product_id=product.id,
+        action_type="add_to_cart",
     )
     invalidate_recommendation_cache_for_user(current_user.id)
     db.commit()
