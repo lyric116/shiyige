@@ -849,3 +849,31 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前导出脚本没有复制一份平行推荐算法，而是直接调用 `semantic_search_products()` 和 `recommend_products_for_user()`；这样 baseline 文件天然就是“当前线上逻辑的快照”，而不是另一个测试替身。
 * baseline 快照已经暴露出当前系统的真实短板。
   例如 `宋韵茶器雅致礼物` 这类 query 在当前 `local_hash + 全量遍历 + 规则加分` 基线上无法稳定命中真正的茶器商品，这正好说明后续 Phase 4 到 Phase 6 引入真实语义模型、sparse 检索和混合搜索是必要的，而不是为了“技术栈好看”。
+
+### 9.37 向量基础设施现在已经分成“Qdrant 连接层 + 运行时标记层 + 旧逻辑 fallback”
+
+第 61 次同日推进并没有直接改写推荐算法，而是先把向量基础设施接线完成：
+
+* `docker-compose.yml`：新增 `qdrant` 服务。
+  当前编排会同时拉起 PostgreSQL、Redis、MinIO、Qdrant、FastAPI 和 Nginx，`6333/6334` 暴露给宿主机，Qdrant 持久化数据落在 `qdrant-data` volume。
+* `backend/app/core/config.py`：新增向量数据库配置。
+  `AppSettings` 现在提供 `vector_db_provider`、`qdrant_url`、三个 collection 名称和 `recommendation_pipeline_version`，让 Qdrant 接入不需要把配置硬编码到业务层。
+* `backend/app/services/qdrant_client.py`：Qdrant 连接层。
+  它只负责创建 client、探测可用性、读取 collections 和判断 collection 是否存在，不承载任何搜索或推荐业务逻辑。
+* `backend/app/services/vector_store.py`：向量运行时抽象层。
+  这个模块把“配置了什么 provider”“Qdrant 当前是否可达”“是否已降级回 baseline”“当前搜索/推荐后端是谁”统一表达成一份 runtime marker，供健康检查和接口响应复用。
+* `backend/app/main.py` 与 `backend/app/api/v1/health.py`：启动探测与健康输出。
+  API 启动时会探测一次 Qdrant 连接；健康检查则实时返回 `qdrant_available`、`degraded_to_baseline` 和当前 active backend。
+* `backend/app/api/v1/products.py` 与 `backend/app/api/v1/search.py`：运行时标记输出。
+  当前“猜你喜欢”“相似商品”“语义搜索”接口会把 `pipeline` 标记一起返回，让前台和后台能明确知道当前虽已配置 Qdrant，但这一步仍在使用 baseline 逻辑。
+* `.env.example` 与 `.gitignore`：环境模板现在正式入库。
+  由于仓库原先会忽略 `.env.*`，本轮显式加入 `!.env.example`，避免配置模板再次被忽略。
+
+这里有三个新的关键架构洞察：
+
+* 在真正把搜索切到 Qdrant 之前，先把“运行时状态可观测”做好，比直接写检索代码更重要。
+  现在任何人只看 `/api/v1/health` 或推荐接口里的 `pipeline` 字段，就能知道系统是“Qdrant 可用并准备好”还是“Qdrant 不可达，仍在 fallback”。
+* “Qdrant 可用”和“当前请求实际由 Qdrant 驱动”是两回事。
+  本轮健康检查出现 `qdrant_available=true` 同时 `active_search_backend=baseline`，正是为了明确区分“基础设施已接通”和“业务算法已切换”这两个阶段，避免后续误判已经完成搜索改造。
+* fallback 机制不应藏在异常处理里，而应显式暴露。
+  当前 `vector_store.py` 会明确给出 `degraded_to_baseline`，比单纯 try/except 后默默走旧逻辑更利于排障、答辩说明和后续灰度切换。

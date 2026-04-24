@@ -2,15 +2,18 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from backend.app.api.v1.users import get_current_user
 from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
 from backend.app.models.product import Category, Product, ProductSku, ProductTag
 from backend.app.models.user import User
-from backend.app.services.recommendations import recommend_products_for_user
+from backend.app.services.behavior import (
+    BEHAVIOR_VIEW_PRODUCT,
+    get_optional_user_from_request,
+    log_behavior,
+)
 from backend.app.services.cache import (
     PRODUCT_DETAIL_CACHE_TTL,
     RECOMMENDATIONS_CACHE_TTL,
@@ -19,13 +22,9 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
-from backend.app.services.behavior import (
-    BEHAVIOR_VIEW_PRODUCT,
-    get_optional_user_from_request,
-    log_behavior,
-)
+from backend.app.services.recommendations import recommend_products_for_user
 from backend.app.services.vector_search import find_related_products
-
+from backend.app.services.vector_store import build_runtime_marker
 
 router = APIRouter(tags=["catalog"])
 
@@ -127,6 +126,7 @@ def get_product_recommendations(
     db: Session = Depends(get_db),
     limit: int = Query(default=6, ge=1, le=20),
 ):
+    pipeline = build_runtime_marker()
     cache_key = build_cache_key("products", "recommendations", current_user.id, limit)
     cached_items = get_cached_json(cache_key)
     if isinstance(cached_items, list):
@@ -134,7 +134,7 @@ def get_product_recommendations(
             request=request,
             code=0,
             message="ok",
-            data={"items": cached_items},
+            data={"items": cached_items, "pipeline": pipeline},
             status_code=200,
         )
 
@@ -160,7 +160,7 @@ def get_product_recommendations(
         request=request,
         code=0,
         message="ok",
-        data={"items": items},
+        data={"items": items, "pipeline": pipeline},
         status_code=200,
     )
 
@@ -285,7 +285,8 @@ def get_related_products(
                     "reason": result.reason,
                 }
                 for result in results
-            ]
+            ],
+            "pipeline": build_runtime_marker(),
         },
         status_code=200,
     )

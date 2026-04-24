@@ -8,8 +8,9 @@ from backend.app.core.exceptions import register_exception_handlers
 from backend.app.core.logger import configure_logging
 from backend.app.core.minio import check_minio_connection
 from backend.app.core.rate_limit import register_rate_limit_middleware
-from backend.app.core.request_id import register_request_id_middleware
 from backend.app.core.redis import check_redis_connection
+from backend.app.core.request_id import register_request_id_middleware
+from backend.app.services.vector_store import probe_vector_store_runtime
 
 
 def create_app() -> FastAPI:
@@ -17,7 +18,8 @@ def create_app() -> FastAPI:
     configure_logging(settings.log_level)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI):
+    async def lifespan(app: FastAPI):
+        app.state.vector_store_runtime = probe_vector_store_runtime(log_on_degrade=True)
         if settings.enable_startup_checks:
             check_redis_connection()
             check_minio_connection()

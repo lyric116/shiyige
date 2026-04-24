@@ -18,6 +18,8 @@ async def test_semantic_search_returns_ranked_items_with_reason(
     assert response.status_code == 200
     assert body["code"] == 0
     assert body["data"]["query"] == "适合春日出游的素雅汉服"
+    assert body["data"]["pipeline"]["active_search_backend"] == "baseline"
+    assert body["data"]["pipeline"]["degraded_to_baseline"] is True
     assert body["data"]["items"][0]["name"] == "明制襦裙"
     assert "语义相近" in body["data"]["items"][0]["reason"]
     assert "汉服" in body["data"]["items"][0]["reason"]

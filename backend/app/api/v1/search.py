@@ -9,6 +9,11 @@ from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
 from backend.app.models.product import Category, Product, ProductTag
 from backend.app.schemas.search import SemanticSearchRequest
+from backend.app.services.behavior import (
+    BEHAVIOR_SEARCH,
+    get_optional_user_from_request,
+    log_behavior,
+)
 from backend.app.services.cache import (
     SEARCH_SUGGESTIONS_CACHE_TTL,
     build_cache_key,
@@ -16,13 +21,8 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
-from backend.app.services.behavior import (
-    BEHAVIOR_SEARCH,
-    get_optional_user_from_request,
-    log_behavior,
-)
 from backend.app.services.vector_search import semantic_search_products
-
+from backend.app.services.vector_store import build_runtime_marker
 
 router = APIRouter(tags=["search"])
 
@@ -254,12 +254,13 @@ def semantic_search(
     db: Session = Depends(get_db),
 ):
     query = normalize_keyword(payload.query)
+    pipeline = build_runtime_marker()
     if not query:
         return build_response(
             request=request,
             code=0,
             message="ok",
-            data={"query": "", "items": [], "total": 0},
+            data={"query": "", "items": [], "total": 0, "pipeline": pipeline},
             status_code=200,
         )
 
@@ -304,6 +305,7 @@ def semantic_search(
                 for result in results
             ],
             "total": len(results),
+            "pipeline": pipeline,
         },
         status_code=200,
     )

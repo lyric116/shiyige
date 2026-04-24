@@ -22,10 +22,20 @@ class AppSettings(BaseSettings):
     embedding_provider: str = "local_hash"
     embedding_model_name: str = "shiyige-local-hash-zh"
     embedding_dimension: int = 384
-    embedding_model_source: str = "Deterministic local hash fallback for offline development and tests"
+    embedding_model_source: str = (
+        "Deterministic local hash fallback for offline development and tests"
+    )
     embedding_model_revision: str = "local"
     embedding_device: str = "cpu"
     embedding_normalize: bool = True
+    vector_db_provider: str = "qdrant"
+    qdrant_url: str = "http://qdrant:6333"
+    qdrant_api_key: str | None = None
+    qdrant_timeout_seconds: float = 1.5
+    qdrant_collection_products: str = "shiyige_products_v1"
+    qdrant_collection_users: str = "shiyige_users_v1"
+    qdrant_collection_cf: str = "shiyige_collaborative_v1"
+    recommendation_pipeline_version: str = "v1"
 
 
 class InfrastructureSettings(BaseSettings):

@@ -1771,3 +1771,61 @@ Step 14:
 * Phase 1 只冻结现状，没有改写任何搜索和推荐打分逻辑；后续 Phase 2 及之后的改造必须保留旧逻辑作为 fallback/baseline。
 * 当前 baseline 报告默认会使用当前应用配置里的 embedding provider；在本地未额外配置时，仍然是 `local_hash`，这是当前真实基线的一部分，不要在 Phase 1 回避这一点。
 * `docs/recommendation_baseline_metrics.json` 是本轮导出的对照快照，后续如果重新导出导致数值变化，需要在提交说明里明确为什么变化以及是否属于预期。
+
+### 同日继续推进记录（三十八）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 2：引入 Qdrant 独立向量数据库
+
+新增与修改：
+
+* `docker-compose.yml`
+* `.env.example`
+* `.gitignore`
+* `backend/requirements.txt`
+* `backend/app/core/config.py`
+* `backend/app/main.py`
+* `backend/app/api/v1/health.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/search.py`
+* `backend/app/services/qdrant_client.py`
+* `backend/app/services/vector_store.py`
+* `backend/tests/test_qdrant_connection.py`
+* `backend/tests/api/test_health.py`
+* `backend/tests/api/test_recommendations.py`
+* `backend/tests/api/test_search_semantic.py`
+* `backend/tests/unit/test_settings.py`
+* `docs/deployment.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `UV_CACHE_DIR=.uv-cache uv pip install --python .venv/bin/python -r backend/requirements-dev.txt`
+* `./.venv/bin/python -m ruff check backend/app/core/config.py backend/app/main.py backend/app/api/v1/health.py backend/app/api/v1/products.py backend/app/api/v1/search.py backend/app/services/qdrant_client.py backend/app/services/vector_store.py backend/tests/api/test_health.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py backend/tests/unit/test_settings.py backend/tests/test_qdrant_connection.py`
+* `docker compose config --quiet`
+* `./.venv/bin/python -m pytest backend/tests/unit/test_settings.py backend/tests/api/test_health.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py backend/tests/test_qdrant_connection.py -q`
+* `docker compose down -v --remove-orphans`
+* `docker compose up -d --build`
+* `curl --noproxy '*' -s http://127.0.0.1:6333/collections`
+* `curl --noproxy '*' -s http://127.0.0.1/api/v1/health`
+* `./.venv/bin/python -m pytest backend/tests/test_qdrant_connection.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已在 `docker-compose.yml` 中引入独立 `qdrant` 服务，开放 `6333/6334` 端口并挂载持久化 volume，同时保留 PostgreSQL、Redis、MinIO 作为原有业务基础设施。
+* 已在 `backend/app/core/config.py` 增加 `VECTOR_DB_PROVIDER`、`QDRANT_URL`、collection 名称和 `RECOMMENDATION_PIPELINE_VERSION` 等配置，并补齐 `.env.example`。
+* 已新增 `backend/app/services/qdrant_client.py`，负责 Qdrant 连接、健康探测和 collection 存在性判断，没有掺入业务检索逻辑。
+* 已新增 `backend/app/services/vector_store.py`，统一暴露当前向量存储运行时信息；当 Qdrant 不可达时，系统会明确标记 `degraded_to_baseline=true`，而不是让接口崩溃。
+* 已把 Qdrant 启动探测接入 `backend/app/main.py`，并把运行时状态暴露到 `GET /api/v1/health`。
+* 已把当前推荐和语义搜索接口的数据体补充 `pipeline` 标记，能够说明“当前配置的是 Qdrant，但这一步仍使用 baseline 搜索/推荐后端”。
+* 已新增 `backend/tests/test_qdrant_connection.py`，覆盖 Qdrant 可达和不可达两种状态；旧接口测试和后端全量测试仍全部通过。
+* 本轮真实环境验证中，`curl http://127.0.0.1:6333/collections` 返回 `status=ok` 且 collections 为空数组，`curl http://127.0.0.1/api/v1/health` 返回 `qdrant_available=true`、`degraded_to_baseline=false` 和 `active_*_backend=baseline`。
+
+交接提醒：
+
+* 当前 Phase 2 只是把 Qdrant 作为基础设施接入，并没有把搜索或推荐真正切到 Qdrant；因此健康检查里会出现“Qdrant 可用，但 active backend 仍是 baseline”的状态，这是刻意保守的阶段结果。
+* `docker compose up -d --build` 首次构建 API 镜像时，Docker BuildKit 出现过一次 snapshot 导出异常；直接重试后命中缓存并成功完成构建，当前代码本身没有因此回滚。
+* 由于 `.gitignore` 原先会忽略 `.env.*`，本轮额外加入了 `!.env.example`，后续如果再添加新的环境模板文件，记得确认不会被忽略。

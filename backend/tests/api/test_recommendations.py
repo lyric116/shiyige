@@ -4,7 +4,13 @@ from sqlalchemy import select
 from backend.app.models.product import Product
 
 
-async def create_user_preference_trace(api_client, headers, product_id: int, sku_id: int, query: str) -> None:
+async def create_user_preference_trace(
+    api_client,
+    headers,
+    product_id: int,
+    sku_id: int,
+    query: str,
+) -> None:
     detail_response = await api_client.get(f"/api/v1/products/{product_id}", headers=headers)
     assert detail_response.status_code == 200
 
@@ -63,8 +69,14 @@ async def test_recommendations_return_different_results_for_different_users(
         "古风发簪",
     )
 
-    first_response = await api_client.get("/api/v1/products/recommendations", headers=first_headers)
-    second_response = await api_client.get("/api/v1/products/recommendations", headers=second_headers)
+    first_response = await api_client.get(
+        "/api/v1/products/recommendations",
+        headers=first_headers,
+    )
+    second_response = await api_client.get(
+        "/api/v1/products/recommendations",
+        headers=second_headers,
+    )
 
     first_body = first_response.json()
     second_body = second_response.json()
@@ -73,6 +85,8 @@ async def test_recommendations_return_different_results_for_different_users(
     assert second_response.status_code == 200
     assert first_body["data"]["items"]
     assert second_body["data"]["items"]
+    assert first_body["data"]["pipeline"]["active_recommendation_backend"] == "baseline"
+    assert first_body["data"]["pipeline"]["degraded_to_baseline"] is True
     assert first_body["data"]["items"][0]["id"] != hanfu_id
     assert second_body["data"]["items"][0]["id"] != accessory_id
     assert [item["id"] for item in first_body["data"]["items"][:3]] != [

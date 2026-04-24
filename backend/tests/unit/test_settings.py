@@ -10,6 +10,9 @@ def test_app_settings_use_safe_defaults() -> None:
     assert settings.app_name == "Shiyige API"
     assert settings.api_v1_prefix == "/api/v1"
     assert settings.log_level == "INFO"
+    assert settings.vector_db_provider == "qdrant"
+    assert settings.qdrant_url == "http://qdrant:6333"
+    assert settings.recommendation_pipeline_version == "v1"
 
 
 def test_infrastructure_settings_raise_clear_error_when_required_env_missing(monkeypatch) -> None:

@@ -19,6 +19,7 @@ htmlcov/
 # Local environment files
 .env
 .env.*
+!.env.example
 .python-version
 
 # Local databases and logs
