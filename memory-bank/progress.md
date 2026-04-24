@@ -2110,3 +2110,58 @@ Step 14:
 * 当前协同过滤召回还是基于 `user_behavior_log` 的轻量相似用户/共同行为聚合，真正的“用户 sparse vector / item-item 共现索引化”属于下一阶段 Phase 8。
 * `recommendation_pipeline.py` 里的内容语义、关键词兴趣和相似商品召回依赖 Qdrant；当这些调用失败时，当前实现会保留协同过滤、热门和新品通道继续工作，因此后台调试接口即使在 Qdrant 短暂异常时也不会直接空白。
 * 当前首页推荐接口已经不再全量扫描商品，但 `build_user_interest_profile()` 仍会在构建画像时更新 PostgreSQL 侧 profile 元数据；如果后续要继续压缩 p95，应优先考虑缓存画像和 Phase 8 的协同过滤索引，而不是重新退回全量遍历。
+
+### 同日继续推进记录（四十四）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 8：实现协同过滤召回索引
+
+新增与修改：
+
+* `backend/app/models/recommendation_experiment.py`
+* `backend/alembic/env.py`
+* `backend/alembic/versions/20260424_11_recommendation_experiment.py`
+* `backend/app/models/__init__.py`
+* `backend/app/services/collaborative_filtering.py`
+* `backend/app/tasks/collaborative_index_tasks.py`
+* `backend/app/services/recall_collaborative.py`
+* `backend/app/services/candidate_fusion.py`
+* `backend/app/services/recommendation_pipeline.py`
+* `backend/scripts/build_collaborative_index.py`
+* `backend/tests/test_collaborative_filtering.py`
+* `backend/tests/test_recommendation_pipeline.py`
+* `docs/collaborative_filtering_design.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/models/recommendation_experiment.py backend/app/services/collaborative_filtering.py backend/app/tasks/collaborative_index_tasks.py backend/app/services/recall_collaborative.py backend/app/services/candidate_fusion.py backend/app/services/recommendation_pipeline.py backend/scripts/build_collaborative_index.py backend/tests/test_collaborative_filtering.py backend/tests/test_recommendation_pipeline.py`
+* `./.venv/bin/python -m pytest backend/tests/test_collaborative_filtering.py backend/tests/test_recommendation_pipeline.py backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `docker compose up -d --build`
+* `docker compose exec -T api python -m backend.scripts.reindex_embeddings`
+* `docker compose exec -T api python - <<'PY' ... # 写入 phase8-cf-a@example.com / phase8-cf-b@example.com 的相似兴趣行为样本`
+* `docker compose exec -T api python backend/scripts/build_collaborative_index.py`
+* `./.venv/bin/python - <<'PY' ... # 管理员登录并请求 /api/v1/admin/recommendations/debug?email=phase8-cf-b@example.com&limit=5`
+
+结果：
+
+* 已新增 `backend/app/models/recommendation_experiment.py` 和迁移 `20260424_11_recommendation_experiment.py`，把协同过滤离线产物从“只在内存里临时计算”升级成可以持久化在数据库中的正式元数据实体。
+* 已新增 `backend/app/services/collaborative_filtering.py`，实现行为权重、时间衰减、Qdrant sparse user vector 相似用户召回，以及基于用户行为聚合的 item-item 共现图构建。
+* 已新增 `backend/app/tasks/collaborative_index_tasks.py`，负责创建 sparse-only 的 `shiyige_collaborative_v1` collection、写入每个用户的 `interactions` sparse vector，并把 `collaborative_item_cooccurrence_v1` 工件持久化到 `recommendation_experiment`。
+* 已把 `backend/app/services/recall_collaborative.py` 从 Phase 7 的轻量相似行为聚合改为双通道委托层，正式输出 `collaborative_user` 和 `item_cooccurrence` 两条协同过滤召回来源。
+* 已把 `backend/app/services/candidate_fusion.py` 与 `backend/app/services/recommendation_pipeline.py` 扩展到新的协同过滤通道，使融合结果和后台调试响应能保留两条通道的分数、原因和元信息。
+* 已新增 `backend/scripts/build_collaborative_index.py` 作为离线构建入口；脚本支持直接从仓库根目录执行，并在本地 Qdrant 地址与 Compose 内部地址之间自动择优连接。
+* 已新增 `backend/tests/test_collaborative_filtering.py`，覆盖 sparse user vector 建索引、相似用户召回和 item cooccurrence 召回；同时更新 `backend/tests/test_recommendation_pipeline.py`，验证多路召回中确实出现新的协同过滤通道。
+* 真实 Compose 环境验证中，API 容器已自动执行 `20260424_11` 迁移；`docker compose exec -T api python -m backend.scripts.reindex_embeddings` 返回 `indexed=20 skipped=0 model=BAAI/bge-small-zh-v1.5`，说明商品向量索引正常可用。
+* 同一真实环境下，执行 `docker compose exec -T api python backend/scripts/build_collaborative_index.py` 返回 `indexed_users=4 qdrant_points=4 item_nodes=2`，说明协同过滤 sparse 用户索引和 item 共现工件都已真实落地。
+* 进一步人工构造 `phase8-cf-a@example.com` 与 `phase8-cf-b@example.com` 两位兴趣相似用户后，请求 `/api/v1/admin/recommendations/debug?email=phase8-cf-b@example.com&limit=5` 的首条推荐为 `宋风褙子套装`；调试明细同时出现 `collaborative_user` 和 `item_cooccurrence`，且已消费的 `明制襦裙` 没有重复推荐，符合 Phase 8 的人工验收要求。
+* 本轮最终验证结果为：Phase 8 专项测试、推荐相关 API 回归、后端全量测试、容器重建、商品向量重建、协同过滤离线构建和真实后台调试接口验证全部通过；后端全量测试结果为 `130 passed`。
+
+交接提醒：
+
+* Phase 8 之后，协同过滤已经依赖离线构建步骤；如果演示环境里新增了大量行为数据，应重新执行 `backend/scripts/build_collaborative_index.py`，不要假设请求时会自动刷新 Qdrant sparse 用户索引。
+* `recommendation_experiment` 现在承载 item-item 共现图工件；后续如果要扩展离线评估、A/B 实验或排序特征缓存，应优先复用这张表，而不是再散落到新的 JSON 文件或临时表。
+* 下一阶段应进入 Phase 9 的高级排序与重排，把当前多路召回结果进一步转成显式特征和统一排序分数，而不是继续在召回层堆叠更多启发式规则。

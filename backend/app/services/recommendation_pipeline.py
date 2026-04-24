@@ -119,12 +119,16 @@ def run_recommendation_pipeline(
                 exc,
             )
 
-        recall_results["collaborative"] = recall_collaborative_candidates(
-            db,
-            user_id=user_id,
-            consumed_product_ids=consumed_product_ids,
-            recent_product_ids=recent_product_ids,
-            top_terms=top_terms,
+        recall_results.update(
+            recall_collaborative_candidates(
+                db,
+                user_id=user_id,
+                consumed_product_ids=consumed_product_ids,
+                recent_product_ids=recent_product_ids,
+                top_terms=top_terms,
+                settings=app_settings,
+                client=client,
+            )
         )
 
     recall_results["trending"] = recall_trending_candidates(

@@ -178,7 +178,8 @@ def test_recommendation_pipeline_returns_multi_channel_candidates_for_engaged_us
             for candidate in pipeline_run.candidates
         )
         assert any(
-            "collaborative" in candidate.recall_channels
+            "collaborative_user" in candidate.recall_channels
+            or "item_cooccurrence" in candidate.recall_channels
             for candidate in pipeline_run.candidates
         )
         assert pipeline_run.candidates[0].reason

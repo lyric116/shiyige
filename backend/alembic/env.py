@@ -9,6 +9,7 @@ from backend.app.models import (
     membership,  # noqa: F401
     product,  # noqa: F401
     recommendation,  # noqa: F401
+    recommendation_experiment,  # noqa: F401
     review,  # noqa: F401
     user,  # noqa: F401
 )

@@ -1041,3 +1041,35 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前 `recommendation_pipeline.py` 会在用户行为不足时显式生成 `cold_start` 通道，并把热门与新品混合进同一条证据链里；这样冷启动推荐不再是“其他通道失败后的副作用”，而是可解释的正式策略。
 * 推荐接口“不全表扫描商品”的关键在于把全局信息拆回各自合适的数据源。
   现在内容与关键词召回走 Qdrant，协同过滤走用户行为日志，热门与新品走有界 SQL 查询，最后只把融合后的有限候选商品回表加载；这和旧版 `load_active_products_for_recommendations()` 再全量打分的思路已经是两套完全不同的系统边界。
+
+### 9.43 协同过滤层现在已经形成“行为加权层 + 稀疏用户索引层 + 离线共现图层 + 双通道召回层”的 Phase 8 形态
+
+第 67 次同日推进把 Phase 8 的协同过滤从“轻量日志聚合”升级成了可离线构建、可持久化、可解释的正式召回层：
+
+* `backend/app/services/collaborative_filtering.py`：协同过滤核心服务层。
+  当前集中保存行为权重表、时间衰减规则、`build_user_sparse_vector()`、相似用户 sparse 检索、item-item 共现图构建和两类召回结果的统一 `RecallItem` 输出。这里把 “product_id 作为 sparse 维度” 的设计固定下来，使协同过滤结果可以直接解释为“哪些商品行为导致了用户相似”。
+* `backend/app/tasks/collaborative_index_tasks.py`：离线构建任务层。
+  当前负责幂等创建 `QDRANT_COLLECTION_CF`、写入每个用户的 sparse `interactions` 向量、建立 `user_id` payload 索引，并把离线 item 共现图和构建元数据回写到数据库。Phase 8 之后，协同过滤不再只是请求时临时扫日志，而是有了正式的离线 build 步骤。
+* `backend/app/models/recommendation_experiment.py`：推荐实验与工件元数据层。
+  当前新增 `recommendation_experiment` 表，用于持久化 `experiment_key`、`strategy`、`pipeline_version`、`model_version`、`config_json` 和 `artifact_json`；本轮主要承载 `collaborative_item_cooccurrence_v1` 的离线工件，但表结构本身已经能继续支持后续排序特征缓存或实验快照。
+* `backend/alembic/versions/20260424_11_recommendation_experiment.py`、`backend/alembic/env.py` 与 `backend/app/models/__init__.py`：迁移接线层。
+  当前保证新实验表会进入 Alembic 元数据扫描，并随容器启动自动迁移，不需要后续开发者手工补建表。
+* `backend/scripts/build_collaborative_index.py`：离线运维入口。
+  当前提供正式 CLI，可直接从仓库根目录执行；脚本会在需要时补齐 ORM 元数据，并在 `http://qdrant:6333` 与 `http://127.0.0.1:6333` 间自动选择可用地址，兼容 Compose 容器内和本地直连两种运行方式。
+* `backend/app/services/recall_collaborative.py`：协同召回分发层。
+  当前不再自己做日志聚合，而是明确拆成 `collaborative_user` 与 `item_cooccurrence` 两条通道，并把两类结果作为独立 source 返回给推荐编排层。
+* `backend/app/services/candidate_fusion.py` 与 `backend/app/services/recommendation_pipeline.py`：协同通道接入层。
+  当前融合层已经识别新的协同过滤通道权重，推荐主流水线也会把两条通道的 `recall_channels`、`channel_details` 和原因说明原样带到最终调试响应里，不会在融合阶段丢失证据链。
+* `backend/tests/test_collaborative_filtering.py` 与 `backend/tests/test_recommendation_pipeline.py`：Phase 8 验收测试层。
+  前者验证 sparse 用户索引、相似用户召回和 item 共现召回的基本正确性；后者验证完整推荐流水线确实把 `collaborative_user` / `item_cooccurrence` 接到了最终候选集合里。
+* `docs/collaborative_filtering_design.md`：协同过滤设计说明文档。
+  当前把行为权重、时间衰减、Qdrant collection 契约、离线工件 key 和运行边界写成了后续开发者可直接复用的说明。
+
+这里有三个新的关键架构洞察：
+
+* 协同过滤的离线产物必须成为正式资产，而不是继续藏在请求时临时计算里。
+  现在 sparse 用户索引写入 Qdrant，item 共现图写入 `recommendation_experiment`，这意味着“构建何时发生、工件存在哪里、运行时如何回退”都有了清晰边界；后续无论做 cron、手工运维还是实验回滚，都不需要重新把逻辑塞回接口请求里。
+* `collaborative_user` 和 `item_cooccurrence` 必须保留为两条独立召回通道，而不是过早混成一个协同分。
+  前者回答“和我相似的人还喜欢什么”，后者回答“和我最近看的商品经常一起出现什么”；它们的可解释性、冷启动表现和后续排序特征价值都不同，所以在 `channel_details` 里分开保留证据是必要的。
+* 以 `product_id` 作为 sparse 向量维度，是比赛型推荐系统里比“复杂 latent factor 训练”更稳的第一步。
+  这种表示法天然支持行为权重和时间衰减，也便于直接映射到“哪些商品行为导致了相似用户召回”；在答辩、调试和运维上都比黑盒 embedding 更容易解释和修正。
