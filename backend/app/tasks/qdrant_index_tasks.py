@@ -17,7 +17,11 @@ from backend.app.services.product_index_document import (
     get_product_point_id,
     is_product_indexable,
 )
-from backend.app.services.qdrant_client import create_qdrant_client, get_qdrant_connection_status
+from backend.app.services.qdrant_client import (
+    create_qdrant_client,
+    get_qdrant_connection_status,
+    invalidate_qdrant_connection_status,
+)
 from backend.app.tasks.embedding_tasks import upsert_product_embedding
 from backend.app.tasks.qdrant_schema_tasks import ensure_product_collection
 
@@ -169,6 +173,7 @@ def sync_products_to_qdrant(
                 db.add(failed_embedding)
 
         db.commit()
+        invalidate_qdrant_connection_status(app_settings)
         return {
             "mode": mode,
             "indexed": indexed,
@@ -244,6 +249,7 @@ def delete_product_points(
             db.add(embedding)
 
         db.commit()
+        invalidate_qdrant_connection_status(app_settings)
         return {
             "deleted": len(point_ids),
             "product_ids": sorted(set(product_ids)),

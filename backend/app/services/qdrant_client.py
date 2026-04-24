@@ -69,6 +69,22 @@ def get_qdrant_connection_status(
             close()
 
 
+def invalidate_qdrant_connection_status(
+    settings: AppSettings | None = None,
+    *,
+    url: str | None = None,
+) -> None:
+    if url is not None:
+        _status_cache.pop(url, None)
+        return
+
+    if settings is not None:
+        _status_cache.pop(settings.qdrant_url, None)
+        return
+
+    _status_cache.clear()
+
+
 def collection_exists(
     collection_name: str,
     *,

@@ -1205,3 +1205,37 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前 `recommendation_admin.py` 把 KPI、Qdrant 状态、索引摘要和实验方案收成一个稳定输出，这让后台静态页面可以更轻、更稳地展示系统全貌，也为后续加更多指标保留了清晰扩展点。
 * 当首页登录成功后会自动发起推荐请求时，embedding 初始化就必须被视为并发入口而不是离线预热细节。
   本轮暴露出的 `product_embedding.product_id` 唯一键冲突证明：只要首页和测试/脚本同时拉推荐，商品 embedding 就会面临真实并发首写；因此 `embedding_tasks.py` 的幂等 upsert 现在已经是推荐展示层稳定性的基础设施，而不是单纯的数据任务实现。
+
+### 9.47 Phase 12 现在已经形成“文档资产层 + 答辩讲稿层 + 最终验收约束层”的收尾形态
+
+第 71 次同日推进把推荐系统从“实现完成”推进到了“可答辩、可验收、可复盘”的最终状态：
+
+* `docs/vector_database_design.md`：向量数据库设计总说明。
+  当前明确解释了为什么旧版“业务库 JSON 向量 + Python cosine”不够、为什么当前选择 Qdrant 而不是继续把 pgvector 当主方案，以及商品/协同过滤 collection、payload index、同步元数据和降级策略的职责边界。
+* `docs/recommendation_pipeline.md`：推荐主链路文档。
+  当前把多路召回、候选融合、排序、业务重排、冷启动和推荐理由串成了一张清晰流程图，使答辩时可以按模块解释，而不是临场从代码里找函数名。
+* `docs/search_pipeline.md`：搜索主链路文档。
+  当前把 dense+sparse hybrid retrieval、RRF、ColBERT rerank、过滤条件下推和解释生成都写成了正式说明，能直接回应“搜索是不是只是换个名字的 cosine”。
+* `docs/recommendation_evaluation.md`：离线评估报告层。
+  当前不再只是脚本打印的 Markdown 表，而是加入了场景定义、指标解释、模式对比和结论段，使 `baseline`、`dense_sparse_colbert`、`multi_recall_ltr` 之间的差异可直接作为答辩证据引用。
+* `docs/performance_benchmark.md`：性能报告层。
+  当前整理了 100 / 1000 / 10000 三档真实压测数据，并把 100000 商品规模明确写成容量推演而不是含糊带过；这让性能边界本身也成为可解释资产。
+* `docs/defense_script.md`：答辩讲稿层。
+  当前把开场讲稿、演示顺序和高频 FAQ 固定成一份统一口径文档，确保“不是只算余弦”“为什么不是 pgvector”“推荐系统完整性体现在哪”这些问题有工程一致的回答。
+* `backend/app/services/qdrant_client.py`：Qdrant 状态缓存与失效层。
+  当前除了短 TTL 状态缓存外，还新增 `invalidate_qdrant_connection_status(...)`，确保 collection 刚创建或 point 刚写入后，运行时探测不会继续读到几秒前的旧状态。
+* `backend/app/tasks/qdrant_index_tasks.py`：索引写入后的状态同步层。
+  当前在 full sync / delete 成功提交后会主动失效 Qdrant 状态缓存，从而保证 `probe_vector_store_runtime()`、后台索引看板和健康检查读到的是最新 collection 事实。
+* `backend/tests/unit/test_settings.py`：环境隔离守护层。
+  当前明确清掉 `QDRANT_URL` 环境变量，避免全量测试时被其他测试模块的 `os.environ.setdefault(...)` 污染；这保证“默认配置测试”测的真的是默认值，而不是全局副作用。
+* `memory-bank/progress.md` 与 `memory-bank/architecture.md`：最终交接层。
+  当前不仅记录了 Phase 12 的文档资产，还明确记下了最终验收时暴露出的 Qdrant 状态缓存失效约束和 Compose PostgreSQL 验收方式，为下一位开发者保留稳定入口。
+
+这里有三个新的关键架构洞察：
+
+* 对比赛型系统来说，文档和讲稿不是附属物，而是系统架构的一部分。
+  当系统已经拥有多路召回、向量数据库和后台调试页后，如果没有统一的设计文档和答辩口径，老师看到的仍然只是“很多零散功能”；Phase 12 实际上是在给实现补上可解释、可证明的外层结构。
+* 一旦引入运行时状态缓存，就必须同步设计缓存失效协议。
+  本轮暴露出的 bug 说明：即使缓存 TTL 只有几秒，只要 collection 生命周期变化比 TTL 更快，runtime marker 就会出现“索引已经写入，但系统还以为没准备好”的错误判断。也就是说，Qdrant 状态缓存不是单纯的性能优化点，而是带有一致性语义的基础设施。
+* 最终验收脚本依赖的数据库必须与当前迁移链保持同构。
+  `backend/dev.db` 在本轮暴露出 schema 落后于 Alembic 的事实，所以最终验收改为显式指向 Compose PostgreSQL；这说明当前项目的“正式验收环境”已经不再是临时 SQLite，而是容器化 PostgreSQL + Qdrant 组合。

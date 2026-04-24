@@ -2351,3 +2351,59 @@ Step 14:
 * 首页登录后会自动请求 `/api/v1/products/recommendations?slot=home&debug=true`；后续如果继续改商品 embedding 初始化、推荐缓存或首页加载顺序，必须保持 `backend/app/tasks/embedding_tasks.py` 的并发幂等语义，否则很容易在真实浏览器和 e2e 里再次触发双请求竞争。
 * `admin/reindex.html` 当前在 Qdrant 不可用或 collection 尚未就绪时，会对 full rebuild 自动回退到旧的 `/api/v1/admin/reindex/products`；这个兼容分支是为了保证本地和答辩环境都能演示，不要在未替换验证方案前删掉。
 * `front/index.html` 在本地工作区里有用户自己的未提交修改，本轮 Phase 11 提交不会携带它；同样，`memory-bank/shiyige_recommendation_upgrade_plan.md` 仍作为未跟踪的计划输入保留，不应被提交进代码历史。
+
+### 同日继续推进记录（四十八）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 12：补齐答辩文档、最终验收与最终收尾
+
+新增与修改：
+
+* `docs/vector_database_design.md`
+* `docs/recommendation_pipeline.md`
+* `docs/search_pipeline.md`
+* `docs/recommendation_evaluation.md`
+* `docs/performance_benchmark.md`
+* `docs/defense_script.md`
+* `backend/app/services/qdrant_client.py`
+* `backend/app/tasks/qdrant_index_tasks.py`
+* `backend/tests/unit/test_settings.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `docker compose down -v --remove-orphans`
+* `docker compose up -d`
+* `curl -s http://127.0.0.1:6333/collections`
+* `curl -s http://127.0.0.1/api/v1/health`
+* `DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige QDRANT_URL=http://127.0.0.1:6333 ./.venv/bin/python -m backend.scripts.reindex_products_to_qdrant --mode full`
+* `DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige QDRANT_URL=http://127.0.0.1:6333 ./.venv/bin/python backend/scripts/build_collaborative_index.py`
+* `curl -s http://127.0.0.1/api/v1/health`
+* `DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige QDRANT_URL=http://127.0.0.1:6333 ./.venv/bin/python backend/scripts/evaluate_recommendations.py --scenario all`
+* `DATABASE_URL=sqlite:////tmp/shiyige_phase12_bench_100.db QDRANT_URL=http://127.0.0.1:6333 QDRANT_COLLECTION_PRODUCTS=shiyige_phase12_bench_100_products QDRANT_COLLECTION_CF=shiyige_phase12_bench_100_cf ./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 100 --users 50 --requests 20`
+* `DATABASE_URL=sqlite:////tmp/shiyige_phase12_bench_1000.db QDRANT_URL=http://127.0.0.1:6333 QDRANT_COLLECTION_PRODUCTS=shiyige_phase12_bench_1000_products QDRANT_COLLECTION_CF=shiyige_phase12_bench_1000_cf ./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 1000 --users 200 --requests 40`
+* `DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige QDRANT_URL=http://127.0.0.1:6333 ./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 1000`
+* `./.venv/bin/python -m ruff check backend/app/services/qdrant_client.py backend/app/tasks/qdrant_index_tasks.py backend/tests/unit/test_settings.py`
+* `./.venv/bin/python -m pytest backend/tests/test_hybrid_search.py backend/tests/test_product_qdrant_indexing.py backend/tests/unit/test_settings.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `./.venv/bin/python -m pytest tests/e2e/test_full_demo_flow.py -q`
+
+结果：
+
+* 已重写 `docs/vector_database_design.md`、`docs/recommendation_pipeline.md`、`docs/search_pipeline.md`，把“旧版本问题 vs 升级后方案”、架构图、数据流、算法模块、运行时降级和答辩表述统一整理成可直接展示的文档，而不是只保留脚本原始输出。
+* 已新增 `docs/defense_script.md`，把开场讲稿、演示顺序、老师高频追问以及“不是只算余弦 / 为什么不是 pgvector / 为什么要向量数据库 / 推荐系统完整性”这些回答固定成统一口径。
+* 已把 `docs/recommendation_evaluation.md` 升级为正式评估报告；当前保留 3 个场景、7 组模式对比和指标解释，其中 `multi_recall_ltr` 达到 `P@5=0.6`、`R@5=1.0`、`NDCG@5=1.0`，明显优于 `baseline` 的 `0.4667 / 0.7778 / 0.6763`。
+* 已把 `docs/performance_benchmark.md` 升级为可答辩版压测报告；当前明确写入了 100、1000、10000 商品规模的真实结果，并对 100000 规模给出容量推演。最新 10k 结果为：`search_keyword p95=2298.531ms`、`search_semantic p95=4030.115ms`、`recommend_home p95=38891.419ms`、`related_products p95=90946.377ms`。
+* Compose 重建后，首次 `curl http://127.0.0.1/api/v1/health` 返回 `degraded_to_baseline=true` 和 `qdrant_error=Qdrant product collection has no indexed points`；在商品索引重建和协同过滤构建完成后，同一健康检查已切换为 `active_search_backend=qdrant_hybrid`、`active_recommendation_backend=multi_recall`，证明最终验收链路完整有效。
+* 最终验收中发现一个真实运行时问题：`backend/app/services/qdrant_client.py` 的短 TTL 状态缓存只按 URL 缓存，不会在 collection 刚创建或 point 刚写入后立即失效，导致后续几秒内 runtime marker 可能误判“collection 不存在”或“没有 indexed points”，从而错误退回 baseline。
+* 已新增 `invalidate_qdrant_connection_status(...)` 并在 `backend/app/tasks/qdrant_index_tasks.py` 的 full sync / delete 成功提交后主动失效缓存；这修复了全量测试里暴露出的两个问题：Hybrid search 刚建索引后仍走 baseline，以及失败重试后 `qdrant_point_count` 被错误读成 `0`。
+* 同时修正了 `backend/tests/unit/test_settings.py` 对 `QDRANT_URL` 环境变量的隔离，避免在全量测试时被其他测试模块的 `os.environ.setdefault("QDRANT_URL", "http://127.0.0.1:6333")` 污染。
+* 最终回归结果为：Qdrant 集合查询、Nginx 健康检查、商品全量重建、协同过滤构建、离线评估、100/1000/10000 压测、后端全量测试 `141 passed`、完整 e2e `test_full_demo_flow` 全部通过。
+
+交接提醒：
+
+* 第 12 步最终验收里，本地默认 `backend/dev.db` 暴露出 schema 落后于当前 Alembic 的问题，所以本轮把重建脚本切到了 Compose PostgreSQL：`DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige`。后续如果继续用仓库根目录脚本做正式验收，优先沿用 Compose PostgreSQL，而不要假设本地 SQLite 一定已迁移到最新 schema。
+* `docs/performance_benchmark.md` 里的所有结果都明确基于 `local_hash` provider，用来隔离检索和排序开销；如果后续要展示真实 embedding 模型推理耗时，需要额外单独跑一版保留 `fastembed_*` provider 的报告。
+* 当前 10k 结果已经证明 `related_products` 是最急需优化的旧边界；如果后续继续推进 100000 商品规模演示，应优先把该接口迁到 ANN-only 路径，并补用户画像/候选缓存层。

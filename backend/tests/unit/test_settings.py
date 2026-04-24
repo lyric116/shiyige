@@ -17,6 +17,7 @@ def test_app_settings_use_safe_defaults(monkeypatch) -> None:
         "COLBERT_EMBEDDING_PROVIDER",
         "COLBERT_EMBEDDING_MODEL_NAME",
         "COLBERT_EMBEDDING_DIMENSION",
+        "QDRANT_URL",
     ):
         monkeypatch.delenv(key, raising=False)
 
