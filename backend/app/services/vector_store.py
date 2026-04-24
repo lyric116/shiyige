@@ -78,7 +78,7 @@ def probe_vector_store_runtime(
         qdrant_error=qdrant_status.error or search_error,
         degraded_to_baseline=degraded,
         active_search_backend="qdrant_hybrid" if search_ready else "baseline",
-        active_recommendation_backend="baseline",
+        active_recommendation_backend="multi_recall" if search_ready else "baseline",
     )
     if degraded and log_on_degrade:
         logger.warning(

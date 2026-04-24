@@ -6,17 +6,15 @@ from backend.app.api.v1.admin_auth import create_operation_log, get_current_admi
 from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
 from backend.app.models.admin import AdminUser
+from backend.app.models.product import Product
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.models.user import User
 from backend.app.services.embedding import get_embedding_provider
+from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
 from backend.app.services.recommendations import (
-    build_user_interest_profile,
     collect_product_ids_from_log,
-    extract_profile_terms,
-    load_active_products_for_recommendations,
     load_products_for_interest_profile,
     load_user_behavior_logs,
-    rank_recommendation_candidates,
 )
 
 router = APIRouter(prefix="/admin/recommendations", tags=["admin-recommendations"])
@@ -104,9 +102,24 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
                 "reason": candidate.reason,
                 "matched_terms": candidate.matched_terms,
                 "score": round(candidate.score, 6),
-                "vector_similarity": round(candidate.similarity, 6),
+                "vector_similarity": round(
+                    getattr(candidate, "similarity", getattr(candidate, "vector_similarity", 0.0)),
+                    6,
+                ),
                 "vector_score": round(candidate.vector_score, 6),
                 "term_bonus": round(candidate.term_bonus, 6),
+                "recall_channels": list(getattr(candidate, "recall_channels", [])),
+                "channel_details": [
+                    {
+                        "channel": detail.recall_channel,
+                        "score": round(detail.recall_score, 6),
+                        "rank": detail.rank_in_channel,
+                        "matched_terms": list(detail.matched_terms),
+                        "reason_parts": list(detail.reason_parts),
+                        "metadata": dict(detail.metadata),
+                    }
+                    for detail in getattr(candidate, "channel_details", [])
+                ],
                 "embedding_dimension": len(embedding.embedding_vector or []) if embedding else 0,
                 "embedding_vector_preview": round_vector_preview(
                     embedding.embedding_vector if embedding else None
@@ -139,20 +152,27 @@ def debug_recommendations(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 
     embedding_provider = get_embedding_provider()
-    profile = build_user_interest_profile(db, user_id=user.id, provider=embedding_provider)
-    db.expire_all()
+    pipeline_run = run_recommendation_pipeline(
+        db,
+        user_id=user.id,
+        limit=limit,
+        provider=embedding_provider,
+        candidate_limit=max(limit * 4, 12),
+    )
+    profile = pipeline_run.profile
 
     logs = load_user_behavior_logs(db, user.id)
     referenced_product_ids: set[int] = set()
     for log in logs:
         referenced_product_ids.update(collect_product_ids_from_log(log))
 
-    top_terms, consumed_product_ids = extract_profile_terms(profile)
+    top_terms = pipeline_run.top_terms
+    consumed_product_ids = pipeline_run.consumed_product_ids
     referenced_product_ids.update(consumed_product_ids)
     products_by_id = load_products_for_interest_profile(db, referenced_product_ids)
 
-    active_products = load_active_products_for_recommendations(db)
-    candidates = rank_recommendation_candidates(active_products, profile)
+    active_products = db.scalar(select(func.count(Product.id)).where(Product.status == 1)) or 0
+    candidates = pipeline_run.candidates
     indexed_products = db.scalar(select(func.count(ProductEmbedding.id))) or 0
 
     create_operation_log(
@@ -194,8 +214,9 @@ def debug_recommendations(
             },
             "metrics": {
                 "indexed_products": indexed_products,
-                "active_products": len(active_products),
+                "active_products": active_products,
                 "candidate_count": len(candidates),
+                "cold_start": pipeline_run.cold_start,
             },
             "recent_behaviors": serialize_behavior_logs(logs, products_by_id),
             "recommendations": serialize_candidates(candidates, limit=limit),

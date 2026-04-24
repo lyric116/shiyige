@@ -252,6 +252,7 @@ def export_baseline_metrics(output_path: Path = DEFAULT_OUTPUT_PATH) -> dict[str
                 user_id=int(user_case["user_id"]),
                 limit=5,
                 provider=provider,
+                force_baseline=True,
             )
             latency_ms = (perf_counter() - started_at) * 1000
             recommendation_cases.append(

@@ -1003,3 +1003,41 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在 `search_filters.py` 同时服务于 payload filter 和 ORM fallback，意味着无论当前请求是否降级到 baseline，`category_id`、价格区间、朝代、工艺、节令、场景和库存语义都保持一致，不会出现“同一个接口在两条路径上筛选规则不同”的问题。
 * 混合搜索真正替代“全量遍历”，关键不在于把向量搬进 Qdrant，而在于只回表最终候选。
   当前 `hybrid_search.py` 先在 Qdrant 内部做 dense/sparse 召回，再只把 Top 50 候选的 ColBERT 向量和最终少量商品 ID 拉回应用层；这已经从架构上切断了过去“先从 PostgreSQL 拉全量商品，再逐个算余弦”的旧模式。
+
+### 9.42 推荐层现在已经形成“多路召回通道 + 候选融合层 + 多样性层 + 调试证据层”的 Phase 7 形态
+
+第 66 次同日推进把首页推荐从单一路径升级成了真正的多路召回结构：
+
+* `backend/app/services/recommendation_pipeline.py`：推荐编排层。
+  当前负责构建用户画像、判断是否冷启动、调用各召回通道、做候选融合和多样性控制，并把最终候选包装成带 `recall_channels`、`channel_details`、`matched_terms`、`vector_score` 和 `term_bonus` 的统一对象。
+* `backend/app/services/recall_content.py`：内容召回层。
+  这里同时提供两条内容相关通道：一条是用 `UserInterestProfile.embedding_vector` 去 Qdrant 做 dense 召回的 `content_profile`；另一条是用用户最近浏览/加购商品的 dense vector 做相似商品延展的 `related_products`。这使推荐系统第一次具备了“用户整体兴趣”和“最近种子商品”两种内容视角。
+* `backend/app/services/recall_sparse_interest.py`：关键词兴趣召回层。
+  当前会把 `top_terms` 拼成 sparse query，命中 Qdrant 里的类目、标签、朝代、工艺、场景和节令 payload，从而让推荐不只依赖 dense 语义画像。
+* `backend/app/services/recall_collaborative.py`：轻量协同过滤召回层。
+  当前基于 `user_behavior_log` 中与当前用户有共同商品行为的其他用户，聚合这些相似用户进一步浏览/加购的商品，形成不依赖内容向量的协同候选。这还是 Phase 7 的轻量版本，真正的 sparse user vector 和 item-item 共现索引会在 Phase 8 深化。
+* `backend/app/services/recall_trending.py`：热门趋势召回层。
+  当前按最近 7 天行为日志的加权热度聚合商品，作为“站内流行趋势”补充通道。
+* `backend/app/services/recall_new_arrival.py`：新品探索召回层。
+  当前按商品创建时间倒序挑选上新商品，并只保留在售有库存的结果，用于给主推荐流补充探索性候选。
+* `backend/app/services/candidate_fusion.py`：候选融合层。
+  当前把所有召回通道统一成标准化 `RecallItem`，再用带通道权重的 RRF 做融合；同一个商品会保留全部召回来源与明细，而不是在融合时丢失证据链。
+* `backend/app/services/diversity.py`：结果去同质化层。
+  当前对重复类目、重复朝代和重复工艺做轻量惩罚，防止最终推荐列表被单一群组完全占满。
+* `backend/app/services/recommendations.py`：公开推荐入口与 baseline 分界层。
+  现在 `recommend_products_for_user()` 会在运行时检查 `active_recommendation_backend`，默认优先使用 Phase 7 的多路召回管线；旧的单画像向量 + 全量遍历逻辑被保留下来作为 `baseline_recommend_products_for_user()`。
+* `backend/app/services/vector_store.py`：推荐 readiness 标记层。
+  当前 `active_recommendation_backend` 已不再固定为 `baseline`，而是在商品 collection ready 时切换为 `multi_recall`，因此健康检查和接口 `pipeline` 字段终于能区分“旧推荐”和“新推荐”。
+* `backend/app/api/v1/admin_recommendations.py`：推荐调试证据层。
+  当前后台调试接口直接消费 `RecommendationPipelineRun`，除了画像文本和消费商品外，还会把每个候选的 `recall_channels` 与 `channel_details` 一起返回，使后台真正能展示“这个推荐是被哪几条召回链路带出来的”。
+* `docs/recommendation_pipeline.md`：推荐管线说明文档。
+  当前把运行时入口、召回通道、融合层、多样性层和调试输出写成了一份可以直接被后续开发和答辩材料引用的说明。
+
+这里有三个新的关键架构洞察：
+
+* 推荐系统的“多路召回”不是把几个排序规则堆到一起，而是让每条通道都能独立产出候选和证据。
+  现在每个 `RecallItem` 都明确记录了 `recall_channel`、`recall_score`、`rank_in_channel`、`matched_terms` 和 `reason_parts`，这意味着后续无论接更强的排序模型还是做离线评估，都不会丢失候选的来源信息。
+* 冷启动不应只是“没有画像时返回热门榜”，而应是正式的召回策略分支。
+  当前 `recommendation_pipeline.py` 会在用户行为不足时显式生成 `cold_start` 通道，并把热门与新品混合进同一条证据链里；这样冷启动推荐不再是“其他通道失败后的副作用”，而是可解释的正式策略。
+* 推荐接口“不全表扫描商品”的关键在于把全局信息拆回各自合适的数据源。
+  现在内容与关键词召回走 Qdrant，协同过滤走用户行为日志，热门与新品走有界 SQL 查询，最后只把融合后的有限候选商品回表加载；这和旧版 `load_active_products_for_recommendations()` 再全量打分的思路已经是两套完全不同的系统边界。

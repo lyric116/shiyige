@@ -66,6 +66,8 @@ async def test_admin_recommendation_debug_returns_profile_and_score_breakdown(
     assert body["data"]["recommendations"][0]["product_id"] != product_id
     assert body["data"]["recommendations"][0]["reason"]
     assert body["data"]["recommendations"][0]["matched_terms"]
+    assert body["data"]["recommendations"][0]["recall_channels"]
+    assert body["data"]["recommendations"][0]["channel_details"]
     assert body["data"]["recommendations"][0]["embedding_dimension"] > 0
     assert body["data"]["recommendations"][0]["embedding_vector_preview"]
 

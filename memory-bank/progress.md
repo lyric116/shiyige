@@ -2049,3 +2049,64 @@ Step 14:
 * 当前只有搜索链路默认切到了 `qdrant_hybrid`，个性化推荐接口仍然保持 baseline；推荐侧的多路召回属于下一阶段 Phase 7。
 * `probe_vector_store_runtime()` 现在会额外检查 product collection 是否存在 points，因此在“刚建 collection 但尚未 full reindex”的环境里仍会回退 baseline；如果后续要进一步压缩接口延迟，可考虑把这部分 readiness 探测做短 TTL 缓存。
 * `semantic_search_products()` 仍然保留 `force_baseline=True` 与 `provider=` 的测试/脚本注入能力，后续如果要继续做 baseline 对照或离线审计，不要删除这条显式回退路径。
+
+### 同日继续推进记录（四十三）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 7：实现完整多路召回推荐系统
+
+新增与修改：
+
+* `backend/app/services/candidate_fusion.py`
+* `backend/app/services/diversity.py`
+* `backend/app/services/recall_content.py`
+* `backend/app/services/recall_sparse_interest.py`
+* `backend/app/services/recall_collaborative.py`
+* `backend/app/services/recall_trending.py`
+* `backend/app/services/recall_new_arrival.py`
+* `backend/app/services/recommendation_pipeline.py`
+* `backend/app/services/recommendations.py`
+* `backend/app/services/vector_store.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/scripts/export_baseline_recommendation_metrics.py`
+* `backend/tests/test_recommendation_pipeline.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `docs/recommendation_pipeline.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/candidate_fusion.py backend/app/services/diversity.py backend/app/services/recall_content.py backend/app/services/recall_sparse_interest.py backend/app/services/recall_collaborative.py backend/app/services/recall_trending.py backend/app/services/recall_new_arrival.py backend/app/services/recommendation_pipeline.py backend/app/services/recommendations.py backend/app/services/vector_store.py backend/app/api/v1/admin_recommendations.py backend/scripts/export_baseline_recommendation_metrics.py backend/tests/test_recommendation_pipeline.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/api/test_recommendations.py`
+* `./.venv/bin/python -m pytest backend/tests/test_recommendation_pipeline.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/test_qdrant_connection.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_recommendation_pipeline.py backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/test_qdrant_connection.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `docker compose up -d --build`
+* `docker compose exec -T api python -m backend.scripts.reindex_products_to_qdrant --mode full`
+* `curl --noproxy '*' -s -X POST http://127.0.0.1/api/v1/auth/register -H 'Content-Type: application/json' -d '{"email":"phase7-user@example.com","username":"phase7user","password":"phase7-pass-123"}'`
+* `curl --noproxy '*' -s http://127.0.0.1/api/v1/products/1 -H 'Authorization: Bearer <phase7-user-token>'`
+* `curl --noproxy '*' -s 'http://127.0.0.1/api/v1/search?q=春日汉服' -H 'Authorization: Bearer <phase7-user-token>'`
+* `curl --noproxy '*' -s -X POST http://127.0.0.1/api/v1/cart/items -H 'Authorization: Bearer <phase7-user-token>' -H 'Content-Type: application/json' -d '{"product_id":1,"sku_id":1,"quantity":1}'`
+* `curl --noproxy '*' -s http://127.0.0.1/api/v1/products/recommendations -H 'Authorization: Bearer <phase7-user-token>'`
+* `curl --noproxy '*' -s 'http://127.0.0.1/api/v1/admin/recommendations/debug?email=phase7-user@example.com&limit=3' -H 'Authorization: Bearer <admin-token>'`
+
+结果：
+
+* 已新增 `backend/app/services/recommendation_pipeline.py`，把用户画像构建、冷启动判断、多路召回调用、候选融合、多样性控制和最终推荐结果组装集中到同一条推荐管线上。
+* 已新增 `backend/app/services/recall_content.py`、`recall_sparse_interest.py`、`recall_collaborative.py`、`recall_trending.py` 和 `recall_new_arrival.py`，分别承载内容语义召回、关键词兴趣召回、相似商品召回、基于用户行为重叠的协同过滤召回、热门趋势召回和新品探索召回。
+* 已新增 `backend/app/services/candidate_fusion.py` 与 `diversity.py`，把多路候选统一成带 `recall_channels`、`channel_details`、`matched_terms`、`vector_score` 和 `term_bonus` 的融合候选，并在最终结果前做轻量的类目/朝代/工艺去同质化。
+* 已把 `backend/app/services/recommendations.py` 改成双路径入口：当 Qdrant product collection ready 时默认走 `multi_recall`；否则保留 `baseline_recommend_products_for_user()` 作为显式回退路径。Phase 1 baseline 导出脚本现在也会对推荐显式传入 `force_baseline=True`。
+* 已把 `backend/app/services/vector_store.py` 的 `active_recommendation_backend` 从固定 `baseline` 改成 readiness 驱动：在 Qdrant collection 存在、schema 正确且已有 points 时切换为 `multi_recall`。
+* 已把 `backend/app/api/v1/admin_recommendations.py` 接到新的推荐管线，并在调试响应中补充 `recall_channels` 和 `channel_details`，让后台能直接看到每个推荐商品来自哪些召回通道。
+* 已新增 `backend/tests/test_recommendation_pipeline.py`，覆盖“有行为用户触发多路召回”和“冷启动用户仍然返回非空推荐”两条关键链路；同时更新 `backend/tests/api/test_admin_recommendation_debug.py`，验证后台调试接口真的返回召回通道明细。
+* 真实 Compose 环境验证中，新注册用户对 `明制襦裙` 产生浏览、搜索和加购行为后，请求 `/api/v1/products/recommendations` 返回的 `pipeline.active_recommendation_backend` 已切为 `multi_recall`、`degraded_to_baseline=false`；Top1 推荐为 `云肩披帛扣`，reason 为 `来自内容语义召回、关键词兴趣召回、相似商品召回，匹配“汉服/明制/日常”`。
+* 同一真实环境下，请求 `/api/v1/admin/recommendations/debug?email=phase7-user@example.com&limit=3` 已能返回每个候选的 `recall_channels` 和 `channel_details`；例如 `云肩披帛扣` 同时带有 `content_profile`、`sparse_interest`、`related_products` 和 `new_arrival` 四条召回来源，说明多路召回融合已真实生效。
+* 本轮最终验证结果为：Phase 7 专项测试、推荐相关 API 回归、后端全量测试、容器重建、Qdrant 全量重建、真实登录用户推荐请求和后台调试接口验证全部通过；后端全量测试结果为 `129 passed`。
+
+交接提醒：
+
+* 当前协同过滤召回还是基于 `user_behavior_log` 的轻量相似用户/共同行为聚合，真正的“用户 sparse vector / item-item 共现索引化”属于下一阶段 Phase 8。
+* `recommendation_pipeline.py` 里的内容语义、关键词兴趣和相似商品召回依赖 Qdrant；当这些调用失败时，当前实现会保留协同过滤、热门和新品通道继续工作，因此后台调试接口即使在 Qdrant 短暂异常时也不会直接空白。
+* 当前首页推荐接口已经不再全量扫描商品，但 `build_user_interest_profile()` 仍会在构建画像时更新 PostgreSQL 侧 profile 元数据；如果后续要继续压缩 p95，应优先考虑缓存画像和 Phase 8 的协同过滤索引，而不是重新退回全量遍历。

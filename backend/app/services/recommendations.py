@@ -3,12 +3,15 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
+from qdrant_client import QdrantClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from backend.app.core.config import get_app_settings
-from backend.app.models.product import Product
+from backend.app.core.config import AppSettings, get_app_settings
+from backend.app.core.logger import get_logger
+from backend.app.models.product import Product, ProductSku
 from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
@@ -19,6 +22,9 @@ from backend.app.services.vector_search import (
     cosine_similarity,
     ensure_product_embeddings,
 )
+from backend.app.services.vector_store import probe_vector_store_runtime
+
+logger = get_logger(__name__)
 
 BEHAVIOR_WEIGHTS = {
     "view_product": 1,
@@ -80,7 +86,7 @@ def load_active_products_for_recommendations(db: Session) -> list[Product]:
         .options(
             selectinload(Product.category),
             selectinload(Product.tags),
-            selectinload(Product.skus),
+            selectinload(Product.skus).selectinload(ProductSku.inventory),
             selectinload(Product.embedding),
         )
         .where(Product.status == 1)
@@ -288,7 +294,7 @@ def rank_recommendation_candidates(
     return results
 
 
-def recommend_products_for_user(
+def baseline_recommend_products_for_user(
     db: Session,
     *,
     user_id: int,
@@ -309,3 +315,52 @@ def recommend_products_for_user(
         )
         for candidate in candidates[:limit]
     ]
+
+
+def recommend_products_for_user(
+    db: Session,
+    *,
+    user_id: int,
+    limit: int = 6,
+    provider: EmbeddingProvider | None = None,
+    settings: AppSettings | None = None,
+    client: QdrantClient | None = None,
+    bundle: Any | None = None,
+    force_baseline: bool = False,
+) -> list[VectorSearchResult]:
+    app_settings = settings or get_app_settings()
+    if not force_baseline and provider is None:
+        runtime = probe_vector_store_runtime(app_settings)
+        if runtime.active_recommendation_backend == "multi_recall":
+            try:
+                from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
+
+                pipeline_run = run_recommendation_pipeline(
+                    db,
+                    user_id=user_id,
+                    limit=limit,
+                    settings=app_settings,
+                    client=client,
+                    bundle=bundle,
+                )
+                return [
+                    VectorSearchResult(
+                        product=candidate.product,
+                        score=candidate.score,
+                        reason=candidate.reason,
+                    )
+                    for candidate in pipeline_run.candidates[:limit]
+                ]
+            except Exception as exc:  # pragma: no cover - fallback protection
+                logger.warning(
+                    "Recommendation pipeline failed, falling back to baseline. user_id=%s error=%s",
+                    user_id,
+                    exc,
+                )
+
+    return baseline_recommend_products_for_user(
+        db,
+        user_id=user_id,
+        limit=limit,
+        provider=provider,
+    )
