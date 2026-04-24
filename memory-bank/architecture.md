@@ -825,3 +825,27 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   相比用户 ID，邮箱更适合答辩场景里快速切换两个账号并现场对照截图，也更不容易因为环境重建导致 ID 漂移而影响演示稳定性。
 * 证明推荐系统运行，不应只展示最终推荐商品名称。
   当前调试页同时给出“最近行为 -> top terms -> 候选商品 -> 分数拆解 -> embedding 片段/向量预览”这条因果链，这比单独展示首页卡片更能证明系统里确实存在画像构建和向量匹配过程。
+
+### 9.36 推荐系统升级现在已经有了“可导出的 baseline 审计快照”
+
+在正式引入 Qdrant 之前，第 60 次同日推进先把当前推荐系统的真实状态冻结成可重复导出的 baseline：
+
+* `docs/recommendation_baseline_analysis.md`：当前推荐系统审计文档。
+  这份文档明确指出：商品向量和用户画像向量还存放在 `backend/app/models/recommendation.py` 的 JSON 字段中，`backend/app/services/vector_search.py` 和 `backend/app/services/recommendations.py` 仍然采用“先拉全量商品，再在 Python 里做 cosine similarity 和规则加分”的模式。
+* `docs/recommendation_upgrade_plan.md`：执行说明文档。
+  它不替代 `memory-bank/shiyige_recommendation_upgrade_plan.md`，而是把当前开发阶段必须遵守的升级顺序、基线约束和验收命令压缩成一份更适合随代码一起查看的说明。
+* `backend/scripts/export_baseline_recommendation_metrics.py`：baseline 导出脚本。
+  该脚本会固定 4 个搜索 query 和 2 个基线用户，自动补齐基础商品数据与行为日志，然后导出当前搜索/推荐 TopK、top1 分数、理由和耗时到 `docs/recommendation_baseline_metrics.json`。
+* `backend/tests/test_recommendation_baseline.py`：baseline 导出测试。
+  它在临时 SQLite 数据库里运行导出脚本，并锁定报告结构与关键字段，避免后续重构时把 baseline 导出能力一并丢失。
+* `docs/recommendation_baseline_metrics.json`：当前真实基线快照。
+  这份 JSON 不是设计稿，而是基于当前代码真实跑出来的对照数据，后续升级必须能继续拿同一批 query 和用户样本进行前后比较。
+
+这里有三个新的关键架构洞察：
+
+* “升级推荐系统”之前，必须先把“当前系统到底怎么工作”写成审计文档。
+  否则后续即使换成 Qdrant、多路召回和重排，也很难回答“比旧系统到底好在哪、快在哪、为什么更像独立向量数据库”。
+* baseline 导出脚本应该和业务实现解耦，但必须复用真实业务服务。
+  当前导出脚本没有复制一份平行推荐算法，而是直接调用 `semantic_search_products()` 和 `recommend_products_for_user()`；这样 baseline 文件天然就是“当前线上逻辑的快照”，而不是另一个测试替身。
+* baseline 快照已经暴露出当前系统的真实短板。
+  例如 `宋韵茶器雅致礼物` 这类 query 在当前 `local_hash + 全量遍历 + 规则加分` 基线上无法稳定命中真正的茶器商品，这正好说明后续 Phase 4 到 Phase 6 引入真实语义模型、sparse 检索和混合搜索是必要的，而不是为了“技术栈好看”。

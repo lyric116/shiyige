@@ -1730,3 +1730,44 @@ Step 14:
 * 当前推荐调试页查询入口是“前台用户邮箱”，不是用户 ID，目的是方便答辩时直接对照账号切换。
 * 调试页里展示的是“向量检索与兴趣词加权”的真实拆解结果：`vector_similarity`、`vector_score`、`term_bonus`、`matched_terms` 和 `reason` 都来自同一套后端推荐逻辑。
 * 如果后续再调整首页推荐公式，必须同步关注 `backend/app/services/recommendations.py` 的共享候选打分函数，否则后台调试页和前台“猜你喜欢”会失真。
+
+### 同日继续推进记录（三十七）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 1：基线冻结与问题确认
+
+新增与修改：
+
+* `docs/recommendation_baseline_analysis.md`
+* `docs/recommendation_upgrade_plan.md`
+* `docs/recommendation_baseline_metrics.json`
+* `backend/scripts/export_baseline_recommendation_metrics.py`
+* `backend/tests/test_recommendation_baseline.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `docker compose up -d`
+* `./.venv/bin/python -m pytest backend/tests/test_recommendation_baseline.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py backend/tests/integration/test_search_ranking.py backend/tests/integration/test_user_interest_profile.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `./.venv/bin/python -m backend.scripts.export_baseline_recommendation_metrics`
+* `./.venv/bin/python -m ruff check backend/scripts/export_baseline_recommendation_metrics.py backend/tests/test_recommendation_baseline.py`
+
+结果：
+
+* 已冻结当前推荐系统 baseline，并明确记录当前实现仍然是“JSON 向量 + Python 全量余弦遍历 + 规则加分”的链路，而不是独立向量数据库检索。
+* 已新增 `docs/recommendation_baseline_analysis.md`，把 `vector_search.py`、`recommendations.py`、`recommendation.py` 的当前搜索和推荐流程、限制与固定评估样本整理成文档。
+* 已新增 `docs/recommendation_upgrade_plan.md`，把 `memory-bank/shiyige_recommendation_upgrade_plan.md` 收敛成当前执行用的阶段说明和 Phase 1 验收入口。
+* 已新增 `backend/scripts/export_baseline_recommendation_metrics.py`，可固定 4 个搜索 query 和 2 个基线用户画像，导出当前 TopK 结果、top1 分数、推荐理由和耗时。
+* 已新增 `backend/tests/test_recommendation_baseline.py`，锁定 baseline 导出脚本能够在临时数据库中稳定生成可复用的 JSON 报告。
+* 已生成 `docs/recommendation_baseline_metrics.json`，后续所有推荐升级阶段都可以基于同一批 query 和用户样本做前后对比。
+* 本轮验证结果为：新增 baseline 测试、推荐相关回归测试、后端全量测试和新增 Python 文件的 `ruff check` 全部通过。
+
+交接提醒：
+
+* Phase 1 只冻结现状，没有改写任何搜索和推荐打分逻辑；后续 Phase 2 及之后的改造必须保留旧逻辑作为 fallback/baseline。
+* 当前 baseline 报告默认会使用当前应用配置里的 embedding provider；在本地未额外配置时，仍然是 `local_hash`，这是当前真实基线的一部分，不要在 Phase 1 回避这一点。
+* `docs/recommendation_baseline_metrics.json` 是本轮导出的对照快照，后续如果重新导出导致数值变化，需要在提交说明里明确为什么变化以及是否属于预期。

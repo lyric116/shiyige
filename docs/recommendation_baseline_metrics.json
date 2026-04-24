@@ -1,0 +1,333 @@
+{
+  "provider": {
+    "provider": "local_hash",
+    "model_name": "shiyige-local-hash-zh",
+    "dimension": 384,
+    "source": "Deterministic local hash fallback for offline development and tests",
+    "revision": "local",
+    "device": "cpu",
+    "normalize": true
+  },
+  "search_cases": [
+    {
+      "case_type": "semantic_search",
+      "label": "search::适合春日出游的素雅汉服",
+      "query": "适合春日出游的素雅汉服",
+      "user_id": null,
+      "returned_product_ids": [
+        1,
+        4,
+        2,
+        3,
+        15
+      ],
+      "score": 1.229855,
+      "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服/出游/春日”特征",
+      "latency_ms": 26.56,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 1,
+          "name": "明制襦裙",
+          "score": 1.229855,
+          "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服/出游/春日”特征"
+        },
+        {
+          "rank": 2,
+          "product_id": 4,
+          "name": "宋风褙子套装",
+          "score": 0.761821,
+          "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服”特征"
+        },
+        {
+          "rank": 3,
+          "product_id": 2,
+          "name": "汉元素对襟",
+          "score": 0.76083,
+          "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服”特征"
+        },
+        {
+          "rank": 4,
+          "product_id": 3,
+          "name": "唐制交领袍",
+          "score": 0.74513,
+          "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服”特征"
+        },
+        {
+          "rank": 5,
+          "product_id": 15,
+          "name": "云肩披帛扣",
+          "score": 0.649674,
+          "reason": "与“适合春日出游的素雅汉服”语义相近，命中“汉服”特征"
+        }
+      ]
+    },
+    {
+      "case_type": "semantic_search",
+      "label": "search::端午香囊送礼",
+      "query": "端午香囊送礼",
+      "user_id": null,
+      "returned_product_ids": [
+        5,
+        12,
+        20,
+        18,
+        17
+      ],
+      "score": 0.728388,
+      "reason": "与“端午香囊送礼”语义相近，命中“端午/香囊”特征",
+      "latency_ms": 9.722,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 5,
+          "name": "故宫宫廷香囊",
+          "score": 0.728388,
+          "reason": "与“端午香囊送礼”语义相近，命中“端午/香囊”特征"
+        },
+        {
+          "rank": 2,
+          "product_id": 12,
+          "name": "竹编龙舟",
+          "score": 0.725512,
+          "reason": "与“端午香囊送礼”语义相近，命中“端午”特征"
+        },
+        {
+          "rank": 3,
+          "product_id": 20,
+          "name": "端午祈福礼盒",
+          "score": 0.694632,
+          "reason": "与“端午香囊送礼”语义相近，命中“端午”特征"
+        },
+        {
+          "rank": 4,
+          "product_id": 18,
+          "name": "上元灯会礼盒",
+          "score": 0.672082,
+          "reason": "与“端午香囊送礼”语义相近，命中“送礼”特征"
+        },
+        {
+          "rank": 5,
+          "product_id": 17,
+          "name": "节气香礼盒",
+          "score": 0.614123,
+          "reason": "与“端午香囊送礼”语义相近，命中“送礼”特征"
+        }
+      ]
+    },
+    {
+      "case_type": "semantic_search",
+      "label": "search::古风发簪饰品",
+      "query": "古风发簪饰品",
+      "user_id": null,
+      "returned_product_ids": [
+        13,
+        14,
+        16,
+        15,
+        3
+      ],
+      "score": 1.121694,
+      "reason": "与“古风发簪饰品”语义相近，命中“饰品/发簪/古风”特征",
+      "latency_ms": 7.675,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 13,
+          "name": "点翠发簪",
+          "score": 1.121694,
+          "reason": "与“古风发簪饰品”语义相近，命中“饰品/发簪/古风”特征"
+        },
+        {
+          "rank": 2,
+          "product_id": 14,
+          "name": "玉兔耳坠",
+          "score": 0.772285,
+          "reason": "与“古风发簪饰品”语义相近，命中“饰品”特征"
+        },
+        {
+          "rank": 3,
+          "product_id": 16,
+          "name": "宫灯流苏书签",
+          "score": 0.753027,
+          "reason": "与“古风发簪饰品”语义相近，命中“饰品”特征"
+        },
+        {
+          "rank": 4,
+          "product_id": 15,
+          "name": "云肩披帛扣",
+          "score": 0.736429,
+          "reason": "与“古风发簪饰品”语义相近，命中“饰品”特征"
+        },
+        {
+          "rank": 5,
+          "product_id": 3,
+          "name": "唐制交领袍",
+          "score": 0.534711,
+          "reason": "与“古风发簪饰品”语义相近"
+        }
+      ]
+    },
+    {
+      "case_type": "semantic_search",
+      "label": "search::宋韵茶器雅致礼物",
+      "query": "宋韵茶器雅致礼物",
+      "user_id": null,
+      "returned_product_ids": [
+        4,
+        14,
+        6,
+        5,
+        1
+      ],
+      "score": 0.608791,
+      "reason": "与“宋韵茶器雅致礼物”语义相近，命中“雅致”特征",
+      "latency_ms": 10.018,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 4,
+          "name": "宋风褙子套装",
+          "score": 0.608791,
+          "reason": "与“宋韵茶器雅致礼物”语义相近，命中“雅致”特征"
+        },
+        {
+          "rank": 2,
+          "product_id": 14,
+          "name": "玉兔耳坠",
+          "score": 0.549352,
+          "reason": "与“宋韵茶器雅致礼物”语义相近"
+        },
+        {
+          "rank": 3,
+          "product_id": 6,
+          "name": "故宫百喜毯",
+          "score": 0.542812,
+          "reason": "与“宋韵茶器雅致礼物”语义相近"
+        },
+        {
+          "rank": 4,
+          "product_id": 5,
+          "name": "故宫宫廷香囊",
+          "score": 0.538186,
+          "reason": "与“宋韵茶器雅致礼物”语义相近"
+        },
+        {
+          "rank": 5,
+          "product_id": 1,
+          "name": "明制襦裙",
+          "score": 0.535828,
+          "reason": "与“宋韵茶器雅致礼物”语义相近"
+        }
+      ]
+    }
+  ],
+  "recommendation_cases": [
+    {
+      "case_type": "personalized_recommendation",
+      "label": "recommend::baseline-hanfu@example.com",
+      "query": "春日汉服",
+      "user_id": 1,
+      "returned_product_ids": [
+        15,
+        5,
+        4,
+        3,
+        2
+      ],
+      "score": 0.548052,
+      "reason": "基于你近期关注的“汉服/明制”偏好推荐",
+      "latency_ms": 21.89,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 15,
+          "name": "云肩披帛扣",
+          "score": 0.548052,
+          "reason": "基于你近期关注的“汉服/明制”偏好推荐"
+        },
+        {
+          "rank": 2,
+          "product_id": 5,
+          "name": "故宫宫廷香囊",
+          "score": 0.363924,
+          "reason": "基于你近期关注的“刺绣”偏好推荐"
+        },
+        {
+          "rank": 3,
+          "product_id": 4,
+          "name": "宋风褙子套装",
+          "score": 0.358678,
+          "reason": "基于你近期关注的“汉服”偏好推荐"
+        },
+        {
+          "rank": 4,
+          "product_id": 3,
+          "name": "唐制交领袍",
+          "score": 0.354872,
+          "reason": "基于你近期关注的“汉服”偏好推荐"
+        },
+        {
+          "rank": 5,
+          "product_id": 2,
+          "name": "汉元素对襟",
+          "score": 0.3506,
+          "reason": "基于你近期关注的“汉服”偏好推荐"
+        }
+      ]
+    },
+    {
+      "case_type": "personalized_recommendation",
+      "label": "recommend::baseline-gift@example.com",
+      "query": "香囊发簪送礼",
+      "user_id": 2,
+      "returned_product_ids": [
+        15,
+        16,
+        14,
+        7,
+        6
+      ],
+      "score": 0.544487,
+      "reason": "基于你近期关注的“饰品/穿搭”偏好推荐",
+      "latency_ms": 18.278,
+      "items": [
+        {
+          "rank": 1,
+          "product_id": 15,
+          "name": "云肩披帛扣",
+          "score": 0.544487,
+          "reason": "基于你近期关注的“饰品/穿搭”偏好推荐"
+        },
+        {
+          "rank": 2,
+          "product_id": 16,
+          "name": "宫灯流苏书签",
+          "score": 0.541984,
+          "reason": "基于你近期关注的“饰品/宫廷风”偏好推荐"
+        },
+        {
+          "rank": 3,
+          "product_id": 14,
+          "name": "玉兔耳坠",
+          "score": 0.517488,
+          "reason": "基于你近期关注的“饰品/穿搭”偏好推荐"
+        },
+        {
+          "rank": 4,
+          "product_id": 7,
+          "name": "故宫花神口红",
+          "score": 0.359178,
+          "reason": "基于你近期关注的“宫廷风”偏好推荐"
+        },
+        {
+          "rank": 5,
+          "product_id": 6,
+          "name": "故宫百喜毯",
+          "score": 0.354906,
+          "reason": "基于你近期关注的“宫廷风”偏好推荐"
+        }
+      ]
+    }
+  ]
+}
