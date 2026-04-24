@@ -68,8 +68,12 @@ async def test_admin_recommendation_debug_returns_profile_and_score_breakdown(
     assert body["data"]["recommendations"][0]["matched_terms"]
     assert body["data"]["recommendations"][0]["recall_channels"]
     assert body["data"]["recommendations"][0]["channel_details"]
+    assert body["data"]["recommendations"][0]["ranking_features"]
+    assert body["data"]["recommendations"][0]["feature_summary"]
+    assert body["data"]["recommendations"][0]["score_breakdown"]
     assert body["data"]["recommendations"][0]["embedding_dimension"] > 0
     assert body["data"]["recommendations"][0]["embedding_vector_preview"]
+    assert body["data"]["metrics"]["active_ranker"]
 
     with api_session_factory() as session:
         operation_log = session.scalar(

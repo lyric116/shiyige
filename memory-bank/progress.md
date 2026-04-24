@@ -2165,3 +2165,63 @@ Step 14:
 * Phase 8 之后，协同过滤已经依赖离线构建步骤；如果演示环境里新增了大量行为数据，应重新执行 `backend/scripts/build_collaborative_index.py`，不要假设请求时会自动刷新 Qdrant sparse 用户索引。
 * `recommendation_experiment` 现在承载 item-item 共现图工件；后续如果要扩展离线评估、A/B 实验或排序特征缓存，应优先复用这张表，而不是再散落到新的 JSON 文件或临时表。
 * 下一阶段应进入 Phase 9 的高级排序与重排，把当前多路召回结果进一步转成显式特征和统一排序分数，而不是继续在召回层堆叠更多启发式规则。
+
+### 同日继续推进记录（四十五）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 9：实现高级排序与重排
+
+新增与修改：
+
+* `backend/app/core/config.py`
+* `backend/app/services/ranking_features.py`
+* `backend/app/services/business_rules.py`
+* `backend/app/services/ltr_ranker.py`
+* `backend/app/services/ranker.py`
+* `backend/app/services/recommendation_explainer.py`
+* `backend/app/services/recommendation_pipeline.py`
+* `backend/app/services/vector_store.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/tests/test_ranking_features.py`
+* `backend/tests/test_ranker.py`
+* `backend/tests/test_recommendation_pipeline.py`
+* `backend/tests/api/test_recommendations.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `docs/ranking_design.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/core/config.py backend/app/services/ranking_features.py backend/app/services/business_rules.py backend/app/services/ltr_ranker.py backend/app/services/ranker.py backend/app/services/recommendation_explainer.py backend/app/services/recommendation_pipeline.py backend/app/services/vector_store.py backend/app/api/v1/products.py backend/app/api/v1/admin_recommendations.py backend/tests/test_ranking_features.py backend/tests/test_ranker.py backend/tests/test_recommendation_pipeline.py backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py`
+* `./.venv/bin/python -m pytest backend/tests/test_ranking_features.py backend/tests/test_ranker.py backend/tests/test_recommendation_pipeline.py backend/tests/api/test_admin_recommendation_debug.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `docker compose up -d --build`
+* `docker compose exec -T api python -m backend.scripts.reindex_embeddings`
+* `docker compose exec -T api python backend/scripts/build_collaborative_index.py`
+* `./.venv/bin/python - <<'PY' ... # 登录 phase8-cf-b@example.com 后请求 /api/v1/recommendations?slot=home&debug=true`
+* `./.venv/bin/python - <<'PY' ... # 管理员登录后请求 /api/v1/admin/recommendations/debug?email=phase8-cf-b@example.com&limit=5`
+
+结果：
+
+* 已新增 `backend/app/services/ranking_features.py`，为多路召回候选统一构造 recall、用户兴趣、商品质量和业务规则四大类排序特征，并在 debug 输出中保留完整原始特征值。
+* 已新增 `backend/app/services/business_rules.py`，把上架/库存过滤、近期曝光降权、同类目连续上限、朝代/工艺集中度控制和探索位注入从召回阶段剥离成正式 post-processing 层。
+* 已新增 `backend/app/services/ranker.py`，实现可解释的 `weighted_ranker`；当前最终分数明确拆成 `recall_score`、`interest_score`、`quality_score`、`business_total` 和 `final_score`，不再只是融合分或向量分排序。
+* 已新增 `backend/app/services/ltr_ranker.py`，预留 `ltr_ranker` 切换入口；当存在 JSON 模型权重文件时可直接加载，否则会安全回退到 `weighted_ranker` 并在 debug 响应里标记 `ltr_fallback_used`。
+* 已新增 `backend/app/services/recommendation_explainer.py`，统一生成 `feature_summary`、`feature_highlights` 和排序解释文本，使公开调试接口与后台调试接口能共享相同的解释口径。
+* 已把 `backend/app/services/recommendation_pipeline.py` 从“召回后直接做 diversity”改成“召回 -> 特征构建 -> ranker -> 业务重排”的 Phase 9 流水线，并在 `RecommendationPipelineRun` 中新增 `active_ranker`、`ranker_model_version` 和 `ltr_fallback_used`。
+* 已把 `backend/app/api/v1/products.py` 扩展为同时支持原有 `/api/v1/products/recommendations` 和新的 `/api/v1/recommendations` 别名；当 `debug=true` 时，公开接口会返回 `ranking_features`、`feature_summary`、`feature_highlights`、`score_breakdown` 和 `ranker_name`。
+* 已把 `backend/app/api/v1/admin_recommendations.py` 扩展成完整排序调试视图；每个候选除了召回通道，还会返回排序特征、打分拆解和当前 ranker 版本。
+* 已新增 `backend/tests/test_ranking_features.py` 与 `backend/tests/test_ranker.py`，分别固定特征构建正确性和“排序不是简单按原始召回分走”的关键行为；同时更新了推荐 API 与后台 debug API 测试，保证新的 debug 字段被正式回归覆盖。
+* 本地专项测试全部通过，后端全量测试结果提升为 `134 passed`。
+* 真实 Compose 环境验证中，`docker compose exec -T api python -m backend.scripts.reindex_embeddings` 返回 `indexed=20 skipped=0 model=BAAI/bge-small-zh-v1.5`；`docker compose exec -T api python backend/scripts/build_collaborative_index.py` 返回 `indexed_users=4 qdrant_points=4 item_nodes=2`，说明排序层依赖的向量与协同过滤数据都已重建到最新代码。
+* 同一真实环境下，用户 `phase8-cf-b@example.com` 请求 `/api/v1/recommendations?slot=home&debug=true` 后，`pipeline.active_ranker=weighted_ranker`、`ranker_model_version=weighted-ranker-v1`、`degraded_to_baseline=false`；Top1 推荐仍为 `宋风褙子套装`，并且公开响应里能看到 `feature_summary` 的 `recall/interest/quality/business` 四组摘要以及 `score_breakdown.final_score=1.109793`。
+* 后台 `/api/v1/admin/recommendations/debug?email=phase8-cf-b@example.com&limit=5` 也返回了相同的 `weighted_ranker` 和分解明细；Top1 候选同时带有 `content_profile`、`sparse_interest`、`related_products`、`collaborative_user`、`item_cooccurrence`、`trending` 和 `new_arrival` 七条召回来源，说明当前最终排序已明确建立在多路召回之上，而不是简单按单一相似度分排序。
+
+交接提醒：
+
+* 当前 `ltr_ranker` 只完成了模型加载接口和回退机制，默认仍会使用 `weighted_ranker`；后续如果进入 Phase 10 的离线评估与训练，优先补 `recommendation_request_log` 等日志表，再生成真实 LTR 训练样本。
+* `ranking_features.py` 里部分业务特征仍是基于现有表结构推导出的启发式近似值，例如后台精选和 ColBERT 对齐分；如果后续新增了更明确的数据源，应直接替换这些推导逻辑，而不是再新增一套并行特征。
+* 下一阶段应进入 Phase 10 的日志、离线评估和性能压测，把现在的多路召回与排序结果转化成可量化指标，而不是只停留在 debug 可解释层。

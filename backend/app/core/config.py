@@ -50,6 +50,10 @@ class AppSettings(BaseSettings):
     qdrant_collection_users: str = "shiyige_users_v1"
     qdrant_collection_cf: str = "shiyige_collaborative_v1"
     recommendation_pipeline_version: str = "v1"
+    recommendation_ranker: str = "weighted_ranker"
+    recommendation_ltr_model_path: str | None = None
+    recommendation_exploration_ratio: float = 0.15
+    recommendation_max_consecutive_category: int = 2
 
 
 class InfrastructureSettings(BaseSettings):

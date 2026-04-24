@@ -93,3 +93,27 @@ async def test_recommendations_return_different_results_for_different_users(
         item["id"] for item in second_body["data"]["items"][:3]
     ]
     assert "偏好推荐" in first_body["data"]["items"][0]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_recommendations_debug_alias_returns_pipeline_metadata(
+    api_client,
+    create_user,
+    auth_headers_factory,
+    seed_product_catalog,
+) -> None:
+    user = create_user(email="rec-debug-alias@example.com", username="rec-debug-alias")
+    headers = auth_headers_factory(user)
+
+    response = await api_client.get(
+        "/api/v1/recommendations",
+        headers=headers,
+        params={"slot": "home", "debug": True, "limit": 3},
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["data"]["pipeline"]["slot"] == "home"
+    assert "active_ranker" in body["data"]["pipeline"]
+    assert "ranker_model_version" in body["data"]["pipeline"]
+    assert "ltr_fallback_used" in body["data"]["pipeline"]

@@ -12,18 +12,17 @@ from backend.app.models.product import Product, ProductSku
 from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
 from backend.app.services.candidate_fusion import (
-    FusedRecommendationCandidate,
     RecallItem,
-    build_fused_reason,
     fuse_recall_results,
 )
-from backend.app.services.diversity import diversify_candidates
 from backend.app.services.embedding import (
     EmbeddingProvider,
     get_embedding_bundle,
     get_embedding_provider,
 )
 from backend.app.services.product_index_document import product_has_available_stock
+from backend.app.services.ranker import rank_fused_candidates
+from backend.app.services.ranking_features import build_ranking_feature_context
 from backend.app.services.recall_collaborative import recall_collaborative_candidates
 from backend.app.services.recall_content import (
     recall_profile_content_candidates,
@@ -47,6 +46,13 @@ class PipelineRecommendationCandidate:
     vector_similarity: float
     vector_score: float
     term_bonus: float
+    ranking_features: dict[str, float]
+    feature_summary: dict[str, object]
+    feature_highlights: list[str]
+    score_breakdown: dict[str, float]
+    ranker_name: str
+    ranker_model_version: str
+    ltr_fallback_used: bool
 
 
 @dataclass(slots=True)
@@ -58,6 +64,9 @@ class RecommendationPipelineRun:
     consumed_product_ids: set[int]
     recent_product_ids: list[int]
     cold_start: bool
+    active_ranker: str
+    ranker_model_version: str
+    ltr_fallback_used: bool
 
 
 def run_recommendation_pipeline(
@@ -158,16 +167,26 @@ def run_recommendation_pipeline(
             and candidate.product_id in products_by_id
         )
     ]
-    diversified_candidates = diversify_candidates(
+    ranking_context = build_ranking_feature_context(
+        db,
+        user_id=user_id,
+        top_terms=top_terms,
+        consumed_product_ids=consumed_product_ids,
+        recent_product_ids=recent_product_ids,
+        logs=logs,
+        candidate_product_ids=[candidate.product_id for candidate in filtered_candidates],
+    )
+    ranked_candidates = rank_fused_candidates(
         filtered_candidates,
         products_by_id=products_by_id,
+        context=ranking_context,
         limit=candidate_limit or max(limit * 4, 24),
+        settings=app_settings,
     )
 
     pipeline_candidates = [
-        build_pipeline_candidate(candidate, products_by_id[candidate.product_id])
-        for candidate in diversified_candidates
-        if candidate.product_id in products_by_id
+        build_pipeline_candidate(candidate)
+        for candidate in ranked_candidates
     ]
 
     return RecommendationPipelineRun(
@@ -178,6 +197,17 @@ def run_recommendation_pipeline(
         consumed_product_ids=consumed_product_ids,
         recent_product_ids=recent_product_ids,
         cold_start=cold_start,
+        active_ranker=(
+            pipeline_candidates[0].ranker_name
+            if pipeline_candidates
+            else app_settings.recommendation_ranker
+        ),
+        ranker_model_version=(
+            pipeline_candidates[0].ranker_model_version
+            if pipeline_candidates
+            else app_settings.recommendation_ranker
+        ),
+        ltr_fallback_used=any(candidate.ltr_fallback_used for candidate in pipeline_candidates),
     )
 
 
@@ -229,6 +259,7 @@ def load_pipeline_products(
             selectinload(Product.category),
             selectinload(Product.tags),
             selectinload(Product.skus).selectinload(ProductSku.inventory),
+            selectinload(Product.media_items),
             selectinload(Product.embedding),
         )
         .where(Product.id.in_(product_ids), Product.status == 1)
@@ -242,17 +273,23 @@ def load_pipeline_products(
 
 
 def build_pipeline_candidate(
-    fused_candidate: FusedRecommendationCandidate,
-    product: Product,
+    ranked_candidate,
 ) -> PipelineRecommendationCandidate:
     return PipelineRecommendationCandidate(
-        product=product,
-        score=fused_candidate.score,
-        reason=build_fused_reason(fused_candidate),
-        matched_terms=list(fused_candidate.matched_terms),
-        recall_channels=list(fused_candidate.recall_channels),
-        channel_details=list(fused_candidate.channel_details),
-        vector_similarity=fused_candidate.vector_similarity,
-        vector_score=fused_candidate.vector_score,
-        term_bonus=fused_candidate.term_bonus,
+        product=ranked_candidate.product,
+        score=ranked_candidate.final_score,
+        reason=ranked_candidate.reason,
+        matched_terms=list(ranked_candidate.fused_candidate.matched_terms),
+        recall_channels=list(ranked_candidate.fused_candidate.recall_channels),
+        channel_details=list(ranked_candidate.fused_candidate.channel_details),
+        vector_similarity=ranked_candidate.fused_candidate.vector_similarity,
+        vector_score=ranked_candidate.fused_candidate.vector_score,
+        term_bonus=ranked_candidate.fused_candidate.term_bonus,
+        ranking_features=ranked_candidate.features.to_dict(),
+        feature_summary=dict(ranked_candidate.feature_summary),
+        feature_highlights=list(ranked_candidate.feature_highlights),
+        score_breakdown=dict(ranked_candidate.score_breakdown),
+        ranker_name=ranked_candidate.ranker_name,
+        ranker_model_version=ranked_candidate.ranker_model_version,
+        ltr_fallback_used=ranked_candidate.ltr_fallback_used,
     )

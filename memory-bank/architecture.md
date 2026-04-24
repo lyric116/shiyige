@@ -1073,3 +1073,41 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   前者回答“和我相似的人还喜欢什么”，后者回答“和我最近看的商品经常一起出现什么”；它们的可解释性、冷启动表现和后续排序特征价值都不同，所以在 `channel_details` 里分开保留证据是必要的。
 * 以 `product_id` 作为 sparse 向量维度，是比赛型推荐系统里比“复杂 latent factor 训练”更稳的第一步。
   这种表示法天然支持行为权重和时间衰减，也便于直接映射到“哪些商品行为导致了相似用户召回”；在答辩、调试和运维上都比黑盒 embedding 更容易解释和修正。
+
+### 9.44 排序层现在已经形成“特征构建层 + Ranker 层 + 业务后处理层 + 双调试出口层”的 Phase 9 形态
+
+第 68 次同日推进把推荐系统从“多路召回 + 融合分”推进到了真正的统一排序层：
+
+* `backend/app/services/ranking_features.py`：排序特征构建层。
+  当前会为每个候选同时构造 recall 特征、用户兴趣特征、商品质量特征和业务规则特征，并给出原始值与归一化视图。Phase 9 之后，推荐排序终于不再只是消费 `fusion_score` 和 `matched_terms`，而是有了一份正式的候选特征向量。
+* `backend/app/services/ranker.py`：统一排序入口。
+  当前实现默认 `weighted_ranker`，把最终分明确拆成 `recall_score`、`interest_score`、`quality_score`、`business_total` 和 `final_score`；同时它也负责接 `ltr_ranker` 的预测入口，并在模型不可用时自动回退到加权排序器。
+* `backend/app/services/ltr_ranker.py`：LTR 兼容层。
+  当前还没有接真实 LightGBM / XGBoost 模型，但已经完成“按配置加载 JSON 权重模型 + 失败时回退”的接口契约。这样后续进入 Phase 10 时，LTR 不需要重新改推荐主链路，只需要补训练样本和模型文件。
+* `backend/app/services/business_rules.py`：业务后处理层。
+  当前把“近期曝光降权、同类目连续上限、朝代/工艺集中度控制、探索位注入”从召回或融合逻辑中剥离出来，成为排序后的独立 post-processing 层。这让“业务约束”和“候选打分”终于分清了职责。
+* `backend/app/services/recommendation_explainer.py`：排序解释层。
+  当前负责把原始特征和分数拆解压缩成 `feature_summary`、`feature_highlights` 和最终解释文案，使公开 debug 接口和后台 debug 接口使用统一口径展示排序原因。
+* `backend/app/services/recommendation_pipeline.py`：推荐编排层。
+  当前已从“召回后直接做 diversity”升级为“召回 -> 特征构建 -> ranker -> 业务后处理 -> 最终候选”，并在 `RecommendationPipelineRun` 中正式暴露 `active_ranker`、`ranker_model_version` 和 `ltr_fallback_used`。
+* `backend/app/core/config.py`：排序运行时配置入口。
+  当前新增 `recommendation_ranker`、`recommendation_ltr_model_path`、`recommendation_exploration_ratio` 和 `recommendation_max_consecutive_category`，把排序器切换和后处理阈值纳入正式配置，而不是硬编码在函数内部。
+* `backend/app/services/vector_store.py`：运行时标记层。
+  当前 `build_runtime_marker()` 已能返回 `configured_recommendation_ranker`，使接口 `pipeline` 元数据不仅能说明“推荐后端是不是 multi_recall”，还能说明“当前配置想用哪种排序器”。
+* `backend/app/api/v1/products.py`：公开推荐与调试出口。
+  当前保留原有 `/api/v1/products/recommendations`，同时新增 `/api/v1/recommendations` 别名；当 `debug=true` 时，公开接口会直接返回 `ranking_features`、`feature_summary`、`feature_highlights`、`score_breakdown` 和 `ranker_name`。
+* `backend/app/api/v1/admin_recommendations.py`：后台调试出口。
+  当前不仅返回召回证据，还会把排序特征和打分拆解完整输出，使后台真正成为“召回 + 排序”双视角的调试界面，而不只是 recall trace view。
+* `backend/tests/test_ranking_features.py` 与 `backend/tests/test_ranker.py`：Phase 9 验收测试层。
+  前者固定特征工程的输出边界，后者固定“兴趣匹配优先于单一召回分”和“LTR 缺席时安全回退”的行为边界。
+* `docs/ranking_design.md`：排序设计说明文档。
+  当前把特征组、ranker 切换、post-processing 规则和 debug 输出写成了独立文档，是后续 Phase 10 评估和答辩材料的直接入口。
+
+这里有三个新的关键架构洞察：
+
+* 多路召回完成后，真正决定体验的已经不是“再多加一条召回通道”，而是“有没有统一的排序层把不同信号放到同一尺度上”。
+  当前 `ranking_features.py + ranker.py` 的组合，第一次把 recall、兴趣、质量和业务约束同时放进了同一条打分链路；这比继续在 `candidate_fusion.py` 上堆启发式权重更可控，也更容易演进到 LTR。
+* `weighted_ranker` 和 `ltr_ranker` 必须共享同一份特征契约，而不是各自维护一套输入。
+  现在无论是加权排序还是未来 LTR，都消费 `RecommendationRankingFeatures`；这意味着后续训练、离线评估和线上推理都可以围绕同一份特征定义展开，而不会出现“训练特征”和“线上特征”两套体系逐渐漂移。
+* 排序 debug 必须同时出现在公开接口和后台接口，而不能只留在管理员视角。
+  当前 `/api/v1/recommendations?slot=home&debug=true` 和后台 debug 都能看到 `feature_summary` 与 `score_breakdown`，这让“推荐为什么这样排”不再只能靠后台解释；对演示、联调和后续日志验证都更有价值。

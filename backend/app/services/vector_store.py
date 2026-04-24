@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 class VectorStoreRuntime:
     configured_provider: str
     recommendation_pipeline_version: str
+    configured_recommendation_ranker: str
     qdrant_available: bool
     qdrant_url: str
     qdrant_collections: list[str]
@@ -72,6 +73,7 @@ def probe_vector_store_runtime(
     runtime = VectorStoreRuntime(
         configured_provider=app_settings.vector_db_provider,
         recommendation_pipeline_version=app_settings.recommendation_pipeline_version,
+        configured_recommendation_ranker=app_settings.recommendation_ranker,
         qdrant_available=qdrant_status.available,
         qdrant_url=qdrant_status.url,
         qdrant_collections=qdrant_status.collections,
@@ -97,6 +99,7 @@ def build_runtime_marker(settings: AppSettings | None = None) -> dict[str, objec
     return {
         "configured_provider": runtime.configured_provider,
         "recommendation_pipeline_version": runtime.recommendation_pipeline_version,
+        "configured_recommendation_ranker": runtime.configured_recommendation_ranker,
         "qdrant_available": runtime.qdrant_available,
         "degraded_to_baseline": runtime.degraded_to_baseline,
         "active_search_backend": runtime.active_search_backend,

@@ -22,9 +22,10 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
+from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
 from backend.app.services.recommendations import recommend_products_for_user
 from backend.app.services.vector_search import find_related_products
-from backend.app.services.vector_store import build_runtime_marker
+from backend.app.services.vector_store import build_runtime_marker, probe_vector_store_runtime
 
 router = APIRouter(tags=["catalog"])
 
@@ -119,48 +120,96 @@ def list_categories(
     )
 
 
+def serialize_recommendation_item(result, *, debug: bool = False) -> dict[str, object]:
+    item = {
+        **serialize_product_list_item(result.product),
+        "score": round(result.score, 6),
+        "reason": result.reason,
+    }
+    if debug:
+        item.update(
+            {
+                "matched_terms": list(getattr(result, "matched_terms", [])),
+                "recall_channels": list(getattr(result, "recall_channels", [])),
+                "feature_highlights": list(getattr(result, "feature_highlights", [])),
+                "ranking_features": dict(getattr(result, "ranking_features", {})),
+                "feature_summary": dict(getattr(result, "feature_summary", {})),
+                "score_breakdown": dict(getattr(result, "score_breakdown", {})),
+                "ranker_name": getattr(result, "ranker_name", "baseline"),
+                "ranker_model_version": getattr(result, "ranker_model_version", "baseline"),
+                "ltr_fallback_used": bool(getattr(result, "ltr_fallback_used", False)),
+            }
+        )
+    return item
+
+
 @router.get("/products/recommendations")
+@router.get("/recommendations")
 def get_product_recommendations(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     limit: int = Query(default=6, ge=1, le=20),
+    slot: str = Query(default="home", min_length=2, max_length=50),
+    debug: bool = Query(default=False),
 ):
     pipeline = build_runtime_marker()
     cache_key = build_cache_key("products", "recommendations", current_user.id, limit)
     cached_items = get_cached_json(cache_key)
-    if isinstance(cached_items, list):
+    if not debug and isinstance(cached_items, list):
         return build_response(
             request=request,
             code=0,
             message="ok",
-            data={"items": cached_items, "pipeline": pipeline},
+            data={"items": cached_items, "pipeline": {**pipeline, "slot": slot}},
             status_code=200,
         )
 
-    results = recommend_products_for_user(
-        db,
-        user_id=current_user.id,
-        limit=limit,
-    )
-    items = [
-        {
-            **serialize_product_list_item(result.product),
-            "score": round(result.score, 6),
-            "reason": result.reason,
-        }
-        for result in results
-    ]
-    set_cached_json(
-        cache_key,
-        items,
-        ttl_seconds=RECOMMENDATIONS_CACHE_TTL,
-    )
+    runtime = probe_vector_store_runtime()
+    if runtime.active_recommendation_backend == "multi_recall":
+        pipeline_run = run_recommendation_pipeline(
+            db,
+            user_id=current_user.id,
+            limit=limit,
+        )
+        items = [
+            serialize_recommendation_item(candidate, debug=debug)
+            for candidate in pipeline_run.candidates[:limit]
+        ]
+        pipeline.update(
+            {
+                "active_ranker": pipeline_run.active_ranker,
+                "ranker_model_version": pipeline_run.ranker_model_version,
+                "ltr_fallback_used": pipeline_run.ltr_fallback_used,
+            }
+        )
+    else:
+        results = recommend_products_for_user(
+            db,
+            user_id=current_user.id,
+            limit=limit,
+            force_baseline=True,
+        )
+        items = [serialize_recommendation_item(result, debug=debug) for result in results]
+        pipeline.update(
+            {
+                "active_ranker": "baseline",
+                "ranker_model_version": "baseline",
+                "ltr_fallback_used": False,
+            }
+        )
+
+    if not debug:
+        set_cached_json(
+            cache_key,
+            items,
+            ttl_seconds=RECOMMENDATIONS_CACHE_TTL,
+        )
     return build_response(
         request=request,
         code=0,
         message="ok",
-        data={"items": items, "pipeline": pipeline},
+        data={"items": items, "pipeline": {**pipeline, "slot": slot}},
         status_code=200,
     )
 

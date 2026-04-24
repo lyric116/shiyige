@@ -183,6 +183,9 @@ def test_recommendation_pipeline_returns_multi_channel_candidates_for_engaged_us
             for candidate in pipeline_run.candidates
         )
         assert pipeline_run.candidates[0].reason
+        assert pipeline_run.candidates[0].ranking_features
+        assert pipeline_run.candidates[0].feature_summary
+        assert pipeline_run.active_ranker
     finally:
         if client.collection_exists(settings.qdrant_collection_products):
             client.delete_collection(settings.qdrant_collection_products)
@@ -236,6 +239,7 @@ def test_recommendation_pipeline_returns_cold_start_candidates_for_new_user(
             or "new_arrival" in candidate.recall_channels
             for candidate in pipeline_run.candidates
         )
+        assert pipeline_run.candidates[0].score_breakdown
     finally:
         if client.collection_exists(settings.qdrant_collection_products):
             client.delete_collection(settings.qdrant_collection_products)

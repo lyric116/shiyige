@@ -108,6 +108,17 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
                 ),
                 "vector_score": round(candidate.vector_score, 6),
                 "term_bonus": round(candidate.term_bonus, 6),
+                "ranker_name": getattr(candidate, "ranker_name", "weighted_ranker"),
+                "ranker_model_version": getattr(
+                    candidate,
+                    "ranker_model_version",
+                    "weighted-ranker-v1",
+                ),
+                "ltr_fallback_used": bool(getattr(candidate, "ltr_fallback_used", False)),
+                "ranking_features": dict(getattr(candidate, "ranking_features", {})),
+                "feature_summary": dict(getattr(candidate, "feature_summary", {})),
+                "feature_highlights": list(getattr(candidate, "feature_highlights", [])),
+                "score_breakdown": dict(getattr(candidate, "score_breakdown", {})),
                 "recall_channels": list(getattr(candidate, "recall_channels", [])),
                 "channel_details": [
                     {
@@ -217,6 +228,9 @@ def debug_recommendations(
                 "active_products": active_products,
                 "candidate_count": len(candidates),
                 "cold_start": pipeline_run.cold_start,
+                "active_ranker": pipeline_run.active_ranker,
+                "ranker_model_version": pipeline_run.ranker_model_version,
+                "ltr_fallback_used": pipeline_run.ltr_fallback_used,
             },
             "recent_behaviors": serialize_behavior_logs(logs, products_by_id),
             "recommendations": serialize_candidates(candidates, limit=limit),
