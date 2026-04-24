@@ -939,3 +939,35 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前 `AppSettings` 的生产默认值已经是真实模型，但测试夹具会在模块导入前覆写成 `local_hash`；这种“导入前固定环境 + 缓存后稳定运行”的方式，是在保留真实默认值的同时避免回归测试变慢或失败的关键。
 * 商品 embedding 文本不应再是单字符串黑盒。
   现在 `semantic_text`、`keyword_text` 和 `rerank_text` 已经对应 dense、sparse 和 ColBERT 三条后续链路，这意味着 Phase 5 的索引任务和 Phase 6 的混合搜索可以直接消费结构化文本，而不需要在检索逻辑里临时拼接字段。
+
+### 9.40 商品索引层现在已经形成“文档构建层 + Qdrant 同步任务层 + 后台运维入口”的完整闭环
+
+第 64 次同日推进把 Phase 5 落成了真正可运行的索引链路：
+
+* `backend/app/services/product_index_document.py`：商品索引文档构建层。
+  它负责把商品、SKU、库存、标签和四路 embedding 文本组合成统一的 payload 与 named vectors，并输出可直接写入 Qdrant 的 `PointStruct`。这让 payload 字段定义、向量命名和 point id 规则不再散落在任务层。
+* `backend/app/tasks/qdrant_index_tasks.py`：Qdrant 商品同步任务层。
+  当前集中承载全量索引、增量索引、失败重试、删除同步和状态查询逻辑，并把结果回写到 `product_embedding.index_status/index_error/last_indexed_at`。Phase 5 之后，“商品是否已经写入 Qdrant”不再需要靠猜测，而是有正式状态源。
+* `backend/app/tasks/qdrant_schema_tasks.py`：商品 collection 契约守护层。
+  现在除了幂等建 collection，还会检测 named vectors 是否和当前模型配置一致；在 full 模式重建时，schema drift 会触发 collection 重建，从而把旧版 `384/128` 向量 schema 切到新版 `512/96`。
+* `backend/app/api/v1/admin_vector_index.py`：后台索引运维接口。
+  当前提供状态查询和同步触发入口，允许管理员查看 collection 状态、失败商品和 point 数量，并发起 full/incremental/retry/delete 四类动作。
+* `backend/scripts/reindex_products_to_qdrant.py`：命令行运维入口。
+  这让 Qdrant 商品索引第一次具备了正式 CLI，而不是只能依赖后台页面或交互式脚本。
+* `backend/app/services/vector_search.py` 与 `backend/app/services/recommendations.py`：baseline 过滤对齐层。
+  尽管真正的 Qdrant 检索还在下一阶段，当前 baseline 搜索和猜你喜欢已经开始复用 `stock_available` 语义，把缺货商品排除掉，避免新旧链路在业务过滤规则上分叉。
+* `backend/tests/test_product_qdrant_indexing.py`：索引任务验收测试。
+  它直接验证“全量写入 20 个 point、增量更新标签 payload、下架商品删除 point、失败后重试成功、缺货商品不进入搜索/推荐结果”。
+* `backend/tests/api/test_admin_vector_index.py`：后台索引接口验收测试。
+  这组测试把状态接口和同步接口的路由接线、响应结构和操作日志固定住，避免后续只剩任务层测试而接口悄悄失效。
+* `docs/indexing_operations.md`：索引运维说明。
+  当前把 CLI 命令、后台接口、payload 字段和增量规则写成了可以直接交给后续开发者和答辩材料引用的说明。
+
+这里有三个新的关键架构洞察：
+
+* 商品索引必须是正式任务，而不能继续藏在检索请求里临时触发。
+  现在 Qdrant point 的生成、更新、删除和失败重试都已经从搜索/推荐请求里剥离出来，变成后台接口和 CLI 任务；这正是“独立向量数据库链路”成立的前提。
+* schema drift 在模型升级后是必然会发生的运维问题，不能假装它不存在。
+  本轮真实验证中，Qdrant 里原先保留了 `dense=384 / colbert=128` 的旧 schema；如果没有在 full 模式里检测并重建 collection，新的 `512 / 96` 模型根本无法落索引。这说明“向量 schema 迁移”本身就是系统设计的一部分。
+* `status` 和 `stock_available` 必须分开表达。
+  当前索引层已经把“商品下架”定义为 point 删除，把“商品缺货”定义为 point 保留但过滤掉结果；这让后续 Phase 6 的 payload filter、Phase 7 的推荐召回和后台统计都可以基于同一套业务语义演进，而不会在一个字段上混杂多种状态。

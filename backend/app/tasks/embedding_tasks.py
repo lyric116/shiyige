@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from backend.app.core.config import get_app_settings
-from backend.app.models.product import Product
+from backend.app.models.product import Product, ProductSku
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import build_product_embedding_payload
@@ -19,7 +19,7 @@ def build_product_embedding_query(product_ids: Iterable[int] | None = None):
         .options(
             selectinload(Product.category),
             selectinload(Product.tags),
-            selectinload(Product.skus),
+            selectinload(Product.skus).selectinload(ProductSku.inventory),
             selectinload(Product.embedding),
         )
         .order_by(Product.id.asc())

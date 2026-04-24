@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -31,4 +32,9 @@ class AdminProductUpsertRequest(BaseModel):
 
 class AdminReindexRequest(BaseModel):
     force: bool = True
+    product_ids: list[int] | None = None
+
+
+class AdminVectorIndexRequest(BaseModel):
+    mode: Literal["full", "incremental", "retry_failed", "delete"] = "full"
     product_ids: list[int] | None = None

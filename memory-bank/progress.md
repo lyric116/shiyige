@@ -1939,3 +1939,59 @@ Step 14:
 * 当前 Phase 4 只负责“生成哪三类 embedding、用什么模型、文本怎么构造”，还没有把商品真正写入 Qdrant；Qdrant point 写入、状态查询和失败重试属于下一阶段 Phase 5。
 * `backend/tests/conftest.py`、`backend/tests/api/conftest.py` 和 `tests/e2e/conftest.py` 现在会在导入 `create_app()` 之前先注入测试 embedding 环境变量，后续不要把这些覆盖逻辑移到 fixture 内部，否则全局 `AppSettings` 缓存会重新暴露真实模型默认值。
 * `backend/app/services/embedding_text.py` 目前会根据现有商品字段推导价格带、礼赠属性和搭配属性；如果后续商品模型新增显式字段，应优先改成读取真实字段，而不是继续扩大启发式推导。
+
+### 同日继续推进记录（四十一）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 5：构建商品向量索引任务
+
+新增与修改：
+
+* `backend/app/services/product_index_document.py`
+* `backend/app/tasks/qdrant_index_tasks.py`
+* `backend/app/tasks/qdrant_schema_tasks.py`
+* `backend/app/api/v1/admin_vector_index.py`
+* `backend/app/api/v1/router.py`
+* `backend/app/schemas/admin.py`
+* `backend/app/tasks/embedding_tasks.py`
+* `backend/app/services/vector_search.py`
+* `backend/app/services/recommendations.py`
+* `backend/scripts/reindex_products_to_qdrant.py`
+* `backend/tests/test_product_qdrant_indexing.py`
+* `backend/tests/api/test_admin_vector_index.py`
+* `docs/indexing_operations.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/product_index_document.py backend/app/tasks/qdrant_index_tasks.py backend/app/tasks/qdrant_schema_tasks.py backend/app/api/v1/admin_vector_index.py backend/scripts/reindex_products_to_qdrant.py backend/app/schemas/admin.py backend/app/api/v1/router.py backend/app/tasks/embedding_tasks.py backend/app/services/vector_search.py backend/app/services/recommendations.py backend/tests/test_product_qdrant_indexing.py backend/tests/api/test_admin_vector_index.py`
+* `./.venv/bin/python -m pytest backend/tests/test_product_qdrant_indexing.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_admin_vector_index.py -q`
+* `./.venv/bin/python -m pytest backend/tests/tasks/test_embedding_tasks.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py backend/tests/api/test_admin_reindex.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_qdrant_schema.py backend/tests/test_product_qdrant_indexing.py -q`
+* `docker compose up -d --build`
+* `docker compose exec -T api python -m backend.scripts.reindex_products_to_qdrant --mode full`
+* `curl --noproxy '*' -s http://127.0.0.1:6333/collections/shiyige_products_v1`
+* `./.venv/bin/python - <<'PY' ... client.count('shiyige_products_v1') / client.retrieve(... with_vectors=True) ... PY`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已新增 `backend/app/services/product_index_document.py`，把商品 payload、dense/sparse/colbert 三类向量和 Qdrant `PointStruct` 组装逻辑集中到一个地方，不再在任务层散落拼字段。
+* 已新增 `backend/app/tasks/qdrant_index_tasks.py`，实现商品全量索引、增量索引、失败重试、显式删除同步和索引状态查询；PostgreSQL 侧会同步维护 `index_status`、`index_error` 和 `last_indexed_at`。
+* 已新增 `backend/app/api/v1/admin_vector_index.py` 和 `backend/scripts/reindex_products_to_qdrant.py`，把商品索引变成正式的后台接口与命令行入口，不再依赖搜索请求临时触发全库向量准备。
+* 已新增 `backend/tests/test_product_qdrant_indexing.py`，覆盖了全量写入、标签变更后的增量更新、下架商品删除同步、失败回写与重试，以及“无库存商品不出现在搜索/推荐结果”。
+* 已新增 `backend/tests/api/test_admin_vector_index.py`，验证后台状态接口和同步接口的路由分发、统一响应和操作日志写入。
+* 已新增 `docs/indexing_operations.md`，固定了 CLI 命令、后台接口、payload 字段和增量规则。
+* 已把 baseline 搜索与推荐补上库存过滤：当前即使还没切到 Qdrant 检索，也不会再把 `stock_available=false` 的商品返回给语义搜索和猜你喜欢接口。
+* 已在 `backend/app/tasks/qdrant_schema_tasks.py` 增加 schema drift 检测：当商品 collection 维度仍停留在旧版 `dense=384 / colbert=128` 时，full 模式索引会自动重建 collection；incremental 模式则会明确报错，避免静默写坏索引。
+* 真实 Compose 环境验证中，`docker compose exec -T api python -m backend.scripts.reindex_products_to_qdrant --mode full` 返回 `indexed=20`、`failed=0`；`curl /collections/shiyige_products_v1` 显示 collection 已切到 `dense=512`、`colbert=96`、`points_count=20`；后续直接读取 point 也能看到 `vector_keys=['colbert', 'dense', 'sparse']` 和 `payload_status='active'`。
+* 本轮最终验证结果为：Phase 5 专项测试、后台接口测试、推荐/搜索相关回归、真实容器索引脚本验证、Qdrant collection 查询和后端全量测试全部通过。
+
+交接提醒：
+
+* 当前 Phase 5 已经把商品 points 正式写入 Qdrant，但搜索接口本身仍然走 baseline 检索逻辑；真正把搜索切到 Qdrant hybrid recall 是下一阶段 Phase 6。
+* `sync_products_to_qdrant(mode=\"full\")` 现在会在检测到 collection 维度漂移时自动重建商品 collection，这对“模型升级后第一次全量重建”是必要的；如果后续要做更细粒度的生产迁移，应把这一步变成显式运维动作。
+* `backend/app/services/product_index_document.py` 现在把 `status` 和 `stock_available` 分开维护：下架商品会从 Qdrant 删除，缺货但仍上架的商品会保留 point 但被搜索/推荐过滤；后续 Phase 6/7 的 payload filter 应继续沿用这套语义，不要再混回单一状态字段。

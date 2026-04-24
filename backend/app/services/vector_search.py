@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from decimal import Decimal
-import math
 from typing import Sequence
 
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from backend.app.models.product import Product
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import normalize_text_piece
+from backend.app.services.product_index_document import product_has_available_stock
 from backend.app.tasks.embedding_tasks import reindex_changed_product_embeddings
 
 
@@ -163,6 +164,8 @@ def semantic_search_products(
             continue
         if max_price is not None and (lowest_price is None or lowest_price > max_price):
             continue
+        if not product_has_available_stock(product):
+            continue
 
         if product.embedding is None or not product.embedding.embedding_vector:
             continue
@@ -214,12 +217,18 @@ def find_related_products(
     ).unique().all()
 
     source_product = next((product for product in products if product.id == product_id), None)
-    if source_product is None or source_product.embedding is None or not source_product.embedding.embedding_vector:
+    if (
+        source_product is None
+        or source_product.embedding is None
+        or not source_product.embedding.embedding_vector
+    ):
         return []
 
     results: list[VectorSearchResult] = []
     for candidate in products:
         if candidate.id == source_product.id:
+            continue
+        if not product_has_available_stock(candidate):
             continue
         if candidate.embedding is None or not candidate.embedding.embedding_vector:
             continue

@@ -7,6 +7,7 @@ from backend.app.api.v1.admin_orders import router as admin_orders_router
 from backend.app.api.v1.admin_products import router as admin_products_router
 from backend.app.api.v1.admin_recommendations import router as admin_recommendations_router
 from backend.app.api.v1.admin_reindex import router as admin_reindex_router
+from backend.app.api.v1.admin_vector_index import router as admin_vector_index_router
 from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.cart import router as cart_router
 from backend.app.api.v1.health import router as health_router
@@ -26,6 +27,7 @@ router.include_router(admin_orders_router)
 router.include_router(admin_products_router)
 router.include_router(admin_recommendations_router)
 router.include_router(admin_reindex_router)
+router.include_router(admin_vector_index_router)
 router.include_router(auth_router)
 router.include_router(cart_router)
 router.include_router(health_router)

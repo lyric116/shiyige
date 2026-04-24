@@ -13,6 +13,7 @@ from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import build_embedding_content_hash, normalize_text_piece
+from backend.app.services.product_index_document import product_has_available_stock
 from backend.app.services.vector_search import (
     VectorSearchResult,
     cosine_similarity,
@@ -74,7 +75,7 @@ def load_products_for_interest_profile(db: Session, product_ids: set[int]) -> di
 
 
 def load_active_products_for_recommendations(db: Session) -> list[Product]:
-    return db.scalars(
+    products = db.scalars(
         select(Product)
         .options(
             selectinload(Product.category),
@@ -84,6 +85,7 @@ def load_active_products_for_recommendations(db: Session) -> list[Product]:
         )
         .where(Product.status == 1)
     ).unique().all()
+    return [product for product in products if product_has_available_stock(product)]
 
 
 def build_profile_segments(
