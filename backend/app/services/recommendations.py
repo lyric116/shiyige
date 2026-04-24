@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from backend.app.core.config import get_app_settings
 from backend.app.models.product import Product
 from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
@@ -136,6 +137,7 @@ def build_user_interest_profile(
     user_id: int,
     provider: EmbeddingProvider | None = None,
 ) -> UserInterestProfile:
+    settings = get_app_settings()
     embedding_provider = provider or get_embedding_provider()
     ensure_product_embeddings(db, embedding_provider)
     db.expire_all()
@@ -165,6 +167,8 @@ def build_user_interest_profile(
     profile.profile_text = profile_text
     profile.behavior_count = len(logs)
     profile.last_event_at = last_event_at
+    profile.qdrant_user_point_id = str(user_id)
+    profile.profile_version = settings.recommendation_pipeline_version
     profile.ext_json = {
         "top_terms": [
             term
@@ -180,6 +184,7 @@ def build_user_interest_profile(
     if not profile_text:
         profile.embedding_vector = None
         profile.content_hash = None
+        profile.last_synced_at = None
         profile.last_built_at = datetime.utcnow()
     elif (
         profile.content_hash != content_hash
@@ -188,6 +193,7 @@ def build_user_interest_profile(
     ):
         profile.embedding_vector = embedding_provider.embed_query(profile_text)
         profile.content_hash = content_hash
+        profile.last_synced_at = None
         profile.last_built_at = datetime.utcnow()
 
     db.add(profile)

@@ -23,7 +23,9 @@ def test_qdrant_connection_status_reports_live_service_when_available() -> None:
 
     assert status.url == "http://127.0.0.1:6333"
     assert isinstance(status.collections, list)
-    assert collection_exists("shiyige_products_v1", settings=settings) is False
+    assert collection_exists("shiyige_products_v1", settings=settings) == (
+        "shiyige_products_v1" in status.collections
+    )
 
 
 def test_vector_store_runtime_degrades_to_baseline_when_qdrant_is_unreachable() -> None:

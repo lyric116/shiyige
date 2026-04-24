@@ -877,3 +877,29 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   本轮健康检查出现 `qdrant_available=true` 同时 `active_search_backend=baseline`，正是为了明确区分“基础设施已接通”和“业务算法已切换”这两个阶段，避免后续误判已经完成搜索改造。
 * fallback 机制不应藏在异常处理里，而应显式暴露。
   当前 `vector_store.py` 会明确给出 `degraded_to_baseline`，比单纯 try/except 后默默走旧逻辑更利于排障、答辩说明和后续灰度切换。
+
+### 9.38 商品向量层现在已经形成“Qdrant collection schema + PostgreSQL 同步元数据”的双层结构
+
+第 62 次同日推进把 Phase 3 落到了真正可运行的 schema 层：
+
+* `backend/app/services/vector_schema.py`：Qdrant 商品 collection 规格定义。
+  当前把 `shiyige_products_v1` 固定为一个带 named vectors 的 collection：`dense` 用于后续语义召回，`sparse` 用于关键词通道，`colbert` 用于后续 late interaction rerank 预留。
+* `backend/app/tasks/qdrant_schema_tasks.py`：Qdrant schema 初始化任务。
+  该任务会幂等地创建 collection、建立 payload index，并返回当前 schema 摘要，供测试和启动流程复用。
+* `backend/app/main.py`：应用启动时自动确保商品 collection 存在。
+  现在只要 Qdrant 可达，API 启动就会先探测运行时，再自动确保 `shiyige_products_v1` 和 11 个 payload index 存在，因此 `curl /collections/shiyige_products_v1` 已经能直接看到真实 schema。
+* `backend/app/models/recommendation.py`：推荐元数据表职责被重新明确。
+  `product_embedding` 继续保留现有 baseline 所需的 `embedding_vector`，同时新增 `qdrant_point_id`、`qdrant_collection`、`index_status`、`index_error`；`user_interest_profile` 新增 `qdrant_user_point_id`、`profile_version`、`last_synced_at`，把“画像/商品与 Qdrant 的同步状态”正式落到业务库。
+* `backend/alembic/versions/20260424_10_qdrant_vector_metadata.py`：推荐元数据迁移。
+  该迁移已经真实打到 PostgreSQL，不再只是 ORM 层字段补充。
+* `docs/vector_database_design.md`：向量数据库设计文档。
+  这份文档把 collection、payload 字段、payload index 和 PostgreSQL 侧元数据职责写成了可以直接引用的说明。
+
+这里有三个新的关键架构洞察：
+
+* Qdrant schema 不是“等索引任务写的时候顺手建一下”，而应提前成为一个可验证的系统契约。
+  当前 `vector_schema.py` 和 `test_qdrant_schema.py` 让 named vectors、payload index 和 collection 名称都变成了可重复验证的事实，而不是藏在后续索引代码里的隐式约定。
+* PostgreSQL 仍然是推荐系统的重要组成部分，但职责已经变化。
+  现在它不再被设计成主向量检索库，而是负责保存 embedding 文本、content hash、Qdrant point id、索引状态和同步错误，这样后续 Phase 5 的增量索引、失败重试和状态查询才有落点。
+* “API 启动就确保 collection 存在”是比赛型项目里比“完全手工初始化”更稳的选择。
+  对答辩和演示环境而言，保证 API 启动后立刻能看到 `shiyige_products_v1` 的 schema，比要求评委或开发者额外手工跑一次初始化脚本更不容易出错。

@@ -1829,3 +1829,54 @@ Step 14:
 * 当前 Phase 2 只是把 Qdrant 作为基础设施接入，并没有把搜索或推荐真正切到 Qdrant；因此健康检查里会出现“Qdrant 可用，但 active backend 仍是 baseline”的状态，这是刻意保守的阶段结果。
 * `docker compose up -d --build` 首次构建 API 镜像时，Docker BuildKit 出现过一次 snapshot 导出异常；直接重试后命中缓存并成功完成构建，当前代码本身没有因此回滚。
 * 由于 `.gitignore` 原先会忽略 `.env.*`，本轮额外加入了 `!.env.example`，后续如果再添加新的环境模板文件，记得确认不会被忽略。
+
+### 同日继续推进记录（三十九）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 3：设计 Qdrant 商品 Collection
+
+新增与修改：
+
+* `backend/app/models/recommendation.py`
+* `backend/app/tasks/embedding_tasks.py`
+* `backend/app/services/recommendations.py`
+* `backend/app/services/vector_schema.py`
+* `backend/app/tasks/qdrant_schema_tasks.py`
+* `backend/tests/test_qdrant_schema.py`
+* `backend/tests/test_qdrant_connection.py`
+* `backend/alembic/env.py`
+* `backend/alembic/versions/20260424_10_qdrant_vector_metadata.py`
+* `backend/app/main.py`
+* `docs/vector_database_design.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/models/recommendation.py backend/app/tasks/embedding_tasks.py backend/app/services/recommendations.py backend/alembic/env.py backend/app/services/vector_schema.py backend/app/tasks/qdrant_schema_tasks.py backend/tests/test_qdrant_schema.py backend/alembic/versions/20260424_10_qdrant_vector_metadata.py backend/app/main.py`
+* `./.venv/bin/python -m pytest backend/tests/test_qdrant_schema.py -q`
+* `./.venv/bin/python -m pytest backend/tests/tasks/test_embedding_tasks.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py -q`
+* `DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige ./.venv/bin/alembic -c backend/alembic.ini upgrade head`
+* `docker compose up -d --build api nginx`
+* `curl --noproxy '*' --retry 10 --retry-delay 1 -s http://127.0.0.1:6333/collections/shiyige_products_v1`
+* `curl --noproxy '*' --retry 10 --retry-delay 1 -s http://127.0.0.1/api/v1/health`
+* `docker compose logs api --tail=40`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已新增 `backend/app/services/vector_schema.py`，明确 `shiyige_products_v1` 的 named vectors 结构：`dense(384)`、`sparse` 和 `colbert(128, multivector)`。
+* 已新增 `backend/app/tasks/qdrant_schema_tasks.py`，实现商品 collection 和 payload index 的幂等初始化。
+* 已新增 `docs/vector_database_design.md`，把 Qdrant collection、payload 字段和 PostgreSQL 侧同步元数据职责固定成文档。
+* 已在 `product_embedding` 中新增 `qdrant_point_id`、`qdrant_collection`、`index_status`、`index_error`；已在 `user_interest_profile` 中新增 `qdrant_user_point_id`、`profile_version`、`last_synced_at`。
+* 已新增 Alembic 迁移 `20260424_10_qdrant_vector_metadata.py`，并真实升级到当前 PostgreSQL 数据库。
+* 已把 Qdrant schema 初始化接到 API 启动流程：Qdrant 可达时，API 启动会自动确保 `shiyige_products_v1` collection 和 payload index 存在。
+* 真实环境验证中，`curl http://127.0.0.1:6333/collections/shiyige_products_v1` 已返回 collection 详情，能看到 `dense`、`colbert`、`sparse` 和 11 个 payload index；`/api/v1/health` 也已返回 `qdrant_collections=[\"shiyige_products_v1\"]`。
+* 本轮最终验证结果为：Qdrant schema 测试、推荐相关回归、Alembic 升级、真实 collection 查询和后端全量测试全部通过。
+
+交接提醒：
+
+* 当前 collection 只完成 schema 与 payload index 初始化，还没有写入商品 points；真正的商品全量/增量索引属于下一阶段 Phase 5。
+* `backend/tests/test_qdrant_connection.py` 的断言已经调整为和真实 collections 列表对齐，因为从 Phase 3 开始，`shiyige_products_v1` 可能在 API 启动后自动存在。
+* 目前仍保留 `embedding_vector` JSON 字段，以免 baseline 和现有推荐链路在 Phase 3 就被切断；后续如果完全迁移到 Qdrant，再考虑是否彻底弃用。

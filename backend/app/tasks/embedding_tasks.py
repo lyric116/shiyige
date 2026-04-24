@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from backend.app.core.config import get_app_settings
 from backend.app.models.product import Product
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
@@ -34,6 +35,7 @@ def upsert_product_embedding(
     provider: EmbeddingProvider,
     force: bool = False,
 ) -> tuple[ProductEmbedding, bool]:
+    settings = get_app_settings()
     payload = build_product_embedding_payload(product)
     existing = product.embedding
 
@@ -56,6 +58,9 @@ def upsert_product_embedding(
             embedding_text=payload["embedding_text"],
             embedding_vector=vector,
             content_hash=payload["content_hash"],
+            qdrant_point_id=str(product.id),
+            qdrant_collection=settings.qdrant_collection_products,
+            index_status="pending",
             last_indexed_at=datetime.utcnow(),
         )
     else:
@@ -63,6 +68,10 @@ def upsert_product_embedding(
         existing.embedding_text = payload["embedding_text"]
         existing.embedding_vector = vector
         existing.content_hash = payload["content_hash"]
+        existing.qdrant_point_id = str(product.id)
+        existing.qdrant_collection = settings.qdrant_collection_products
+        existing.index_status = "pending"
+        existing.index_error = None
         existing.last_indexed_at = datetime.utcnow()
 
     db.add(existing)

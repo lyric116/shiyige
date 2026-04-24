@@ -4,12 +4,15 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from backend.app.core.database import get_database_url
+from backend.app.models import (
+    admin,  # noqa: F401
+    membership,  # noqa: F401
+    product,  # noqa: F401
+    recommendation,  # noqa: F401
+    review,  # noqa: F401
+    user,  # noqa: F401
+)
 from backend.app.models.base import Base
-from backend.app.models import admin  # noqa: F401
-from backend.app.models import membership  # noqa: F401
-from backend.app.models import product  # noqa: F401
-from backend.app.models import review  # noqa: F401
-from backend.app.models import user  # noqa: F401
 
 config = context.config
 

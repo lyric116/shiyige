@@ -5,12 +5,15 @@ from fastapi import FastAPI
 from backend.app.api.router import api_router
 from backend.app.core.config import get_app_settings
 from backend.app.core.exceptions import register_exception_handlers
-from backend.app.core.logger import configure_logging
+from backend.app.core.logger import configure_logging, get_logger
 from backend.app.core.minio import check_minio_connection
 from backend.app.core.rate_limit import register_rate_limit_middleware
 from backend.app.core.redis import check_redis_connection
 from backend.app.core.request_id import register_request_id_middleware
 from backend.app.services.vector_store import probe_vector_store_runtime
+from backend.app.tasks.qdrant_schema_tasks import ensure_product_collection
+
+logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -19,7 +22,13 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.vector_store_runtime = probe_vector_store_runtime(log_on_degrade=True)
+        runtime = probe_vector_store_runtime(log_on_degrade=True)
+        app.state.vector_store_runtime = runtime
+        if runtime.qdrant_available:
+            try:
+                app.state.qdrant_schema = ensure_product_collection()
+            except Exception as exc:  # pragma: no cover - startup protection
+                logger.warning("Failed to ensure Qdrant schema on startup. error=%s", exc)
         if settings.enable_startup_checks:
             check_redis_connection()
             check_minio_connection()
