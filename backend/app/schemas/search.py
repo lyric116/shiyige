@@ -9,3 +9,8 @@ class SemanticSearchRequest(BaseModel):
     category_id: int | None = None
     min_price: Decimal | None = None
     max_price: Decimal | None = None
+    dynasty_style: str | None = Field(default=None, max_length=100)
+    craft_type: str | None = Field(default=None, max_length=100)
+    scene_tag: str | None = Field(default=None, max_length=100)
+    festival_tag: str | None = Field(default=None, max_length=100)
+    stock_only: bool = True

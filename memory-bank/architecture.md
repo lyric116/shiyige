@@ -971,3 +971,35 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   本轮真实验证中，Qdrant 里原先保留了 `dense=384 / colbert=128` 的旧 schema；如果没有在 full 模式里检测并重建 collection，新的 `512 / 96` 模型根本无法落索引。这说明“向量 schema 迁移”本身就是系统设计的一部分。
 * `status` 和 `stock_available` 必须分开表达。
   当前索引层已经把“商品下架”定义为 point 删除，把“商品缺货”定义为 point 保留但过滤掉结果；这让后续 Phase 6 的 payload filter、Phase 7 的推荐召回和后台统计都可以基于同一套业务语义演进，而不会在一个字段上混杂多种状态。
+
+### 9.41 搜索层现在已经形成“结构化过滤层 + 双路召回层 + 本地精排层 + 运行时切换层”的 Phase 6 形态
+
+第 65 次同日推进把 Phase 6 的混合搜索链路接到了真实接口上：
+
+* `backend/app/services/search_filters.py`：结构化过滤抽象层。
+  当前把 `category_id`、价格区间、朝代风格、工艺、场景、节令和 `stock_only` 收敛成统一的 `SearchFilters`，并同时生成 Qdrant payload filter、baseline 商品过滤和日志序列化结果，避免新旧搜索路径各自维护一份筛选语义。
+* `backend/app/services/search_reranker.py`：搜索精排信号层。
+  当前集中保存 RRF 分数函数、ColBERT max-sim、本地 payload 语义 bonus、业务 bonus 和最终 reason 组装逻辑；这样 dense/sparse/ColBERT/文化特征的分数解释不再散落在主搜索函数里。
+* `backend/app/services/hybrid_search.py`：Qdrant hybrid search 执行层。
+  当前会对 query 同时生成 dense、sparse 和 ColBERT 向量；先在 Qdrant 里做 dense top 100 与 sparse top 100 召回，再在应用层做 RRF 融合，接着只对 Top 50 候选回取 ColBERT multivector 做本地重排，最后再按最终候选 ID 回表加载商品详情。
+* `backend/app/services/vector_search.py`：公开搜索入口与 baseline 分界层。
+  现在 `semantic_search_products()` 负责根据运行时状态选择 `qdrant_hybrid` 或 `baseline_semantic_search_products()`；旧的 PostgreSQL JSON 向量 + Python cosine 路径没有删除，而是被显式保留下来作为 fallback 与对照组。
+* `backend/app/services/vector_store.py`：搜索 readiness 判定层。
+  当前不再只检查“Qdrant 是否连得通”，而是进一步检查商品 collection 是否存在、schema 是否匹配当前 embedding 配置、以及 collection 是否已经写入 points；只有这些条件都满足时，`active_search_backend` 才会切成 `qdrant_hybrid`。
+* `backend/app/api/v1/search.py` 与 `backend/app/schemas/search.py`：语义搜索接口层。
+  当前 `POST /api/v1/search/semantic` 已支持 Phase 6 需要的全部结构化过滤字段，并会把过滤条件与当前搜索后端一起写进 `semantic_search` 行为日志。
+* `backend/scripts/export_baseline_recommendation_metrics.py`：baseline 稳定性保护层。
+  由于 Phase 6 之后默认搜索路径会切到 Qdrant，这个脚本现在显式传入 `force_baseline=True`，确保 Phase 1 导出的 baseline 指标仍然对应旧搜索逻辑，而不是被新的 hybrid runtime 污染。
+* `backend/tests/test_search_filters.py` 与 `backend/tests/test_hybrid_search.py`：Phase 6 验收测试层。
+  前者固定结构化过滤在 Qdrant 与 baseline 上的一致性；后者同时验证 RRF 融合、ColBERT 精排和“真实写入 Qdrant 后 `semantic_search_products()` 会走 hybrid 路径并尊重库存过滤”。
+* `docs/search_pipeline.md`：搜索链路说明文档。
+  当前把运行时切换条件、过滤字段、召回阶段、精排阶段和 fallback 契约写成了后续开发者与答辩材料都能直接引用的说明。
+
+这里有三个新的关键架构洞察：
+
+* “Qdrant 可用”不等于“Qdrant 搜索已经可以接流量”。
+  当前只有在 collection 存在、schema 正确且 points 已写入后，系统才会把 `active_search_backend` 从 `baseline` 切到 `qdrant_hybrid`；这避免了“容器起来了，但搜索结果因为空 collection 直接变成空列表”的假切换。
+* 结构化过滤必须同时约束 Qdrant 路径和 baseline 路径。
+  现在 `search_filters.py` 同时服务于 payload filter 和 ORM fallback，意味着无论当前请求是否降级到 baseline，`category_id`、价格区间、朝代、工艺、节令、场景和库存语义都保持一致，不会出现“同一个接口在两条路径上筛选规则不同”的问题。
+* 混合搜索真正替代“全量遍历”，关键不在于把向量搬进 Qdrant，而在于只回表最终候选。
+  当前 `hybrid_search.py` 先在 Qdrant 内部做 dense/sparse 召回，再只把 Top 50 候选的 ColBERT 向量和最终少量商品 ID 拉回应用层；这已经从架构上切断了过去“先从 PostgreSQL 拉全量商品，再逐个算余弦”的旧模式。

@@ -230,6 +230,7 @@ def export_baseline_metrics(output_path: Path = DEFAULT_OUTPUT_PATH) -> dict[str
                 query=query,
                 limit=5,
                 provider=provider,
+                force_baseline=True,
             )
             latency_ms = (perf_counter() - started_at) * 1000
             search_cases.append(

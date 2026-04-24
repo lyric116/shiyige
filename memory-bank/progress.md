@@ -1995,3 +1995,57 @@ Step 14:
 * 当前 Phase 5 已经把商品 points 正式写入 Qdrant，但搜索接口本身仍然走 baseline 检索逻辑；真正把搜索切到 Qdrant hybrid recall 是下一阶段 Phase 6。
 * `sync_products_to_qdrant(mode=\"full\")` 现在会在检测到 collection 维度漂移时自动重建商品 collection，这对“模型升级后第一次全量重建”是必要的；如果后续要做更细粒度的生产迁移，应把这一步变成显式运维动作。
 * `backend/app/services/product_index_document.py` 现在把 `status` 和 `stock_available` 分开维护：下架商品会从 Qdrant 删除，缺货但仍上架的商品会保留 point 但被搜索/推荐过滤；后续 Phase 6/7 的 payload filter 应继续沿用这套语义，不要再混回单一状态字段。
+
+### 同日继续推进记录（四十二）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 6：搜索页改造为混合检索
+
+新增与修改：
+
+* `backend/app/services/search_filters.py`
+* `backend/app/services/search_reranker.py`
+* `backend/app/services/hybrid_search.py`
+* `backend/app/services/vector_search.py`
+* `backend/app/services/vector_store.py`
+* `backend/app/api/v1/search.py`
+* `backend/app/schemas/search.py`
+* `backend/scripts/export_baseline_recommendation_metrics.py`
+* `backend/tests/test_search_filters.py`
+* `backend/tests/test_hybrid_search.py`
+* `docs/search_pipeline.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/search_filters.py backend/app/services/search_reranker.py backend/app/services/hybrid_search.py backend/app/services/vector_search.py backend/app/services/vector_store.py backend/app/api/v1/search.py backend/app/schemas/search.py backend/scripts/export_baseline_recommendation_metrics.py backend/tests/test_search_filters.py backend/tests/test_hybrid_search.py`
+* `./.venv/bin/python -m pytest backend/tests/test_search_filters.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_hybrid_search.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_search_semantic.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_qdrant_connection.py backend/tests/test_product_qdrant_indexing.py backend/tests/integration/test_search_ranking.py backend/tests/api/test_health.py -q`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `docker compose up -d --build`
+* `docker compose exec -T api python -m backend.scripts.reindex_products_to_qdrant --mode full`
+* `curl --noproxy '*' -s http://127.0.0.1:6333/collections/shiyige_products_v1`
+* `curl --noproxy '*' -s -X POST http://127.0.0.1/api/v1/search/semantic -H 'Content-Type: application/json' -d '{"query":"香囊","limit":5}'`
+* `curl --noproxy '*' -s -X POST http://127.0.0.1/api/v1/search/semantic -H 'Content-Type: application/json' -d '{"query":"端午送礼","limit":5,"festival_tag":"端午","max_price":200}'`
+
+结果：
+
+* 已新增 `backend/app/services/search_filters.py`，把 `category_id`、价格区间、朝代、工艺、场景、节令和 `stock_only` 统一成同一份过滤模型，并同时复用于 Qdrant payload filter、baseline fallback 和行为日志。
+* 已新增 `backend/app/services/search_reranker.py`，集中承载 RRF 分数、ColBERT max-sim、payload 语义 bonus、业务 bonus 和搜索 reason 拼装逻辑，不再把精排规则散落在搜索主函数里。
+* 已新增 `backend/app/services/hybrid_search.py`，实现 dense recall top 100、sparse recall top 100、本地 RRF 融合、Top 50 ColBERT 重排，以及只回表加载最终候选商品的搜索路径。
+* 已把 `backend/app/services/vector_search.py` 改成“双路径入口”：默认在 Qdrant collection 已建好、schema 正常且已有 points 时走 `qdrant_hybrid`；否则回退到保留的 `baseline_semantic_search_products()`。
+* 已把 `backend/app/services/vector_store.py` 的运行时标记从“Qdrant 是否可达”升级为“Qdrant 搜索是否真正就绪”。现在只有在 collection 存在、schema 无漂移且已有索引 points 时，`active_search_backend` 才会切到 `qdrant_hybrid`。
+* 已扩展 `POST /api/v1/search/semantic` 的请求模型与日志字段，支持 `dynasty_style`、`craft_type`、`scene_tag`、`festival_tag` 和 `stock_only=true` 的结构化过滤，并把过滤条件写入 `semantic_search` 行为日志。
+* 已更新 baseline 导出脚本，让 `backend/scripts/export_baseline_recommendation_metrics.py` 在 Phase 6 之后仍显式使用 `force_baseline=True`，保证 Phase 1 的对照结果不会因为默认搜索后端切到 Qdrant 而被污染。
+* 真实 Compose 环境验证中，`/api/v1/search/semantic` 返回的 `pipeline.active_search_backend` 已切为 `qdrant_hybrid`、`degraded_to_baseline=false`；搜索“香囊”时 Top1 为 `故宫宫廷香囊`，reason 为 `与“香囊”语义相关，关键词命中“香囊”，文化特征匹配“香囊”，经混合检索精排`；搜索“端午送礼”并加 `festival_tag=端午,max_price=200` 时只返回价格符合条件的 `故宫宫廷香囊`。
+* 本轮最终验证结果为：Phase 6 专项测试、搜索/索引/运行时回归、后端全量测试、容器重建、Qdrant collection 检查和真实 API 请求验证全部通过；后端全量测试结果为 `127 passed`。
+
+交接提醒：
+
+* 当前只有搜索链路默认切到了 `qdrant_hybrid`，个性化推荐接口仍然保持 baseline；推荐侧的多路召回属于下一阶段 Phase 7。
+* `probe_vector_store_runtime()` 现在会额外检查 product collection 是否存在 points，因此在“刚建 collection 但尚未 full reindex”的环境里仍会回退 baseline；如果后续要进一步压缩接口延迟，可考虑把这部分 readiness 探测做短 TTL 缓存。
+* `semantic_search_products()` 仍然保留 `force_baseline=True` 与 `provider=` 的测试/脚本注入能力，后续如果要继续做 baseline 对照或离线审计，不要删除这条显式回退路径。

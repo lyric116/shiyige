@@ -21,6 +21,7 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
+from backend.app.services.search_filters import build_search_filters, serialize_search_filters
 from backend.app.services.vector_search import semantic_search_products
 from backend.app.services.vector_store import build_runtime_marker
 
@@ -255,6 +256,16 @@ def semantic_search(
 ):
     query = normalize_keyword(payload.query)
     pipeline = build_runtime_marker()
+    filters = build_search_filters(
+        category_id=payload.category_id,
+        min_price=payload.min_price,
+        max_price=payload.max_price,
+        dynasty_style=payload.dynasty_style,
+        craft_type=payload.craft_type,
+        scene_tag=payload.scene_tag,
+        festival_tag=payload.festival_tag,
+        stock_only=payload.stock_only,
+    )
     if not query:
         return build_response(
             request=request,
@@ -271,6 +282,11 @@ def semantic_search(
         category_id=payload.category_id,
         min_price=payload.min_price,
         max_price=payload.max_price,
+        dynasty_style=payload.dynasty_style,
+        craft_type=payload.craft_type,
+        scene_tag=payload.scene_tag,
+        festival_tag=payload.festival_tag,
+        stock_only=payload.stock_only,
     )
 
     current_user = get_optional_user_from_request(request, db)
@@ -283,7 +299,8 @@ def semantic_search(
             "query": query,
             "mode": "semantic",
             "result_count": len(results),
-            "category_id": payload.category_id,
+            "pipeline": pipeline["active_search_backend"],
+            "filters": serialize_search_filters(filters),
         },
     )
     if current_user is not None:
