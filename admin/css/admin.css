@@ -343,9 +343,16 @@ a {
 
 .admin-form-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) 140px auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) 140px auto;
   gap: 1rem;
   align-items: end;
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .admin-metadata-grid {

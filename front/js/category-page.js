@@ -21,14 +21,6 @@
     return Boolean(state.search) && state.searchMode === "semantic";
   }
 
-  function renderReason(product) {
-    if (!product.reason) {
-      return "";
-    }
-
-    return `<p class="text-muted small mt-2 mb-0 recommendation-reason">${product.reason}</p>`;
-  }
-
   function renderCategoryLinks(categories, activeCategoryId) {
     const list = document.querySelector(".filter-list");
     if (!list) return;
@@ -45,30 +37,17 @@
     list.innerHTML = items.join("");
   }
 
-  function renderProductCard(product) {
-    return `
-      <div class="col-md-4 mb-4 animate-on-scroll product-item" data-product-id="${product.id}">
-        <div class="product-card">
-          <div class="product-img">
-            <img src="${product.cover_url || "images/logo.svg"}" alt="${product.name}" />
-          </div>
-          <div class="product-info">
-            <div class="product-name-row">
-              <h5 class="product-name">${product.name}</h5>
-              <a href="product.html?id=${product.id}" class="btn btn-sm btn-outline-primary view-details-btn">查看详情</a>
-            </div>
-            <div class="product-price">¥${Number(product.price).toFixed(2)}</div>
-            <div class="product-category">${product.category.name}</div>
-            ${renderReason(product)}
-          </div>
-          <div class="add-to-cart">
-            <a href="product.html?id=${product.id}" class="text-white">
-              <i class="fas fa-shopping-cart me-1"></i> 加入购物车
-            </a>
-          </div>
-        </div>
-      </div>
-    `;
+  function renderProductCard(product, state) {
+    const context = isSemanticSearch(state) ? "search_semantic" : "search_keyword";
+    return (
+      window.shiyigeRecommendationUI?.renderProductCard?.(product, {
+        context,
+        hideSource: true,
+        searchMode: state.searchMode,
+        wrapperClass: "col-md-4 mb-4 animate-on-scroll product-item",
+        extraAttributes: `data-product-id="${product.id}"`,
+      }) || ""
+    );
   }
 
   function updateHeader(state) {
@@ -175,7 +154,7 @@
         return;
       }
       const items = payload.data.items || [];
-      productsContainer.innerHTML = items.map(renderProductCard).join("");
+      productsContainer.innerHTML = items.map((product) => renderProductCard(product, state)).join("");
       emptyState.classList.toggle("d-none", items.length > 0);
     } catch (error) {
       if (loadToken !== latestLoadToken) {

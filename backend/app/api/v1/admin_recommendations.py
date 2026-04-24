@@ -10,6 +10,7 @@ from backend.app.models.product import Product
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.models.user import User
 from backend.app.services.embedding import get_embedding_provider
+from backend.app.services.recommendation_admin import build_experiment_payload
 from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
 from backend.app.services.recommendations import (
     collect_product_ids_from_log,
@@ -145,20 +146,25 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
 @router.get("/debug")
 def debug_recommendations(
     request: Request,
-    email: str = Query(min_length=3, max_length=255),
+    email: str | None = Query(default=None, min_length=3, max_length=255),
+    user_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=5, ge=1, le=20),
     current_admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    normalized_email = email.strip().lower()
-    if not normalized_email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email is required")
+    normalized_email = email.strip().lower() if isinstance(email, str) else None
+    if user_id is None and not normalized_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="email or user_id is required",
+        )
 
-    user = db.scalar(
-        select(User)
-        .options(selectinload(User.profile))
-        .where(User.email == normalized_email)
-    )
+    user_query = select(User).options(selectinload(User.profile))
+    if user_id is not None:
+        user_query = user_query.where(User.id == user_id)
+    else:
+        user_query = user_query.where(User.email == normalized_email)
+    user = db.scalar(user_query)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 
@@ -194,7 +200,8 @@ def debug_recommendations(
         target_type="user_interest_profile",
         target_id=user.id,
         detail_json={
-            "email": normalized_email,
+            "email": user.email,
+            "user_id": user.id,
             "limit": limit,
             "behavior_count": profile.behavior_count,
         },
@@ -235,5 +242,30 @@ def debug_recommendations(
             "recent_behaviors": serialize_behavior_logs(logs, products_by_id),
             "recommendations": serialize_candidates(candidates, limit=limit),
         },
+        status_code=200,
+    )
+
+
+@router.get("/experiments")
+def list_recommendation_experiments(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    payload = build_experiment_payload(db)
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_recommendation_experiments",
+        target_type="recommendation_experiment",
+        detail_json={"active_key": payload["active_key"]},
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="ok",
+        data=payload,
         status_code=200,
     )

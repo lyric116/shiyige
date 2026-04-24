@@ -131,14 +131,17 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
     page.wait_for_function(
         "() => document.querySelector('#summary-products')?.textContent?.trim() === '20'"
         " && document.querySelector('#summary-orders')?.textContent?.trim() === '1'"
-        " && document.querySelector('#summary-users')?.textContent?.trim() === '1'",
-        timeout=5000,
+        " && document.querySelector('#summary-users')?.textContent?.trim() === '1'"
+        " && document.querySelector('#recommendation-kpis')?.textContent?.includes('CTR')",
+        timeout=10000,
     )
 
     assert page.locator("#summary-products").text_content() == "20"
     assert page.locator("#summary-orders").text_content() == "1"
     assert page.locator("#summary-users").text_content() == "1"
     assert page.locator("#summary-paid-orders").text_content() == "1"
+    assert "CTR" in page.locator("#recommendation-kpis").text_content()
+    assert "当前激活方案" in page.locator("#dashboard-active-experiment").text_content()
 
     page.goto(f"{live_server}/admin/products.html", wait_until="domcontentloaded")
     page.wait_for_function(
@@ -159,12 +162,17 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
     assert "PAID" in orders_text
 
     page.goto(f"{live_server}/admin/reindex.html", wait_until="domcontentloaded")
-    page.locator("#reindex-products-btn").click()
     page.wait_for_function(
-        "() => document.querySelector('#reindex-result')?.textContent?.includes('已完成 20 条商品向量重建')",
+        "() => document.querySelector('#vector-status-metrics')?.textContent?.includes('Collection')",
         timeout=5000,
     )
-    assert "local" in page.locator("#reindex-result").text_content()
+    page.locator("#reindex-products-btn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#reindex-result')?.textContent?.includes('模式：full')",
+        timeout=5000,
+    )
+    assert "已索引 20 条" in page.locator("#reindex-result").text_content()
+    assert "Collection" in page.locator("#vector-status-metrics").text_content()
 
     page.goto(f"{live_server}/admin/recommendation-debug.html", wait_until="domcontentloaded")
     page.locator("#debug-user-email").fill(user_email)
@@ -175,6 +183,14 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
     assert user_email in page.locator("#debug-user-profile-grid").text_content()
     assert "点翠发簪" in page.locator("#debug-user-profile-grid").text_content()
     assert "add_to_cart" in page.locator("#debug-behavior-table-body").text_content()
-    assert "向量相似度" in page.locator("#debug-recommendation-list").text_content()
+    assert "召回通道" in page.locator("#debug-recommendation-list").text_content()
+
+    page.goto(f"{live_server}/admin/recommendation-config.html", wait_until="domcontentloaded")
+    page.wait_for_function(
+        "() => document.querySelector('#recommendation-config-list')?.textContent?.includes('full_pipeline')",
+        timeout=5000,
+    )
+    assert "baseline" in page.locator("#recommendation-config-list").text_content()
+    assert "full_pipeline" in page.locator("#recommendation-config-list").text_content()
 
     context.close()

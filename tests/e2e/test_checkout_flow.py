@@ -126,6 +126,13 @@ def test_checkout_page_uses_real_cart_address_and_order_flow(browser, live_serve
     page.wait_for_function(
       "() => document.querySelector('#order-number')?.textContent?.startsWith('SYG')"
     )
+    page.wait_for_function(
+      "() => document.querySelector('#order-success-recommendation-section')"
+      "  && !document.querySelector('#order-success-recommendation-section')?.classList.contains('d-none')"
+      "  && document.querySelector('#order-success-recommendations')?.textContent?.length > 0",
+      timeout=5000,
+    )
+    assert "下单后推荐" in page.locator("#order-success-recommendation-section").text_content()
 
     orders_response = httpx.get(
         f"{live_server}/api/v1/orders",

@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from backend.app.models.admin import OperationLog
 from backend.app.models.product import Product
+from backend.app.services.vector_store import VectorStoreRuntime
 from backend.tests.api.test_recommendations import create_user_preference_trace
 
 
@@ -85,3 +86,99 @@ async def test_admin_recommendation_debug_returns_profile_and_score_breakdown(
         assert operation_log is not None
         assert operation_log.action == "admin_debug_recommendations"
         assert operation_log.target_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_admin_recommendation_debug_supports_lookup_by_user_id(
+    api_client,
+    api_session_factory,
+    create_admin_user,
+    admin_auth_headers_factory,
+    create_user,
+    auth_headers_factory,
+    seed_product_catalog,
+) -> None:
+    admin_user = create_admin_user(
+        email="admin-debug-id@example.com",
+        username="admin-debug-id",
+    )
+    user = create_user(
+        email="rec-debug-id@example.com",
+        username="rec-debug-id",
+    )
+    admin_headers = admin_auth_headers_factory(admin_user)
+    user_headers = auth_headers_factory(user)
+
+    with api_session_factory() as session:
+        product = session.scalar(select(Product).where(Product.name == "点翠发簪"))
+        assert product is not None
+        assert product.default_sku is not None
+        product_id = product.id
+        sku_id = product.default_sku.id
+
+    await create_user_preference_trace(
+        api_client,
+        user_headers,
+        product_id,
+        sku_id,
+        "古风发簪",
+    )
+
+    response = await api_client.get(
+        "/api/v1/admin/recommendations/debug",
+        headers=admin_headers,
+        params={"user_id": user.id, "limit": 2},
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["data"]["user"]["id"] == user.id
+    assert len(body["data"]["recommendations"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_admin_recommendation_experiments_endpoint_returns_static_configs(
+    api_client,
+    create_admin_user,
+    admin_auth_headers_factory,
+    monkeypatch,
+) -> None:
+    admin_user = create_admin_user(
+        email="admin-exp@example.com",
+        username="admin-exp",
+    )
+    headers = admin_auth_headers_factory(admin_user)
+
+    monkeypatch.setattr(
+        "backend.app.services.recommendation_admin.probe_vector_store_runtime",
+        lambda: VectorStoreRuntime(
+            configured_provider="qdrant",
+            recommendation_pipeline_version="v1",
+            configured_recommendation_ranker="weighted_ranker",
+            qdrant_available=True,
+            qdrant_url="http://qdrant:6333",
+            qdrant_collections=["shiyige_products_v1"],
+            qdrant_error=None,
+            degraded_to_baseline=False,
+            active_search_backend="qdrant_hybrid",
+            active_recommendation_backend="multi_recall",
+        ),
+    )
+
+    response = await api_client.get(
+        "/api/v1/admin/recommendations/experiments",
+        headers=headers,
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["data"]["active_key"] == "full_pipeline"
+    assert {item["key"] for item in body["data"]["items"]} >= {
+        "baseline",
+        "hybrid",
+        "hybrid_rerank",
+        "full_pipeline",
+    }
+    assert next(
+        item for item in body["data"]["items"] if item["key"] == "full_pipeline"
+    )["is_active"] is True

@@ -34,7 +34,14 @@ def test_product_page_and_cart_page_use_real_cart_api(browser, live_server) -> N
 
     page.goto(f"{live_server}/cart.html", wait_until="domcontentloaded")
     page.get_by_text("点翠发簪").wait_for(timeout=5000)
+    page.wait_for_function(
+        "() => document.querySelector('#cart-recommendation-panel')"
+        "  && !document.querySelector('#cart-recommendation-panel')?.classList.contains('d-none')"
+        "  && document.querySelector('#cart-recommendation-list')?.textContent?.includes('相似商品')",
+        timeout=5000,
+    )
     assert page.locator(".cart-quantity").input_value() == "2"
+    assert "购物车搭配推荐" in page.locator("#cart-recommendation-panel").text_content()
 
     page.locator(".cart-quantity-increase").click()
     page.wait_for_function(

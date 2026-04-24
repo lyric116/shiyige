@@ -29,6 +29,9 @@ async def test_search_endpoint_returns_filtered_products(
     assert body["code"] == 0
     assert body["data"]["query"] == "礼盒"
     assert [item["name"] for item in body["data"]["items"]] == ["国风美妆礼盒", "上元灯会礼盒"]
+    assert body["data"]["items"][0]["reason"]
+    assert "关键词命中" in body["data"]["items"][0]["explanations"]
+    assert body["data"]["items"][0]["search_mode"] == "keyword"
 
 
 @pytest.mark.asyncio

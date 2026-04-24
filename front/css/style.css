@@ -225,6 +225,100 @@
   font-family: "Ma Shan Zheng", cursive;
 }
 
+.recommendation-evidence {
+  margin-top: 0.85rem;
+}
+
+.recommendation-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.recommendation-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.recommendation-chip-source {
+  background: rgba(135, 51, 36, 0.12);
+  color: #873324;
+}
+
+.recommendation-chip-personalized {
+  background: rgba(126, 58, 46, 0.12);
+  color: #7e3a2e;
+}
+
+.recommendation-chip-similar {
+  background: rgba(39, 84, 94, 0.12);
+  color: #27545e;
+}
+
+.recommendation-chip-hot {
+  background: rgba(193, 86, 43, 0.14);
+  color: #a04923;
+}
+
+.recommendation-chip-new {
+  background: rgba(70, 109, 77, 0.14);
+  color: #466d4d;
+}
+
+.recommendation-chip-seasonal {
+  background: rgba(162, 128, 44, 0.16);
+  color: #8b6d18;
+}
+
+.recommendation-chip-explanation {
+  background: rgba(77, 72, 56, 0.08);
+  color: #5c5140;
+}
+
+.recommendation-reason {
+  margin: 0.55rem 0 0;
+  color: #6a5b49;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.recommendation-panel {
+  margin-top: 2rem;
+  padding: 1.6rem;
+  border-radius: 24px;
+  background: rgba(255, 252, 247, 0.92);
+  border: 1px solid rgba(135, 51, 36, 0.12);
+  box-shadow: 0 16px 32px rgba(87, 53, 26, 0.08);
+}
+
+.recommendation-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.recommendation-panel-copy {
+  margin: 0.45rem 0 0;
+  color: #7a6754;
+  line-height: 1.8;
+}
+
+.recommendation-empty-copy {
+  margin: 0;
+  color: #7a6754;
+}
+
+.recommendation-modal-body {
+  margin-top: 1.25rem;
+}
+
 /* 节气专题窗口样式 */
 .seasonal-theme {
   position: fixed;

@@ -2278,3 +2278,76 @@ Step 14:
 * `docs/performance_benchmark.md` 当前是“合成数据 + local_hash embedding”基准，不是 FastEmbed 真实编码成本报告；如果后续要展示模型真实推理时延，需要额外跑一版保留 `fastembed_*` provider 的报告。
 * `backend/app/api/v1/products.py` 的 `related_products` 仍沿用全量 SQL embedding 相似度计算，10k 规模下已经成为明显瓶颈；如果继续推进 Phase 11 之前的性能优化，应优先把相似商品接口接到 Qdrant 或缓存层。
 * `recommend_home` 在 10k 商品压测下 `p95` 已接近 39 秒，说明多路召回和排序层虽然功能完整，但候选构建与画像计算还没有做缓存分层；后续如果要进入前后台展示改造，建议先补 profile cache / candidate cache，再继续放大演示数据。
+
+### 同日继续推进记录（四十七）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 11：前台和后台展示改造
+
+新增与修改：
+
+* `backend/app/services/recommendation_admin.py`
+* `backend/app/api/v1/admin_dashboard.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/search.py`
+* `backend/app/services/qdrant_client.py`
+* `backend/app/services/vector_store.py`
+* `backend/app/tasks/embedding_tasks.py`
+* `backend/tests/api/conftest.py`
+* `backend/tests/api/test_admin_dashboard.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `backend/tests/api/test_recommendations.py`
+* `backend/tests/api/test_search_keyword.py`
+* `backend/tests/api/test_search_semantic.py`
+* `backend/tests/tasks/test_embedding_tasks.py`
+* `front/cart.html`
+* `front/checkout.html`
+* `front/css/style.css`
+* `front/js/main.js`
+* `front/js/home-page.js`
+* `front/js/category-page.js`
+* `front/js/product.js`
+* `front/js/cart.js`
+* `front/js/checkout.js`
+* `admin/index.html`
+* `admin/reindex.html`
+* `admin/recommendation-debug.html`
+* `admin/recommendation-config.html`
+* `admin/js/app.js`
+* `admin/css/admin.css`
+* `tests/e2e/conftest.py`
+* `tests/e2e/test_admin_basic.py`
+* `tests/e2e/test_recommendation_ui.py`
+* `tests/e2e/test_cart_flow.py`
+* `tests/e2e/test_checkout_flow.py`
+* `tests/e2e/test_full_demo_flow.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `docker compose up -d`
+* `./.venv/bin/python -m ruff check backend/app/tasks/embedding_tasks.py backend/tests/tasks/test_embedding_tasks.py backend/app/api/v1/admin_dashboard.py backend/app/api/v1/admin_recommendations.py backend/app/api/v1/products.py backend/app/api/v1/search.py backend/app/services/recommendation_admin.py backend/app/services/qdrant_client.py backend/app/services/vector_store.py backend/tests/api/test_admin_dashboard.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_keyword.py backend/tests/api/test_search_semantic.py backend/tests/api/conftest.py tests/e2e/conftest.py`
+* `./.venv/bin/python -m pytest backend/tests/tasks/test_embedding_tasks.py backend/tests/api/test_admin_dashboard.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_keyword.py backend/tests/api/test_search_semantic.py -q`
+* `./.venv/bin/python -m pytest tests/e2e/test_admin_basic.py tests/e2e/test_recommendation_ui.py tests/e2e/test_cart_flow.py tests/e2e/test_checkout_flow.py tests/e2e/test_full_demo_flow.py -q`
+
+结果：
+
+* 已新增 `backend/app/services/recommendation_admin.py`，把推荐效果指标、搜索指标、Qdrant 运行状态、索引摘要和实验方案聚合成后台首页可直接消费的单一服务输出。
+* 已把 `backend/app/api/v1/admin_dashboard.py` 扩展成包含 `runtime`、`vector_index`、`recommendation_metrics`、`search_metrics` 和 `experiments` 的完整答辩看板接口；`backend/app/api/v1/admin_recommendations.py` 同时支持通过 `user_id` 或 `email` 调试用户推荐，并新增实验配置读取接口。
+* 已把 `backend/app/api/v1/products.py` 和 `backend/app/api/v1/search.py` 的响应结构升级为前台展示友好的形态：推荐结果统一带 `source_type/source_label`，搜索结果统一带 `reason`、`search_mode`、`score` 和解释标签，前台不再需要硬编码同一句推荐文案。
+* 已把 `front/js/main.js` 提升为推荐展示共享层，提供来源徽章、搜索解释标签、推荐证据块和统一商品卡片渲染；首页、搜索页、商品详情页、购物车页和订单完成弹窗都已改为复用这套展示组件。
+* 已新增购物车推荐区和下单成功推荐区，`front/js/cart.js` 会优先基于购物车商品拉取相似商品，失败时回退到个性化 `slot=cart`；`front/js/checkout.js` 会优先基于下单商品拉取关联推荐，失败时回退到 `slot=order_complete`。
+* 后台静态站点已从“最小管理壳”升级到完整展示层：`admin/index.html` 可直接展示推荐 KPI、搜索指标和 Qdrant 状态，`admin/reindex.html` 可展示向量索引健康度并支持 full/retry_failed，`admin/recommendation-debug.html` 新增 `user_id` 调试入口，`admin/recommendation-config.html` 可直观看到 `baseline / hybrid / hybrid_rerank / full_pipeline` 实验方案。
+* 为减少后台和前台页面反复探测 Qdrant 带来的卡顿，`backend/app/services/qdrant_client.py` 新增了短 TTL 连接状态缓存，`backend/app/services/vector_store.py` 也避免在同一轮运行时判定里重复发起状态探测。
+* 在整体验证中稳定复现了一个真实缺陷：登录后首页会自动请求个性化推荐，如果此时测试代码再并发请求 `/api/v1/products/recommendations`，旧版 `upsert_product_embedding()` 会因并发首次写入同一 `product_id` 而触发 `UNIQUE constraint failed: product_embedding.product_id`。
+* 已把 `backend/app/tasks/embedding_tasks.py` 修成“显式按 `product_id` 回查现有 embedding + 数据库原子 upsert”的幂等写入路径，并新增 `backend/tests/tasks/test_embedding_tasks.py` 的跨 session 回归用例，确认 stale relation 和并发首写都不会再打穿推荐接口。
+* 最终验证结果为：推荐相关后端回归 `12 passed`，关键前后台 e2e 组合验证 `5 passed`；其中 `tests/e2e/test_full_demo_flow.py` 已在与其他 e2e 同批执行时稳定通过，说明 Phase 11 的展示层和并发幂等修复都已落稳。
+
+交接提醒：
+
+* 首页登录后会自动请求 `/api/v1/products/recommendations?slot=home&debug=true`；后续如果继续改商品 embedding 初始化、推荐缓存或首页加载顺序，必须保持 `backend/app/tasks/embedding_tasks.py` 的并发幂等语义，否则很容易在真实浏览器和 e2e 里再次触发双请求竞争。
+* `admin/reindex.html` 当前在 Qdrant 不可用或 collection 尚未就绪时，会对 full rebuild 自动回退到旧的 `/api/v1/admin/reindex/products`；这个兼容分支是为了保证本地和答辩环境都能演示，不要在未替换验证方案前删掉。
+* `front/index.html` 在本地工作区里有用户自己的未提交修改，本轮 Phase 11 提交不会携带它；同样，`memory-bank/shiyige_recommendation_upgrade_plan.md` 仍作为未跟踪的计划输入保留，不应被提交进代码历史。

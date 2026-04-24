@@ -23,4 +23,7 @@ async def test_semantic_search_returns_ranked_items_with_reason(
     assert body["data"]["items"][0]["name"] == "明制襦裙"
     assert "语义相近" in body["data"]["items"][0]["reason"]
     assert "汉服" in body["data"]["items"][0]["reason"]
+    assert "语义相关" in body["data"]["items"][0]["explanations"]
+    assert "文化标签匹配" in body["data"]["items"][0]["explanations"]
+    assert body["data"]["items"][0]["search_mode"] == "semantic"
     assert body["data"]["items"][0]["score"] >= body["data"]["items"][1]["score"]

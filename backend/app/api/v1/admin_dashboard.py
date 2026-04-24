@@ -9,7 +9,7 @@ from backend.app.models.admin import AdminUser
 from backend.app.models.order import Order
 from backend.app.models.product import Product
 from backend.app.models.user import User
-
+from backend.app.services.recommendation_admin import build_recommendation_dashboard_payload
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin-dashboard"])
 
@@ -21,13 +21,24 @@ def get_dashboard_summary(
     db: Session = Depends(get_db),
 ):
     users_total = db.scalar(select(func.count()).select_from(User)) or 0
-    active_users = db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(True))) or 0
+    active_users = (
+        db.scalar(
+            select(func.count()).select_from(User).where(User.is_active.is_(True))
+        )
+        or 0
+    )
     products_total = db.scalar(select(func.count()).select_from(Product)) or 0
     orders_total = db.scalar(select(func.count()).select_from(Order)) or 0
-    paid_orders = db.scalar(select(func.count()).select_from(Order).where(Order.status == "PAID")) or 0
-    pending_orders = (
-        db.scalar(select(func.count()).select_from(Order).where(Order.status == "PENDING_PAYMENT")) or 0
+    paid_orders = (
+        db.scalar(select(func.count()).select_from(Order).where(Order.status == "PAID")) or 0
     )
+    pending_orders = (
+        db.scalar(
+            select(func.count()).select_from(Order).where(Order.status == "PENDING_PAYMENT")
+        )
+        or 0
+    )
+    recommendation_payload = build_recommendation_dashboard_payload(db)
 
     return build_response(
         request=request,
@@ -40,6 +51,11 @@ def get_dashboard_summary(
             "orders_total": orders_total,
             "paid_orders": paid_orders,
             "pending_orders": pending_orders,
+            "runtime": recommendation_payload["runtime"],
+            "vector_index": recommendation_payload["vector_index"],
+            "recommendation_metrics": recommendation_payload["recommendation_metrics"],
+            "search_metrics": recommendation_payload["search_metrics"],
+            "experiments": recommendation_payload["experiments"],
         },
         status_code=200,
     )

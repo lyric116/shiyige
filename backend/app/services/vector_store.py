@@ -4,7 +4,11 @@ from dataclasses import asdict, dataclass
 
 from backend.app.core.config import AppSettings, get_app_settings
 from backend.app.core.logger import get_logger
-from backend.app.services.qdrant_client import create_qdrant_client, get_qdrant_connection_status
+from backend.app.services.qdrant_client import (
+    QdrantConnectionStatus,
+    create_qdrant_client,
+    get_qdrant_connection_status,
+)
 from backend.app.services.vector_schema import build_product_collection_schema
 from backend.app.tasks.qdrant_schema_tasks import collection_has_schema_drift
 
@@ -28,15 +32,19 @@ class VectorStoreRuntime:
         return asdict(self)
 
 
-def is_qdrant_search_ready(settings: AppSettings | None = None) -> tuple[bool, str | None]:
+def is_qdrant_search_ready(
+    settings: AppSettings | None = None,
+    *,
+    qdrant_status: QdrantConnectionStatus | None = None,
+) -> tuple[bool, str | None]:
     app_settings = settings or get_app_settings()
     if app_settings.vector_db_provider != "qdrant":
         return False, None
 
-    qdrant_status = get_qdrant_connection_status(app_settings)
-    if not qdrant_status.available:
-        return False, qdrant_status.error
-    if app_settings.qdrant_collection_products not in qdrant_status.collections:
+    status = qdrant_status or get_qdrant_connection_status(app_settings)
+    if not status.available:
+        return False, status.error
+    if app_settings.qdrant_collection_products not in status.collections:
         return False, "Qdrant product collection is not initialized"
 
     client = create_qdrant_client(app_settings)
@@ -67,7 +75,10 @@ def probe_vector_store_runtime(
 ) -> VectorStoreRuntime:
     app_settings = settings or get_app_settings()
     qdrant_status = get_qdrant_connection_status(app_settings)
-    search_ready, search_error = is_qdrant_search_ready(app_settings)
+    search_ready, search_error = is_qdrant_search_ready(
+        app_settings,
+        qdrant_status=qdrant_status,
+    )
     degraded = app_settings.vector_db_provider == "qdrant" and not search_ready
 
     runtime = VectorStoreRuntime(

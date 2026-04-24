@@ -77,6 +77,53 @@ def rank_product(product: Product, keyword: str) -> tuple[int, int]:
     return (5, product.id)
 
 
+def build_keyword_reason(product: Product, keyword: str) -> str:
+    normalized_keyword = keyword.lower()
+    matched_terms: list[str] = []
+    tag_match = False
+    culture_match = False
+
+    if normalized_keyword in (product.name or "").lower():
+        matched_terms.append(product.name)
+    if product.subtitle and normalized_keyword in product.subtitle.lower():
+        matched_terms.append(product.subtitle)
+    if product.category and normalized_keyword in (product.category.name or "").lower():
+        matched_terms.append(product.category.name)
+        culture_match = True
+    for tag in product.tags:
+        if normalized_keyword in (tag.tag or "").lower():
+            matched_terms.append(tag.tag)
+            tag_match = True
+    if product.culture_summary and normalized_keyword in product.culture_summary.lower():
+        culture_match = True
+
+    reason_parts: list[str] = []
+    if matched_terms:
+        reason_parts.append(f"关键词命中“{'/'.join(matched_terms[:2])}”")
+    if tag_match or culture_match:
+        reason_parts.append("文化标签匹配")
+    return "，".join(reason_parts) if reason_parts else f"关键词匹配“{keyword}”"
+
+
+def build_search_explanations(*, mode: str, reason: str) -> list[str]:
+    explanations: list[str] = []
+
+    if mode == "semantic" and ("语义相关" in reason or "语义相近" in reason):
+        explanations.append("语义相关")
+    if mode == "keyword" or "关键词命中" in reason:
+        explanations.append("关键词命中")
+    if "文化特征" in reason or "文化标签" in reason or "特征" in reason:
+        explanations.append("文化标签匹配")
+    if "ColBERT" in reason:
+        explanations.append("ColBERT 重排")
+
+    deduped: list[str] = []
+    for item in explanations:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped
+
+
 def filter_and_sort_products(
     products: list[Product],
     *,
@@ -217,6 +264,18 @@ def search_products(
     start = (page - 1) * page_size
     end = start + page_size
     items = filtered_products[start:end]
+    serialized_items = []
+    for index, product in enumerate(items, start=1):
+        reason = build_keyword_reason(product, keyword)
+        serialized_items.append(
+            {
+                **serialize_product_list_item(product),
+                "score": round(1.0 / float(index), 6),
+                "reason": reason,
+                "search_mode": "keyword",
+                "explanations": build_search_explanations(mode="keyword", reason=reason),
+            }
+        )
 
     current_user = get_optional_user_from_request(request, db)
     log_behavior(
@@ -248,11 +307,11 @@ def search_products(
         },
         items=[
             {
-                "product_id": product.id,
-                "score": round(1.0 / float(index), 6),
-                "reason": f"keyword:{sort}",
+                "product_id": item["id"],
+                "score": item["score"],
+                "reason": item["reason"],
             }
-            for index, product in enumerate(items, start=1)
+            for item in serialized_items
         ],
     )
     if current_user is not None:
@@ -265,7 +324,7 @@ def search_products(
         message="ok",
         data={
             "query": keyword,
-            "items": [serialize_product_list_item(product) for product in items],
+            "items": serialized_items,
             "page": page,
             "page_size": page_size,
             "total": total,
@@ -335,6 +394,8 @@ def semantic_search(
             **serialize_product_list_item(result.product),
             "score": round(result.score, 6),
             "reason": result.reason,
+            "search_mode": "semantic",
+            "explanations": build_search_explanations(mode="semantic", reason=result.reason),
         }
         for result in results
     ]

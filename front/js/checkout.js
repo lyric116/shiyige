@@ -163,6 +163,112 @@
     return `checkout-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
   }
 
+  function renderRecommendationCards(items) {
+    return items
+      .map(function (product) {
+        return (
+          window.shiyigeRecommendationUI?.renderProductCard?.(product, {
+            context: "order_complete",
+            defaultSourceType: "similar",
+            wrapperClass: "col-lg-6 mb-4",
+          }) || ""
+        );
+      })
+      .join("");
+  }
+
+  function setOrderSuccessRecommendationState(message, copyText) {
+    const container = document.getElementById("order-success-recommendations");
+    const copy = document.getElementById("order-success-recommendation-copy");
+    const section = document.getElementById("order-success-recommendation-section");
+    if (!container || !copy || !section) {
+      return;
+    }
+
+    section.classList.remove("d-none");
+    copy.textContent = copyText;
+    container.innerHTML = `<p class="recommendation-empty-copy">${escapeHtml(message)}</p>`;
+  }
+
+  async function fetchRelatedRecommendations(productIds, limit) {
+    const payloads = await Promise.all(
+      productIds.slice(0, 2).map(async function (productId) {
+        try {
+          return await window.shiyigeApi.get(`/products/${productId}/related?limit=${limit}`);
+        } catch (error) {
+          return null;
+        }
+      })
+    );
+
+    const merged = [];
+    const seen = new Set(productIds);
+    payloads.forEach(function (payload) {
+      (payload?.data?.items || []).forEach(function (item) {
+        if (seen.has(item.id)) {
+          return;
+        }
+        seen.add(item.id);
+        merged.push(item);
+      });
+    });
+    return merged.slice(0, limit);
+  }
+
+  async function loadOrderSuccessRecommendations(order) {
+    const productIds = (order?.items || []).map(function (item) {
+      return item.product_id;
+    });
+    const productNames = (order?.items || []).map(function (item) {
+      return item.product_name;
+    });
+
+    if (!productIds.length) {
+      return;
+    }
+
+    setOrderSuccessRecommendationState("正在生成下单后推荐...", "根据你刚完成支付的商品生成延展推荐。");
+
+    try {
+      let recommendations = await fetchRelatedRecommendations(productIds, 4);
+      if (recommendations.length > 0) {
+        document.getElementById("order-success-recommendation-copy").textContent =
+          `你刚刚购买了 ${productNames.slice(0, 2).join(" / ")}，这些相似商品适合作为继续浏览的延展选择。`;
+        document.getElementById("order-success-recommendations").innerHTML = `
+          <div class="row recommendation-modal-body">
+            ${renderRecommendationCards(recommendations)}
+          </div>
+        `;
+        return;
+      }
+
+      const personalizedPayload = await window.shiyigeApi.get(
+        "/products/recommendations?slot=order_complete&limit=4&debug=true"
+      );
+      recommendations = personalizedPayload?.data?.items || [];
+      if (recommendations.length > 0) {
+        document.getElementById("order-success-recommendation-copy").textContent =
+          "没有足够的同类延展商品时，会退回到你的个性化推荐结果。";
+        document.getElementById("order-success-recommendations").innerHTML = `
+          <div class="row recommendation-modal-body">
+            ${renderRecommendationCards(recommendations)}
+          </div>
+        `;
+        return;
+      }
+
+      setOrderSuccessRecommendationState(
+        "当前没有可展示的下单后推荐。",
+        "下单成功后推荐会优先展示与你刚购买商品相近的内容。"
+      );
+    } catch (error) {
+      setOrderSuccessRecommendationState(
+        "下单后推荐加载失败，请稍后重试。",
+        "下单成功后推荐会优先展示与你刚购买商品相近的内容。"
+      );
+    }
+  }
+
   function showOrderSuccess(order) {
     document.getElementById("order-number").textContent = order.order_no;
     document.getElementById("success-payment-method").textContent =
@@ -173,6 +279,7 @@
 
     const modal = new bootstrap.Modal(document.getElementById("orderSuccessModal"));
     modal.show();
+    void loadOrderSuccessRecommendations(order);
   }
 
   async function submitOrder() {

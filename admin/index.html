@@ -56,6 +56,31 @@
             <strong id="summary-pending-orders" class="metric-value">-</strong>
           </article>
         </section>
+
+        <section class="admin-panel">
+          <h2>推荐效果看板</h2>
+          <p class="page-copy">
+            聚合曝光、点击、加购、支付与覆盖率指标，用于直接说明推荐系统不只是“会返回结果”，而是具备可观测效果。
+          </p>
+          <div id="recommendation-kpis" class="metric-grid"></div>
+        </section>
+
+        <section class="admin-panel">
+          <h2>搜索与向量索引状态</h2>
+          <p class="page-copy">
+            同时展示搜索请求延迟、Qdrant 运行状态、collection 状态和已索引商品量。
+          </p>
+          <div id="search-kpis" class="metric-grid"></div>
+          <div id="dashboard-vector-status" class="admin-metadata-grid mt-4"></div>
+        </section>
+
+        <section class="admin-panel">
+          <h2>实验方案概览</h2>
+          <p id="dashboard-active-experiment" class="page-copy">
+            当前实验配置加载中...
+          </p>
+          <div id="dashboard-experiment-list" class="debug-card-grid"></div>
+        </section>
       </main>
     </div>
     <script src="js/app.js"></script>

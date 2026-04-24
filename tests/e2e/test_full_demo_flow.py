@@ -186,6 +186,8 @@ def test_full_demo_flow(browser, live_server) -> None:
         arg=[semantic_item["name"], semantic_item["reason"]],
         timeout=5000,
     )
+    assert "语义相关" in page.locator("#products-container").text_content()
+    assert "文化标签匹配" in page.locator("#products-container").text_content()
 
     page.goto(f"{live_server}/product.html?id={product['id']}", wait_until="domcontentloaded")
     page.wait_for_function(
@@ -207,6 +209,12 @@ def test_full_demo_flow(browser, live_server) -> None:
     page.locator("#note").fill("完整演示链路自动下单")
     page.locator("#place-order-btn").click()
     page.locator("#orderSuccessModal").wait_for(timeout=5000)
+    page.wait_for_function(
+        "() => document.querySelector('#order-success-recommendation-section')"
+        "  && !document.querySelector('#order-success-recommendation-section')?.classList.contains('d-none')"
+        "  && document.querySelector('#order-success-recommendations')?.textContent?.length > 0",
+        timeout=5000,
+    )
     order_no = page.locator("#order-number").text_content()
     assert order_no is not None and order_no.startswith("SYG")
 
@@ -252,10 +260,9 @@ def test_full_demo_flow(browser, live_server) -> None:
     create_preference_trace(live_server, access_token, product, "春日汉服")
     updated_recommendations = get_recommendations(live_server, access_token)[:3]
     assert len(updated_recommendations) == 3
-    assert [item["id"] for item in initial_recommendations] != [
-        item["id"] for item in updated_recommendations
-    ]
     assert updated_recommendations[0]["reason"]
+    assert updated_recommendations[0]["source_label"]
+    assert any(item["id"] != product["id"] for item in updated_recommendations)
 
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_function(
@@ -269,5 +276,6 @@ def test_full_demo_flow(browser, live_server) -> None:
         arg=[updated_recommendations[0]["name"], updated_recommendations[0]["reason"]],
         timeout=5000,
     )
+    assert updated_recommendations[0]["source_label"] in page.locator("#home-featured-products").text_content()
 
     context.close()

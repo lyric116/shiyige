@@ -253,3 +253,198 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
     }
   });
 }
+
+(function () {
+  const SOURCE_LABELS = {
+    personalized: "个性化",
+    similar: "相似商品",
+    hot: "热门",
+    new: "新品探索",
+    seasonal: "节令主题",
+  };
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, function (char) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[char];
+    });
+  }
+
+  function dedupeLabels(values) {
+    const labels = [];
+    for (const value of values || []) {
+      const normalized = String(value || "").trim();
+      if (!normalized || labels.includes(normalized)) {
+        continue;
+      }
+      labels.push(normalized);
+    }
+    return labels;
+  }
+
+  function buildFallbackSourceType(options = {}) {
+    if (options.defaultSourceType) {
+      return options.defaultSourceType;
+    }
+
+    switch (options.context) {
+      case "related":
+      case "cart":
+      case "order_complete":
+        return "similar";
+      case "home_guest":
+        return "new";
+      case "home":
+      default:
+        return "personalized";
+    }
+  }
+
+  function inferSourceType(item, options = {}) {
+    if (item?.source_type) {
+      return item.source_type;
+    }
+
+    const reason = String(item?.reason || "");
+    if (reason.includes("节令")) {
+      return "seasonal";
+    }
+
+    return buildFallbackSourceType(options);
+  }
+
+  function buildSourceMeta(item, options = {}) {
+    const type = inferSourceType(item, options);
+    return {
+      type,
+      label: item?.source_label || SOURCE_LABELS[type] || SOURCE_LABELS.personalized,
+    };
+  }
+
+  function buildSearchExplanations(item, options = {}) {
+    if (Array.isArray(item?.explanations) && item.explanations.length > 0) {
+      return dedupeLabels(item.explanations);
+    }
+
+    const reason = String(item?.reason || "");
+    const mode = options.searchMode || item?.search_mode || "";
+    const labels = [];
+
+    if (mode === "semantic" || reason.includes("语义相关") || reason.includes("语义相近")) {
+      labels.push("语义相关");
+    }
+    if (mode === "keyword" || reason.includes("关键词命中")) {
+      labels.push("关键词命中");
+    }
+    if (
+      reason.includes("文化标签") ||
+      reason.includes("文化特征") ||
+      reason.includes("特征")
+    ) {
+      labels.push("文化标签匹配");
+    }
+    if (reason.includes("ColBERT")) {
+      labels.push("ColBERT 重排");
+    }
+
+    return dedupeLabels(labels);
+  }
+
+  function renderChips(labels, options = {}) {
+    const normalized = dedupeLabels(labels);
+    if (!normalized.length) {
+      return "";
+    }
+
+    const tone = options.tone || "info";
+    return normalized
+      .map(function (label) {
+        return `<span class="recommendation-chip recommendation-chip-${tone}">${escapeHtml(label)}</span>`;
+      })
+      .join("");
+  }
+
+  function renderEvidence(item, options = {}) {
+    const sourceMeta = buildSourceMeta(item, options);
+    const explanationLabels = buildSearchExplanations(item, options);
+    const chips = [];
+
+    if (!options.hideSource) {
+      chips.push(
+        `<span class="recommendation-chip recommendation-chip-source recommendation-chip-${escapeHtml(
+          sourceMeta.type
+        )}">${escapeHtml(sourceMeta.label)}</span>`
+      );
+    }
+    if (explanationLabels.length > 0) {
+      chips.push(renderChips(explanationLabels, { tone: "explanation" }));
+    }
+
+    const chipRow = chips.length
+      ? `<div class="recommendation-chip-row">${chips.join("")}</div>`
+      : "";
+    const reason = item?.reason
+      ? `<p class="recommendation-reason">${escapeHtml(item.reason)}</p>`
+      : "";
+
+    if (!chipRow && !reason) {
+      return "";
+    }
+
+    return `
+      <div class="recommendation-evidence">
+        ${chipRow}
+        ${reason}
+      </div>
+    `;
+  }
+
+  function renderProductCard(product, options = {}) {
+    const wrapperClass = options.wrapperClass || "col-lg-4 col-md-6 mb-4";
+    const extraAttributes = options.extraAttributes || "";
+    const price = formatPrice(Number(product?.price || 0));
+    const categoryName = product?.category?.name || "未分类";
+    const evidence = renderEvidence(product, options);
+
+    return `
+      <div class="${wrapperClass}" ${extraAttributes}>
+        <div class="product-card" data-product-id="${escapeHtml(product?.id)}">
+          <div class="product-img">
+            <img src="${escapeHtml(product?.cover_url || "images/logo.svg")}" alt="${escapeHtml(
+              product?.name
+            )}" />
+          </div>
+          <div class="product-info">
+            <div class="product-name-row">
+              <h5 class="product-name">${escapeHtml(product?.name)}</h5>
+              <a href="product.html?id=${escapeHtml(
+                product?.id
+              )}" class="btn btn-sm btn-outline-primary view-details-btn">查看详情</a>
+            </div>
+            <div class="product-price">${escapeHtml(price)}</div>
+            <div class="product-category">${escapeHtml(categoryName)}</div>
+            ${evidence}
+          </div>
+          <div class="add-to-cart">
+            <a href="product.html?id=${escapeHtml(product?.id)}" class="text-white">
+              <i class="fas fa-shopping-cart me-1"></i> 加入购物车
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  window.shiyigeRecommendationUI = {
+    escapeHtml,
+    buildSearchExplanations,
+    buildSourceMeta,
+    renderEvidence,
+    renderProductCard,
+  };
+})();

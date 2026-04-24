@@ -174,6 +174,7 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     assert "猜你喜欢" in first_page.locator("#home-recommendation-title").text_content()
     assert first_recommendation["name"] in first_page.locator("#home-featured-products").text_content()
     assert first_recommendation["reason"] in first_page.locator("#home-featured-products").text_content()
+    assert first_recommendation["source_label"] in first_page.locator("#home-featured-products").text_content()
     assert first_unique_recommendation["name"] in first_page.locator(
         "#home-featured-products"
     ).text_content()
@@ -193,6 +194,7 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     )
     assert second_recommendation["name"] in second_page.locator("#home-featured-products").text_content()
     assert second_recommendation["reason"] in second_page.locator("#home-featured-products").text_content()
+    assert second_recommendation["source_label"] in second_page.locator("#home-featured-products").text_content()
     assert second_unique_recommendation["name"] in second_page.locator(
         "#home-featured-products"
     ).text_content()
@@ -210,6 +212,7 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     product_page.locator("#related-products .product-card").first.wait_for(timeout=5000)
     assert related_item["name"] in product_page.locator("#related-products").text_content()
     assert related_item["reason"] in product_page.locator("#related-products").text_content()
+    assert related_item["source_label"] in product_page.locator("#related-products").text_content()
     product_context.close()
 
     search_context = browser.new_context(base_url=live_server)
@@ -236,4 +239,6 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     assert search_page.locator("#category-name").text_content() == "语义搜索：适合春日出游的素雅汉服"
     assert semantic_item["name"] in search_page.locator("#products-container").text_content()
     assert semantic_item["reason"] in search_page.locator("#products-container").text_content()
+    assert "语义相关" in search_page.locator("#products-container").text_content()
+    assert "文化标签匹配" in search_page.locator("#products-container").text_content()
     search_context.close()

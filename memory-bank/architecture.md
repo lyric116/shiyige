@@ -1149,3 +1149,59 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前 10k 商品基准下，`recommend_home` 的 `p95` 达到 38 秒级，`related_products` 的 `p95` 达到 65 秒级，这说明真正的瓶颈已经从“模型能不能接上”转移到“画像、候选和相似商品是否有缓存/索引化”。
 * `related_products` 现在是整个推荐链里最不适合继续放大的旧边界。
   它仍使用全库 embedding 相似度计算，而首页推荐和语义搜索已经进入 Qdrant / 多路召回时代；如果后续 Phase 11 要展示更大规模演示数据，优先级最高的技术债就是把相似商品接口从全量扫描迁到向量库或缓存层。
+
+### 9.46 Phase 11 现在已经形成“前台证据化展示层 + 后台推荐看板层 + 并发安全 embedding 引导层”的完整答辩形态
+
+第 70 次同日推进把 Phase 11 从“推荐系统能跑”推进到了“老师打开页面就能直接看到证据”的展示阶段：
+
+* `front/js/main.js`：前台推荐展示共享层。
+  当前新增 `window.shiyigeRecommendationUI`，统一负责来源徽章、搜索解释标签、推荐理由证据块和商品卡片渲染。Phase 11 之后，首页、搜索页、详情页、购物车页和结算成功态不再各自拼一套 HTML，而是共享同一份推荐/搜索可视化组件。
+* `front/js/home-page.js`：首页推荐证据层。
+  当前登录态首页会请求 `GET /api/v1/products/recommendations?limit=3&slot=home&debug=true`，直接渲染个性化来源、推荐理由和证据标签；未登录或接口失败时则回退到最新商品，并明确标成“新品探索”而不是假装个性化。
+* `front/js/category-page.js`：搜索解释展示层。
+  当前关键词搜索和语义搜索结果都会显示 `reason`、`search_mode` 和解释标签，例如“语义相关”“关键词命中”“文化标签匹配”；这让搜索页第一次具备了“为什么出现这条结果”的可视化说明。
+* `front/js/product.js`：详情页相似商品展示层。
+  当前相关推荐已经开始消费标准化的推荐来源字段，并复用共享卡片展示相似理由，使详情页能直接说明“为什么这几个商品和当前商品相近”。
+* `front/cart.html` 与 `front/js/cart.js`：购物车推荐展示层。
+  当前购物车页新增独立推荐面板，先尝试基于购物车商品拉取相似推荐，失败时退回个性化 `slot=cart`；这使购物车不再只是交易页，也成为推荐系统的答辩展示位。
+* `front/checkout.html` 与 `front/js/checkout.js`：订单完成推荐展示层。
+  当前支付成功弹窗内新增推荐区域，优先展示“基于刚下单商品的关联推荐”，必要时回退到个性化 `slot=order_complete`；推荐系统首次进入完整交易链路的尾部展示位。
+* `front/css/style.css`：推荐解释样式层。
+  当前补齐推荐徽章、解释标签、原因文本和证据区样式，使新增说明信息不会破坏现有静态前端风格。
+* `backend/app/api/v1/products.py`：推荐公开接口展示协议层。
+  当前推荐结果统一带 `source_type`、`source_label`、`reason`，debug 模式下还会带 `matched_terms`、`recall_channels`、`feature_highlights`、`feature_summary` 和 `score_breakdown`；这让前台展示和后台调试使用同一份结构化证据。
+* `backend/app/api/v1/search.py`：搜索公开接口展示协议层。
+  当前关键词搜索会输出 `score`、`reason`、`search_mode` 和 `explanations`，语义搜索也会输出 `search_mode` 和解释标签；前台搜索页因此可以直接做解释展示，而不是自己推断搜索模式。
+* `backend/app/services/recommendation_admin.py`：后台聚合服务层。
+  当前统一聚合推荐 KPI、搜索指标、向量运行状态、索引摘要和实验配置，让后台首页与配置页都能基于单一服务输出渲染，不必在前端拼多个来源。
+* `backend/app/api/v1/admin_dashboard.py`：后台看板接口层。
+  当前除了用户/商品/订单统计外，还返回 `runtime`、`vector_index`、`recommendation_metrics`、`search_metrics` 和 `experiments`，使后台首页真正成为推荐系统运行总览而不是普通电商仪表盘。
+* `backend/app/api/v1/admin_recommendations.py`：后台调试与实验配置接口层。
+  当前推荐调试接口已同时支持 `user_id` 与 `email` 两种用户定位方式，并新增实验配置读取接口，使后台能展示召回/排序证据和当前 pipeline 方案。
+* `admin/index.html`：后台推荐效果看板页。
+  当前首页已扩展为展示推荐 CTR、加购率、转化率、覆盖率、平均延迟，以及 Qdrant / 搜索 / 实验概况的总览页。
+* `admin/reindex.html`：向量索引运维页。
+  当前除旧的重建按钮外，还能展示 Qdrant 连接状态、collection 状态、已索引商品数、失败商品数和失败明细，并支持 full rebuild 与 retry failed 两种入口。
+* `admin/recommendation-debug.html`：推荐调试页。
+  当前支持输入 `user_id` 或邮箱，查看召回通道、排序特征、最终理由和候选细节，使后台调试正式具备“按用户追一条推荐证据链”的能力。
+* `admin/recommendation-config.html`：实验方案展示页。
+  当前以静态前端方式直接展示 `baseline`、`hybrid`、`hybrid_rerank` 和 `full_pipeline` 四档实验方案与当前运行配置，补上了答辩所需的“实验设计可视化”页面。
+* `admin/js/app.js`：后台统一交互编排层。
+  当前除了登录和基础页面加载外，还负责 dashboard KPI 渲染、vector status 渲染、调试查询、实验配置页渲染，以及 Qdrant 不可用时的 reindex 兼容回退。
+* `admin/css/admin.css`：后台展示风格层。
+  当前新增工具栏、调试表单栅格、配置页和指标卡片样式，使后台推荐看板、调试页和配置页共享统一视觉系统。
+* `backend/app/services/qdrant_client.py` 与 `backend/app/services/vector_store.py`：运行时探测降噪层。
+  当前 Qdrant 连接状态新增短 TTL 缓存，同时 runtime 判定避免同一轮请求里重复探测；这保证前后台展示页在频繁刷新指标时不会因为探活过多而明显卡顿。
+* `backend/app/tasks/embedding_tasks.py`：并发安全的 embedding 引导层。
+  当前商品 embedding 首次写入已从“依赖 ORM 关系状态”改成“显式按 `product_id` 回查 + 数据库原子 upsert”，并能处理 stale session relation；这修复了登录后首页自动拉推荐与测试代码同时请求推荐时触发的 `UNIQUE constraint failed: product_embedding.product_id`。
+* `backend/tests/api/test_admin_dashboard.py`、`backend/tests/tasks/test_embedding_tasks.py`、`tests/e2e/test_admin_basic.py`、`tests/e2e/test_recommendation_ui.py`、`tests/e2e/test_cart_flow.py`、`tests/e2e/test_checkout_flow.py`、`tests/e2e/test_full_demo_flow.py`：Phase 11 验收测试层。
+  当前既锁定后台看板和推荐调试响应结构，也锁定首页/搜索/购物车/下单成功态的推荐展示和并发首写场景，避免展示层升级后把真实推荐链路打穿。
+
+这里有三个新的关键架构洞察：
+
+* Phase 11 的前台推荐卡片已经不再只是“商品展示组件”，而是推荐系统的证据载体。
+  现在每个展示位都能把来源类型、推荐理由和搜索解释直接渲染出来，意味着推荐系统的可解释性第一次进入用户可见层，而不是只存在于后台 debug JSON。
+* 后台推荐页面的关键不是“多做几个按钮”，而是建立统一的聚合快照。
+  当前 `recommendation_admin.py` 把 KPI、Qdrant 状态、索引摘要和实验方案收成一个稳定输出，这让后台静态页面可以更轻、更稳地展示系统全貌，也为后续加更多指标保留了清晰扩展点。
+* 当首页登录成功后会自动发起推荐请求时，embedding 初始化就必须被视为并发入口而不是离线预热细节。
+  本轮暴露出的 `product_embedding.product_id` 唯一键冲突证明：只要首页和测试/脚本同时拉推荐，商品 embedding 就会面临真实并发首写；因此 `embedding_tasks.py` 的幂等 upsert 现在已经是推荐展示层稳定性的基础设施，而不是单纯的数据任务实现。

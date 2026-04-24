@@ -89,6 +89,7 @@ async def test_recommendations_return_different_results_for_different_users(
     assert first_body["data"]["pipeline"]["degraded_to_baseline"] is True
     assert first_body["data"]["items"][0]["id"] != hanfu_id
     assert second_body["data"]["items"][0]["id"] != accessory_id
+    assert first_body["data"]["items"][0]["source_label"] in {"个性化", "热门", "新品探索"}
     assert [item["id"] for item in first_body["data"]["items"][:3]] != [
         item["id"] for item in second_body["data"]["items"][:3]
     ]
@@ -117,3 +118,4 @@ async def test_recommendations_debug_alias_returns_pipeline_metadata(
     assert "active_ranker" in body["data"]["pipeline"]
     assert "ranker_model_version" in body["data"]["pipeline"]
     assert "ltr_fallback_used" in body["data"]["pipeline"]
+    assert "source_label" in body["data"]["items"][0]

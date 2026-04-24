@@ -35,14 +35,49 @@
         </header>
         <div id="admin-flash"></div>
         <section class="admin-panel">
+          <h2>商品向量索引状态</h2>
+          <p class="page-copy">
+            先查看 Qdrant 连接、collection 状态、索引总量和失败数量，再决定是否执行全量或失败重试。
+          </p>
+          <div id="vector-status-metrics" class="metric-grid"></div>
+          <div id="vector-runtime-grid" class="admin-metadata-grid mt-4"></div>
+        </section>
+
+        <section class="admin-panel">
           <h2>商品向量重建</h2>
           <p class="page-copy">
-            点击后会调用真实后台重建接口，并同步返回本次重建的数量统计与模型名称。
+            点击后会调用真实后台向量索引接口，并同步返回本次重建的数量统计与模型名称。
           </p>
-          <button id="reindex-products-btn" class="admin-button" type="button">
-            立即重建商品向量
-          </button>
+          <div class="admin-toolbar">
+            <button id="reindex-products-btn" class="admin-button" type="button">
+              全量重建商品向量
+            </button>
+            <button id="retry-failed-btn" class="admin-button secondary" type="button">
+              仅重试失败商品
+            </button>
+          </div>
           <div id="reindex-result"></div>
+        </section>
+
+        <section class="admin-table-panel">
+          <div class="admin-table-panel-header">
+            <h2>索引失败商品</h2>
+            <p>如果某些商品未成功进入 Qdrant，这里会直接展示失败原因和最近索引时间。</p>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>商品 ID</th>
+                <th>错误信息</th>
+                <th>最近索引时间</th>
+              </tr>
+            </thead>
+            <tbody id="vector-failed-body">
+              <tr>
+                <td colspan="3" class="empty-state">正在加载索引失败商品...</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
       </main>
     </div>

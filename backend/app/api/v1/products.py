@@ -34,6 +34,14 @@ from backend.app.services.vector_store import build_runtime_marker, probe_vector
 
 router = APIRouter(tags=["catalog"])
 
+RECOMMENDATION_SOURCE_LABELS = {
+    "personalized": "个性化",
+    "similar": "相似商品",
+    "hot": "热门",
+    "new": "新品探索",
+    "seasonal": "节令主题",
+}
+
 
 def serialize_category(category: Category) -> dict[str, object]:
     return {
@@ -103,6 +111,35 @@ def serialize_product_detail(product: Product) -> dict[str, object]:
     }
 
 
+def build_recommendation_source_meta(result, *, slot: str) -> dict[str, str]:
+    recall_channels = list(getattr(result, "recall_channels", []))
+    reason = str(getattr(result, "reason", ""))
+
+    if slot in {"related", "cart", "order_complete"} or "related_products" in recall_channels:
+        source_type = "similar"
+    elif "collaborative_user" in recall_channels or "item_cooccurrence" in recall_channels:
+        source_type = "personalized"
+    elif "content_profile" in recall_channels or "sparse_interest" in recall_channels:
+        source_type = "personalized"
+    elif "trending" in recall_channels and ("节" in reason or "节令" in reason):
+        source_type = "seasonal"
+    elif "trending" in recall_channels:
+        source_type = "hot"
+    elif "new_arrival" in recall_channels or "cold_start" in recall_channels:
+        source_type = "new"
+    elif "节" in reason or "节令" in reason:
+        source_type = "seasonal"
+    elif slot == "home":
+        source_type = "personalized"
+    else:
+        source_type = "similar"
+
+    return {
+        "source_type": source_type,
+        "source_label": RECOMMENDATION_SOURCE_LABELS[source_type],
+    }
+
+
 @router.get("/categories")
 def list_categories(
     request: Request,
@@ -125,11 +162,17 @@ def list_categories(
     )
 
 
-def serialize_recommendation_item(result, *, debug: bool = False) -> dict[str, object]:
+def serialize_recommendation_item(
+    result,
+    *,
+    debug: bool = False,
+    slot: str = "home",
+) -> dict[str, object]:
     item = {
         **serialize_product_list_item(result.product),
         "score": round(result.score, 6),
         "reason": result.reason,
+        **build_recommendation_source_meta(result, slot=slot),
     }
     if debug:
         item.update(
@@ -200,7 +243,7 @@ def get_product_recommendations(
             limit=limit,
         )
         items = [
-            serialize_recommendation_item(candidate, debug=debug)
+            serialize_recommendation_item(candidate, debug=debug, slot=slot)
             for candidate in pipeline_run.candidates[:limit]
         ]
         pipeline.update(
@@ -217,7 +260,10 @@ def get_product_recommendations(
             limit=limit,
             force_baseline=True,
         )
-        items = [serialize_recommendation_item(result, debug=debug) for result in results]
+        items = [
+            serialize_recommendation_item(result, debug=debug, slot=slot)
+            for result in results
+        ]
         pipeline.update(
             {
                 "active_ranker": "baseline",
@@ -397,6 +443,7 @@ def get_related_products(
                     **serialize_product_list_item(result.product),
                     "score": round(result.score, 6),
                     "reason": result.reason,
+                    **build_recommendation_source_meta(result, slot="related"),
                 }
                 for result in results
             ],

@@ -4,6 +4,8 @@ from collections.abc import Iterable
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, selectinload
 
 from backend.app.core.config import get_app_settings
@@ -29,6 +31,89 @@ def build_product_embedding_query(product_ids: Iterable[int] | None = None):
     return query
 
 
+def load_product_embedding(db: Session, *, product_id: int) -> ProductEmbedding | None:
+    return db.scalar(
+        select(ProductEmbedding).where(ProductEmbedding.product_id == product_id)
+    )
+
+
+def build_product_embedding_values(
+    *,
+    product_id: int,
+    model_name: str,
+    embedding_text: str,
+    embedding_vector: list[float],
+    content_hash: str,
+    collection_name: str,
+    now: datetime,
+) -> dict[str, object]:
+    return {
+        "product_id": product_id,
+        "model_name": model_name,
+        "embedding_text": embedding_text,
+        "embedding_vector": embedding_vector,
+        "content_hash": content_hash,
+        "qdrant_point_id": str(product_id),
+        "qdrant_collection": collection_name,
+        "index_status": "pending",
+        "index_error": None,
+        "last_indexed_at": now,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+
+def upsert_product_embedding_row(
+    db: Session,
+    *,
+    values: dict[str, object],
+) -> ProductEmbedding:
+    bind = db.get_bind()
+    dialect_name = bind.dialect.name if bind is not None else ""
+    update_values = {
+        key: value
+        for key, value in values.items()
+        if key not in {"product_id", "created_at"}
+    }
+
+    if dialect_name == "sqlite":
+        statement = sqlite_insert(ProductEmbedding).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=[ProductEmbedding.product_id],
+            set_=update_values,
+        )
+        db.execute(statement)
+        db.flush()
+    elif dialect_name == "postgresql":
+        statement = postgres_insert(ProductEmbedding).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=[ProductEmbedding.product_id],
+            set_=update_values,
+        )
+        db.execute(statement)
+        db.flush()
+    else:
+        embedding = ProductEmbedding(**values)
+        db.add(embedding)
+        db.flush()
+
+    persisted = load_product_embedding(db, product_id=int(values["product_id"]))
+    if persisted is None:  # pragma: no cover - defensive safeguard
+        raise RuntimeError("product embedding upsert returned no row")
+    return persisted
+
+
+def resolve_existing_product_embedding(db: Session, *, product: Product) -> ProductEmbedding | None:
+    existing = product.embedding
+    if existing is not None:
+        return existing
+
+    existing = load_product_embedding(db, product_id=product.id)
+    if existing is not None:
+        product.embedding = existing
+    return existing
+
+
 def upsert_product_embedding(
     db: Session,
     *,
@@ -38,7 +123,7 @@ def upsert_product_embedding(
 ) -> tuple[ProductEmbedding, bool]:
     settings = get_app_settings()
     payload = build_product_embedding_payload(product)
-    existing = product.embedding
+    existing = resolve_existing_product_embedding(db, product=product)
 
     should_reindex = force or existing is None
     if existing is not None and not force:
@@ -52,18 +137,21 @@ def upsert_product_embedding(
         return existing, False
 
     vector = provider.embed_query(payload["embedding_text"])
+    now = datetime.utcnow()
     if existing is None:
-        existing = ProductEmbedding(
-            product_id=product.id,
-            model_name=provider.descriptor.model_name,
-            embedding_text=payload["embedding_text"],
-            embedding_vector=vector,
-            content_hash=payload["content_hash"],
-            qdrant_point_id=str(product.id),
-            qdrant_collection=settings.qdrant_collection_products,
-            index_status="pending",
-            last_indexed_at=datetime.utcnow(),
+        existing = upsert_product_embedding_row(
+            db,
+            values=build_product_embedding_values(
+                product_id=product.id,
+                model_name=provider.descriptor.model_name,
+                embedding_text=payload["embedding_text"],
+                embedding_vector=vector,
+                content_hash=payload["content_hash"],
+                collection_name=settings.qdrant_collection_products,
+                now=now,
+            ),
         )
+        product.embedding = existing
     else:
         existing.model_name = provider.descriptor.model_name
         existing.embedding_text = payload["embedding_text"]
@@ -73,7 +161,7 @@ def upsert_product_embedding(
         existing.qdrant_collection = settings.qdrant_collection_products
         existing.index_status = "pending"
         existing.index_error = None
-        existing.last_indexed_at = datetime.utcnow()
+        existing.last_indexed_at = now
 
     db.add(existing)
     return existing, True

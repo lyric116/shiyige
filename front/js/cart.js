@@ -106,6 +106,102 @@
     }
   }
 
+  function renderRecommendationCards(items) {
+    return items
+      .map((product) =>
+        window.shiyigeRecommendationUI?.renderProductCard?.(product, {
+          context: "cart",
+          defaultSourceType: "similar",
+          wrapperClass: "col-lg-3 col-md-6 mb-4",
+        })
+      )
+      .join("");
+  }
+
+  function setCartRecommendationEmpty(message) {
+    const panel = document.getElementById("cart-recommendation-panel");
+    const list = document.getElementById("cart-recommendation-list");
+    const copy = document.getElementById("cart-recommendation-copy");
+    if (!panel || !list || !copy) {
+      return;
+    }
+
+    panel.classList.remove("d-none");
+    copy.textContent = "当前购物车暂时没有可展示的搭配推荐。";
+    list.innerHTML = `<p class="recommendation-empty-copy">${message}</p>`;
+  }
+
+  async function fetchRelatedRecommendations(productIds, excludeIds, limit) {
+    const payloads = await Promise.all(
+      productIds.slice(0, 2).map(async function (productId) {
+        try {
+          return await window.shiyigeApi.get(`/products/${productId}/related?limit=${limit}`);
+        } catch (error) {
+          return null;
+        }
+      })
+    );
+
+    const excluded = new Set(excludeIds);
+    const merged = [];
+    const seen = new Set();
+    payloads.forEach(function (payload) {
+      (payload?.data?.items || []).forEach(function (item) {
+        if (excluded.has(item.id) || seen.has(item.id)) {
+          return;
+        }
+        seen.add(item.id);
+        merged.push(item);
+      });
+    });
+
+    return merged.slice(0, limit);
+  }
+
+  async function loadCartRecommendations(cart) {
+    const panel = document.getElementById("cart-recommendation-panel");
+    const list = document.getElementById("cart-recommendation-list");
+    const copy = document.getElementById("cart-recommendation-copy");
+    if (!panel || !list || !copy) {
+      return;
+    }
+
+    const items = cart?.items || [];
+    if (!items.length) {
+      panel.classList.add("d-none");
+      return;
+    }
+
+    panel.classList.remove("d-none");
+    list.innerHTML = '<p class="recommendation-empty-copy">正在生成搭配推荐...</p>';
+
+    const productIds = items.map((item) => item.product.id);
+    const productNames = items.map((item) => item.product.name).slice(0, 2).join(" / ");
+
+    try {
+      let recommendations = await fetchRelatedRecommendations(productIds, productIds, 4);
+      if (recommendations.length > 0) {
+        copy.textContent = `基于购物车中的 ${productNames}，推荐同风格与同工艺的搭配商品。`;
+        list.innerHTML = `<div class="row">${renderRecommendationCards(recommendations)}</div>`;
+        return;
+      }
+
+      const personalizedPayload = await window.shiyigeApi.get(
+        "/products/recommendations?slot=cart&limit=4&debug=true"
+      );
+      recommendations = personalizedPayload?.data?.items || [];
+      if (recommendations.length > 0) {
+        copy.textContent = "没有足够的搭配候选时，会退回到你的个性化推荐结果。";
+        list.innerHTML = `<div class="row">${renderRecommendationCards(recommendations)}</div>`;
+        return;
+      }
+
+      setCartRecommendationEmpty("当前没有可展示的购物车推荐。");
+    } catch (error) {
+      setCartRecommendationEmpty("购物车推荐加载失败，请稍后重试。");
+    }
+  }
+
   function renderCartPage(cart) {
     const cartItemsBody = document.getElementById("cart-items-body");
     const emptyCart = document.getElementById("empty-cart");
@@ -120,6 +216,7 @@
       emptyCart.classList.remove("d-none");
       cartItems.classList.add("d-none");
       cartSummary.classList.add("d-none");
+      document.getElementById("cart-recommendation-panel")?.classList.add("d-none");
       updateCartTotal();
       return;
     }
@@ -175,6 +272,7 @@
 
     bindCartPageEvents();
     updateCartTotal();
+    void loadCartRecommendations(cart);
   }
 
   function updateCartTotal() {
