@@ -1,5 +1,39 @@
 # Progress Log
 
+## 2026-04-25
+
+### 完成事项
+
+* 修复了 `nginx/default.conf` 中 `/admin/` 的精确匹配配置错误。
+* 原配置把 `location = /admin/` 直接 `alias` 到单个文件，导致 Nginx 在访问 `/admin/` 时拼出错误路径 `index.htmlindex.html` 并返回 `500`。
+* 现改为显式跳转到 `/admin/index.html`，后台首页入口恢复可访问。
+
+### 本次修改文件
+
+* `nginx/default.conf`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### 已执行验证
+
+* `docker compose exec -T nginx nginx -t`
+* `docker compose restart nginx`
+* `curl -L -I http://127.0.0.1/admin/`
+
+结果：
+
+* Nginx 配置语法检查通过。
+* `http://127.0.0.1/admin/` 已从原来的 `500` 变为 `302 -> /admin/index.html -> 200`。
+
+### 关键发现
+
+* 这一步只修复了后台静态入口的 Nginx 配置问题。
+* API 当前仍未完成启动，`/api/v1/health` 还是 `502`，根因是数据库迁移卡在 `20260424_12_recommendation_logging`。
+
+### 下一步起点
+
+* 下一步应修复 `backend/alembic/versions/20260424_12_recommendation_logging.py`，让已有日志表但 Alembic 版本未前进的数据库也能顺利升级。
+
 ## 2026-04-13
 
 ### 完成事项

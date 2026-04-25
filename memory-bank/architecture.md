@@ -35,7 +35,7 @@
 ## 3.1 工程级配置文件作用
 
 * `docker-compose.yml`：当前完整 Compose 编排文件；定义 `postgres`、`redis`、`minio`、`api`、`nginx` 五类服务，并把主入口暴露在宿主机 `80` 端口。
-* `nginx/default.conf`：Nginx 主站配置；负责托管 `front/`、托管 `admin/`，并把 `/api`、`/docs`、`/redoc`、`/openapi.json` 反向代理到 FastAPI。
+* `nginx/default.conf`：Nginx 主站配置；负责托管 `front/`、托管 `admin/`，并把 `/api`、`/docs`、`/redoc`、`/openapi.json` 反向代理到 FastAPI。当前 `location = /admin/` 采用显式跳转到 `/admin/index.html`，避免把精确匹配 URI 直接 `alias` 到单文件时触发 `index.htmlindex.html` 的错误拼接。
 * `backend/Dockerfile`：后端运行镜像定义；负责安装运行依赖、复制后端代码并指定 API 容器默认启动入口。
 * `backend/.dockerignore`：后端镜像构建忽略规则；避免把测试目录、缓存和本地数据库文件带进运行镜像上下文。
 * `pytest.ini`：全仓测试收集入口，目前指向 `backend/tests` 和 `tests/e2e`。
