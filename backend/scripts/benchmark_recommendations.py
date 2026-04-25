@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import sys
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import perf_counter
@@ -22,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import AppSettings, get_app_settings
-from backend.app.core.database import get_session_factory
+from backend.app.core.database import get_session_factory, reset_database_state
 from backend.app.core.security import create_access_token, hash_password
 from backend.app.main import create_app
 from backend.app.models.base import Base
@@ -35,7 +36,7 @@ from backend.app.tasks.qdrant_index_tasks import sync_products_to_qdrant
 from backend.scripts.generate_synthetic_catalog import ensure_synthetic_catalog
 from backend.scripts.seed_base_data import seed_base_data
 
-OUTPUT_PATH = Path("docs/performance_benchmark.md")
+OUTPUT_PATH = Path("docs/generated/performance_benchmark_latest.md")
 QDRANT_LOCAL_URL = "http://127.0.0.1:6333"
 SEARCH_QUERIES = ["汉服", "香囊", "非遗", "礼盒", "刺绣", "春日汉服", "国风送礼"]
 SEMANTIC_QUERIES = ["春日汉服穿搭", "适合送礼的传统文创", "非遗家居陈设"]
@@ -73,13 +74,15 @@ def resolve_app_settings() -> AppSettings:
 
 def build_benchmark_settings() -> AppSettings:
     base_settings = resolve_app_settings()
-    return base_settings.model_copy(
-        update={
-            "embedding_provider": "local_hash",
-            "sparse_embedding_provider": "local_hash",
-            "colbert_embedding_provider": "local_hash",
-        }
-    )
+    status = get_qdrant_connection_status(base_settings)
+    updates = {
+        "embedding_provider": "local_hash",
+        "sparse_embedding_provider": "local_hash",
+        "colbert_embedding_provider": "local_hash",
+    }
+    if not status.available:
+        updates["vector_db_provider"] = "baseline"
+    return base_settings.model_copy(update=updates)
 
 
 def suppress_http_logs() -> None:
@@ -95,6 +98,16 @@ def apply_runtime_settings(settings: AppSettings) -> None:
     os.environ["SPARSE_EMBEDDING_PROVIDER"] = settings.sparse_embedding_provider
     os.environ["COLBERT_EMBEDDING_PROVIDER"] = settings.colbert_embedding_provider
     get_app_settings.cache_clear()
+
+
+def prepare_isolated_database() -> None:
+    with tempfile.NamedTemporaryFile(
+        prefix="shiyige-benchmark-",
+        suffix=".db",
+        delete=False,
+    ) as handle:
+        os.environ["DATABASE_URL"] = f"sqlite:///{handle.name}"
+    reset_database_state()
 
 
 def ensure_benchmark_users(
@@ -524,6 +537,7 @@ def benchmark_recommendations(
     request_count: int | None,
     concurrency: int,
 ) -> dict[str, object]:
+    prepare_isolated_database()
     session = get_session_factory()()
     suppress_http_logs()
     settings = build_benchmark_settings()
@@ -541,20 +555,27 @@ def benchmark_recommendations(
             product_ids=product_ids,
         )
 
-        sync_started_at = perf_counter()
-        sync_result = sync_products_to_qdrant(
-            session,
-            mode="full",
-            settings=settings,
-        )
-        sync_latency_ms = round((perf_counter() - sync_started_at) * 1000, 3)
+        qdrant_available = settings.vector_db_provider == "qdrant"
+        if qdrant_available:
+            sync_started_at = perf_counter()
+            sync_result = sync_products_to_qdrant(
+                session,
+                mode="full",
+                settings=settings,
+            )
+            sync_latency_ms = round((perf_counter() - sync_started_at) * 1000, 3)
 
-        collaborative_started_at = perf_counter()
-        collaborative_result = build_collaborative_index(session, settings=settings)
-        collaborative_latency_ms = round(
-            (perf_counter() - collaborative_started_at) * 1000,
-            3,
-        )
+            collaborative_started_at = perf_counter()
+            collaborative_result = build_collaborative_index(session, settings=settings)
+            collaborative_latency_ms = round(
+                (perf_counter() - collaborative_started_at) * 1000,
+                3,
+            )
+        else:
+            sync_result = {"indexed": 0, "skipped": 0, "failed": 0, "mode": "skipped"}
+            collaborative_result = {"indexed_users": 0, "qdrant_points": 0, "item_nodes": 0}
+            sync_latency_ms = 0.0
+            collaborative_latency_ms = 0.0
 
         runtime_summary = probe_vector_store_runtime(settings).to_dict()
         sample_count = resolve_request_count(request_count, users)
@@ -571,13 +592,21 @@ def benchmark_recommendations(
                 endpoint="reindex_products_qdrant",
                 latency_ms=sync_latency_ms,
                 candidate_count=int(sync_result.get("indexed", 0)),
-                notes="sync_products_to_qdrant(mode=full)",
+                notes=(
+                    "sync_products_to_qdrant(mode=full)"
+                    if qdrant_available
+                    else "skipped: qdrant unavailable in current script runtime"
+                ),
             ),
             build_task_row(
                 endpoint="build_collaborative_index",
                 latency_ms=collaborative_latency_ms,
                 candidate_count=int(collaborative_result.get("indexed_users", 0)),
-                notes="build_collaborative_index",
+                notes=(
+                    "build_collaborative_index"
+                    if qdrant_available
+                    else "skipped: qdrant unavailable in current script runtime"
+                ),
             ),
         ]
         rows = [*http_rows, *task_rows]

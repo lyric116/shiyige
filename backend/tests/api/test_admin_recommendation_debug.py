@@ -226,6 +226,11 @@ async def test_admin_recommendation_experiments_endpoint_returns_static_configs(
     assert any(
         item["key"] == "dense_recall" for item in body["data"]["capability_catalog"]
     )
+    assert body["data"]["artifact_summary"]["artifact_count"] >= 4
+    assert any(
+        item["path"] == "docs/recommendation_pipeline.md"
+        for item in body["data"]["artifact_catalog"]
+    )
     assert {item["key"] for item in body["data"]["items"]} >= {
         "baseline",
         "hybrid",

@@ -1,5 +1,14 @@
 # 答辩讲稿与 FAQ
 
+## 0. 推荐引用顺序
+
+建议答辩时按这个顺序引用材料：
+
+1. `docs/recommendation_pipeline.md` 解释系统结构。
+2. `docs/recommendation_evaluation.md` 证明效果优于 baseline。
+3. `docs/performance_benchmark.md` 说明性能边界与瓶颈。
+4. `docs/generated/recommendation_evaluation_latest.md` / `docs/generated/performance_benchmark_latest.md` 作为最近一次脚本原始产物。
+
 ## 1. 开场讲稿
 
 可以按下面这段直接讲：

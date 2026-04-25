@@ -227,7 +227,7 @@ git commit -m "docs: finalize recommendation enhancement artifacts"
 
 ## 四、当前执行项
 
-当前正在执行：
+当前阶段已完成：
 
 * **Phase E5：评估与答辩收口**
 
@@ -238,3 +238,83 @@ git commit -m "docs: finalize recommendation enhancement artifacts"
 * 至少完成一轮覆盖推荐链路的最终验证；
 * 通过验证后更新 `memory-bank/progress.md` 与 `memory-bank/architecture.md`；
 * 单独 git 提交。
+
+当前完成情况：
+
+* 已把推荐评估与压测脚本的原始产物迁移到 `docs/generated/`，避免覆盖人工维护结论文档。
+* 后台实验配置页已增加“评估与答辩材料”区块，可展示材料入口、生成命令、原始产物路径和更新时间。
+* 已完成一轮最终验证：
+  * `./.venv/bin/python backend/scripts/evaluate_recommendations.py`
+  * `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 200`
+  * `./.venv/bin/python -m pytest backend/tests -q`
+* 当前新的关键事实是：`10000` 商品规模下，`GET /api/v1/recommendations?slot=home` 的 p50 已达到约 `31.7s`，推荐主链路延迟已经成为下一阶段增强的首要目标。
+
+---
+
+## 五、第二轮增强执行顺序
+
+接下来进入升级计划第 `17.2` 节的增强版本，优先顺序如下：
+
+1. Phase E6：Redis 预计算推荐
+2. Phase E7：A/B 实验看板
+3. Phase E8：10 万商品压测扩展
+
+### Phase E6：Redis 预计算推荐
+
+**目标**
+
+针对当前 `recommend_home` 在 `10000` 商品规模下 p50 约 `31.7s` 的瓶颈，引入可失效的 Redis 预计算推荐结果，优先优化首页推荐与购物车推荐的首屏延迟。
+
+**具体任务**
+
+1. 在后端增加预计算推荐服务：
+   * 按 `user_id + slot + limit + backend` 生成缓存快照
+   * 保留推荐证据字段，不把预计算结果压缩成仅商品 ID 列表
+2. 增加批量预热入口：
+   * 支持指定用户列表或自动扫描活跃用户
+   * 支持 `home` / `cart` 两个核心展示位
+3. 在推荐接口接入“预计算优先，实时回退”：
+   * 命中快照直接返回
+   * 未命中或过期时回退现有推荐流水线
+4. 后台增加预计算状态说明：
+   * 最近预热时间
+   * 预热用户数
+   * 命中率或命中次数
+5. 补充测试：
+   * 预计算写入、读取、失效
+   * 行为发生后对应用户快照失效
+   * 推荐接口命中预计算结果时仍保持现有公开协议
+
+**验证**
+
+```bash
+./.venv/bin/python -m pytest backend/tests/integration/test_cache_behavior.py -q
+./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py -q
+./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q
+```
+
+**建议提交信息**
+
+```bash
+git commit -m "backend: add redis precomputed recommendations"
+```
+
+### Phase E7：A/B 实验看板
+
+**目标**
+
+利用现有 `pipeline_version`、推荐请求日志和曝光日志，形成后台 A/B 看板，让不同实验版本的流量占比、CTR、CVR 和 fallback 情况可以直接对比。
+
+### Phase E8：10 万商品压测扩展
+
+**目标**
+
+在已有 `10000` 商品压测脚本基础上，补齐更大规模数据生成与分层采样策略，为 `100000` 商品量级提供可执行的压测入口和结果记录方式。
+
+---
+
+## 六、下一步起点
+
+当前正在执行：
+
+* **Phase E6：Redis 预计算推荐**

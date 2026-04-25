@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,11 +18,19 @@ from backend.app.models.recommendation_experiment import RecommendationExperimen
 from backend.app.services.vector_store import VectorStoreRuntime, probe_vector_store_runtime
 from backend.app.tasks.qdrant_index_tasks import get_product_index_status
 
+ROOT_DIR = Path(__file__).resolve().parents[3]
+
 
 def isoformat_or_none(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
+
+
+def isoformat_from_path(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    return datetime.fromtimestamp(path.stat().st_mtime).isoformat()
 
 
 def build_recommendation_dashboard_payload(
@@ -299,6 +308,7 @@ def build_experiment_payload(
     vector_runtime = runtime or probe_vector_store_runtime()
     active_key = derive_active_experiment_key(vector_runtime)
     capability_catalog = build_experiment_capability_catalog()
+    artifact_catalog = build_recommendation_artifact_catalog()
     active_rows = db.scalars(
         select(RecommendationExperiment)
         .where(RecommendationExperiment.is_active.is_(True))
@@ -438,6 +448,8 @@ def build_experiment_payload(
             ),
             "full_pipeline 代表当前推荐主链路：多路召回、协同过滤、排序器、多样性与探索并存。",
         ],
+        "artifact_summary": build_recommendation_artifact_summary(artifact_catalog),
+        "artifact_catalog": artifact_catalog,
         "items": items,
     }
 
@@ -539,3 +551,92 @@ def build_experiment_capability_catalog() -> list[dict[str, str]]:
             "description": "类目打散、探索位与冷启动混排。",
         },
     ]
+
+
+def build_recommendation_artifact_catalog() -> list[dict[str, object]]:
+    docs = [
+        {
+            "key": "pipeline_doc",
+            "title": "推荐流程说明",
+            "path": "docs/recommendation_pipeline.md",
+            "description": "解释多路召回、候选融合、排序、业务重排和前后台证据链。",
+            "usage": "答辩时先用这份文档讲系统结构。",
+            "generation_command": None,
+            "generated_path": None,
+        },
+        {
+            "key": "evaluation_doc",
+            "title": "推荐评估报告",
+            "path": "docs/recommendation_evaluation.md",
+            "description": "整理 baseline 与升级后方案的效果对比结论。",
+            "usage": "回答“怎么证明推荐更好”。",
+            "generation_command": "./.venv/bin/python backend/scripts/evaluate_recommendations.py",
+            "generated_path": "docs/generated/recommendation_evaluation_latest.md",
+        },
+        {
+            "key": "benchmark_doc",
+            "title": "性能压测报告",
+            "path": "docs/performance_benchmark.md",
+            "description": "量化搜索、推荐和索引构建的延迟边界与瓶颈。",
+            "usage": "回答“系统能跑多大规模、瓶颈在哪里”。",
+            "generation_command": (
+                "./.venv/bin/python backend/scripts/benchmark_recommendations.py "
+                "--products 10000 --users 200"
+            ),
+            "generated_path": "docs/generated/performance_benchmark_latest.md",
+        },
+        {
+            "key": "defense_doc",
+            "title": "答辩讲稿与 FAQ",
+            "path": "docs/defense_script.md",
+            "description": "收口老师高频追问、推荐系统亮点和演示顺序。",
+            "usage": "答辩前最后复习与统一口径。",
+            "generation_command": None,
+            "generated_path": None,
+        },
+    ]
+
+    items: list[dict[str, object]] = []
+    for item in docs:
+        summary_path = ROOT_DIR / item["path"]
+        generated_path = (
+            ROOT_DIR / str(item["generated_path"])
+            if item["generated_path"] is not None
+            else None
+        )
+        items.append(
+            {
+                **item,
+                "updated_at": isoformat_from_path(summary_path),
+                "generated_updated_at": (
+                    isoformat_from_path(generated_path) if generated_path is not None else None
+                ),
+            }
+        )
+    return items
+
+
+def build_recommendation_artifact_summary(
+    items: list[dict[str, object]],
+) -> dict[str, object]:
+    curated_updates = [
+        item["updated_at"]
+        for item in items
+        if isinstance(item.get("updated_at"), str)
+    ]
+    generated_updates = [
+        item["generated_updated_at"]
+        for item in items
+        if isinstance(item.get("generated_updated_at"), str)
+    ]
+    missing_generated_count = sum(
+        1
+        for item in items
+        if item.get("generated_path") and not item.get("generated_updated_at")
+    )
+    return {
+        "artifact_count": len(items),
+        "latest_curated_update_at": max(curated_updates) if curated_updates else None,
+        "latest_generated_update_at": max(generated_updates) if generated_updates else None,
+        "missing_generated_count": missing_generated_count,
+    }

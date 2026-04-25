@@ -289,6 +289,58 @@
       .join("");
   }
 
+  function renderArtifactCards(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return '<div class="result-card">当前没有可展示的评估材料。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        const generatedInfo = item.generated_path
+          ? `
+              <div class="debug-card-section">
+                <strong>最新原始产物</strong>
+                <pre class="admin-code-block">${escapeHtml(item.generated_path)}</pre>
+                <div><small>更新时间：${escapeHtml(
+                  formatDateTime(item.generated_updated_at)
+                )}</small></div>
+              </div>
+            `
+          : "";
+        const commandInfo = item.generation_command
+          ? `
+              <div class="debug-card-section">
+                <strong>更新命令</strong>
+                <pre class="admin-code-block">${escapeHtml(item.generation_command)}</pre>
+              </div>
+            `
+          : "";
+        return `
+          <article class="debug-card">
+            <div class="debug-card-header">
+              <div>
+                <p class="admin-eyebrow">${escapeHtml(item.key || "-")}</p>
+                <h3>${escapeHtml(item.title || "-")}</h3>
+                <p class="page-copy">${escapeHtml(item.description || "-")}</p>
+              </div>
+              <span class="admin-status">${escapeHtml(formatDateTime(item.updated_at))}</span>
+            </div>
+            <div class="debug-card-section">
+              <strong>入口文件</strong>
+              <pre class="admin-code-block">${escapeHtml(item.path || "-")}</pre>
+            </div>
+            <div class="debug-card-section">
+              <strong>推荐用途</strong>
+              <p class="page-copy">${escapeHtml(item.usage || "-")}</p>
+            </div>
+            ${generatedInfo}
+            ${commandInfo}
+          </article>
+        `;
+      })
+      .join("");
+  }
+
   function renderDashboard(summary) {
     document.getElementById("summary-users").textContent = String(summary.users_total);
     document.getElementById("summary-products").textContent = String(summary.products_total);
@@ -977,6 +1029,8 @@
     const matrixBody = document.getElementById("recommendation-config-matrix-body");
     const list = document.getElementById("recommendation-config-list");
     const notes = document.getElementById("recommendation-config-notes");
+    const artifactSummary = document.getElementById("recommendation-config-artifact-summary");
+    const artifactList = document.getElementById("recommendation-config-artifact-list");
     const runtime = payload.data.runtime_summary || {};
     const capabilityCatalog = payload.data.capability_catalog || [];
     const items = payload.data.items || [];
@@ -1086,6 +1140,21 @@
     }
     if (notes) {
       notes.innerHTML = renderComparisonNotes(payload.data.comparison_notes || []);
+    }
+    if (artifactSummary) {
+      const summary = payload.data.artifact_summary || {};
+      artifactSummary.textContent = `当前已整理 ${summary.artifact_count || 0} 份推荐升级材料。最近一次文档更新时间：${
+        formatDateTime(summary.latest_curated_update_at) || "-"
+      }；最近一次脚本产物更新时间：${
+        formatDateTime(summary.latest_generated_update_at) || "-"
+      }。${
+        summary.missing_generated_count
+          ? `仍有 ${summary.missing_generated_count} 份原始产物尚未通过脚本重新生成。`
+          : "当前脚本型产物已齐备，可直接用于答辩展示。"
+      }`;
+    }
+    if (artifactList) {
+      artifactList.innerHTML = renderArtifactCards(payload.data.artifact_catalog || []);
     }
   }
 

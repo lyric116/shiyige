@@ -18,10 +18,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from backend.app.core.config import AppSettings, get_app_settings
-from backend.app.core.database import get_session_factory
+from backend.app.core.database import create_app_engine
 from backend.app.core.security import hash_password
 from backend.app.models.base import Base
 from backend.app.models.product import Product
@@ -43,7 +43,7 @@ from backend.app.tasks.collaborative_index_tasks import build_collaborative_inde
 from backend.app.tasks.qdrant_index_tasks import sync_products_to_qdrant
 from backend.scripts.seed_base_data import seed_base_data
 
-OUTPUT_PATH = Path("docs/recommendation_evaluation.md")
+OUTPUT_PATH = Path("docs/generated/recommendation_evaluation_latest.md")
 TOP_K = 5
 QDRANT_LOCAL_URL = "http://127.0.0.1:6333"
 
@@ -140,6 +140,24 @@ def resolve_app_settings() -> AppSettings:
     if get_qdrant_connection_status(localhost_settings).available:
         return localhost_settings
     return settings
+
+
+def create_isolated_session() -> Session:
+    with tempfile.NamedTemporaryFile(
+        prefix="shiyige-eval-",
+        suffix=".db",
+        delete=False,
+    ) as handle:
+        database_url = f"sqlite:///{handle.name}"
+    engine = create_app_engine(database_url)
+    Base.metadata.create_all(bind=engine)
+    factory = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+    return factory()
 
 
 def suppress_http_logs() -> None:
@@ -533,7 +551,7 @@ def percentile(values: list[float], ratio: float) -> float:
 
 
 def evaluate_scenarios() -> dict[str, object]:
-    session = get_session_factory()()
+    session = create_isolated_session()
     suppress_http_logs()
     app_settings = resolve_app_settings()
     ltr_model_path = build_ltr_weights_file()

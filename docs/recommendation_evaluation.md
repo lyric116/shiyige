@@ -1,5 +1,13 @@
 # 推荐系统评估报告
 
+## 配套材料与更新方式
+
+* 推荐流程说明：`docs/recommendation_pipeline.md`
+* 压测报告：`docs/performance_benchmark.md`
+* 答辩讲稿：`docs/defense_script.md`
+* 最新脚本原始产物：`docs/generated/recommendation_evaluation_latest.md`
+* 重新生成命令：`./.venv/bin/python backend/scripts/evaluate_recommendations.py`
+
 ## 1. 评估目的
 
 这份报告的目标不是证明“模型能跑”，而是回答两个答辩问题：

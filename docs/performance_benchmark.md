@@ -1,5 +1,13 @@
 # 推荐系统性能压测报告
 
+## 配套材料与更新方式
+
+* 推荐流程说明：`docs/recommendation_pipeline.md`
+* 评估报告：`docs/recommendation_evaluation.md`
+* 答辩讲稿：`docs/defense_script.md`
+* 最新脚本原始产物：`docs/generated/performance_benchmark_latest.md`
+* 重新生成命令：`./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 200`
+
 ## 1. 目标
 
 这份报告回答三个问题：

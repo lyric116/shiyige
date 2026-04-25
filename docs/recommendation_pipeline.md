@@ -1,5 +1,13 @@
 # 推荐系统流程说明
 
+## 配套材料
+
+* 评估结论：`docs/recommendation_evaluation.md`
+* 最新评估原始产物：`docs/generated/recommendation_evaluation_latest.md`
+* 压测结论：`docs/performance_benchmark.md`
+* 最新压测原始产物：`docs/generated/performance_benchmark_latest.md`
+* 答辩讲稿：`docs/defense_script.md`
+
 ## 1. 升级目标
 
 旧版本的首页推荐本质上是：

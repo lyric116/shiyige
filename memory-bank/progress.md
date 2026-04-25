@@ -2847,3 +2847,57 @@ Step 14:
 
 * `docs/defense_script.md` 现在已经不只是讲稿，而是推荐系统答辩 FAQ 的统一事实来源；后续如果评估指标、排序器版本或冷启动策略继续变动，优先先改这份文档，再去改其他展示材料，避免口径漂移。
 * 第 16 步的最终回归已经把当前代码状态重新跑到 `backend/tests` 全量和 `test_full_demo_flow`，因此后续如果继续推进第 17 节的增强版本，应从这个提交点往后迭代，不要回退到更早的中间提交再做功能叠加。
+
+### 同日继续推进记录（五十三）
+
+已继续完成：
+
+* Recommendation Enhancement Phase E5：评估与答辩收口
+
+新增与修改：
+
+* `backend/app/services/recommendation_admin.py`
+* `backend/scripts/evaluate_recommendations.py`
+* `backend/scripts/benchmark_recommendations.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-config.html`
+* `admin/js/app.js`
+* `docs/recommendation_pipeline.md`
+* `docs/recommendation_evaluation.md`
+* `docs/performance_benchmark.md`
+* `docs/defense_script.md`
+* `docs/generated/recommendation_evaluation_latest.md`
+* `docs/generated/performance_benchmark_latest.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/recommendation_admin.py backend/scripts/evaluate_recommendations.py backend/scripts/benchmark_recommendations.py backend/tests/api/test_admin_recommendation_debug.py`
+* `node --check admin/js/app.js`
+* `docker compose exec -T nginx sh -lc 'wget -S -O /dev/null http://127.0.0.1/admin/recommendation-config.html'`
+* `./.venv/bin/python backend/scripts/evaluate_recommendations.py`
+* `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 200`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已在 `backend/app/services/recommendation_admin.py` 增加推荐评估材料目录聚合，实验配置接口现在会返回 `artifact_summary` 与 `artifact_catalog`，后台能直接展示每份材料的入口文件、用途、原始产物路径、生成命令和更新时间。
+* `admin/recommendation-config.html` 与 `admin/js/app.js` 现在已经把实验页扩成“评估与答辩材料台”，不再只展示方案能力矩阵，还能直接告诉使用者哪些文档是人工整理结论、哪些是脚本最新原始产物。
+* 已把脚本生成物从人工维护文档中剥离出来：`backend/scripts/evaluate_recommendations.py` 现写入 `docs/generated/recommendation_evaluation_latest.md`，`backend/scripts/benchmark_recommendations.py` 现写入 `docs/generated/performance_benchmark_latest.md`，避免脚本每次执行都覆盖人工整理过的结论页。
+* 两个脚本都改成使用隔离临时 SQLite 数据库初始化运行态，修复了此前直接复用 `backend/dev.db` 时可能因为本地 schema 落后而报 `no such column` 的问题。
+* 本轮重新生成的评估原始产物已落盘，且这次 `evaluate_recommendations.py` 直接命中了 `http://127.0.0.1:6333` 的 Qdrant 运行时，`runtime.qdrant_ready=true`。
+* 本轮 `10000` 商品 / `200` 用户压测也已成功生成原始产物。关键结果显示：
+  * `search_keyword` p50 `1812.153ms`
+  * `search_semantic` p50 `866.413ms`
+  * `recommend_home` p50 `31747.117ms`
+  * `related_products` p50 `1296.907ms`
+  * `reindex_products_qdrant` 全量建索引耗时 `331574.515ms`
+* 后端全量回归结果为 `150 passed`；`ruff check`、后台脚本语法检查和 `admin/recommendation-config.html` 静态入口检查均通过。
+
+交接提醒：
+
+* 现在 `docs/` 里的推荐文档分成两层：人工整理结论继续留在 `docs/recommendation_*.md`，脚本最新原始产物统一落到 `docs/generated/`；后续不要再把脚本输出路径改回人工文档本身。
+* 本轮压测最重要的新发现不是“脚本能跑”，而是 `GET /api/v1/recommendations?slot=home` 在 `10000` 商品规模下 p50 已到 `31.7s`。这已经明确说明下一步增强应该优先处理推荐结果预计算或更强缓存，而不是继续堆展示层页面。
+* 实验配置页现在已经承担“材料目录”职责；后续如果再新增评估报告、A/B 报表或 Redis 预计算说明，优先把入口挂到 `artifact_catalog`，避免后台和文档再次分裂。

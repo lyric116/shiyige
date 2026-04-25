@@ -1438,3 +1438,29 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在 `business_rules.py -> recommendation_pipeline.py -> admin_recommendations.py -> admin/js/app.js` 已经形成一条完整追踪链路，说明排序后处理也应该被当成可解释协议的一部分，而不是内部黑盒。
 * 冷启动与新品探索的运营指标，不一定要等到新增专门日志表才能开始做。
   只要曝光日志里已经保存了 `recall_channels`，就可以先通过请求级和曝光级聚合反推出冷启动请求数、Exploration 命中率和新品召回占比。这是当前仓库在比赛工期下最划算的证据化路径。
+
+### 9.55 Phase E5 现在已经形成“人工结论文档层 + 脚本原始产物层 + 后台材料目录层”的收口形态
+
+第 79 次同日推进把推荐系统增强计划的收口阶段从“文档补几页”推进成了真正可维护的材料体系：
+
+* `docs/generated/`：脚本原始产物层。
+  当前新增这个目录，专门承接 `backend/scripts/evaluate_recommendations.py` 与 `backend/scripts/benchmark_recommendations.py` 的最新输出。Phase E5 之后，评估和压测脚本不再覆盖 `docs/recommendation_evaluation.md` 与 `docs/performance_benchmark.md` 这些人工整理结论页，而是把原始报告稳定写到 `docs/generated/recommendation_evaluation_latest.md` 和 `docs/generated/performance_benchmark_latest.md`。
+* `backend/scripts/evaluate_recommendations.py`：隔离评估运行时层。
+  当前脚本会先创建临时 SQLite 数据库和独立 SQLAlchemy session，再灌入基础数据与实验数据，避免直接依赖仓库内 `backend/dev.db` 的 schema 状态。这样即使本地开发库尚未升级到最新字段，评估脚本也不会因为列缺失直接中断。
+* `backend/scripts/benchmark_recommendations.py`：隔离压测运行时与规模验证层。
+  当前脚本同样切换成临时 SQLite 数据库初始化，并把输出改到 `docs/generated/performance_benchmark_latest.md`。Phase E5 的真实压测结果已经证明脚本可以在 `10000` 商品 / `200` 用户规模下跑通，同时保留下次继续做更大规模压测的标准入口。
+* `backend/app/services/recommendation_admin.py`：材料目录聚合层。
+  当前实验配置聚合已不再只返回实验方案，还会集中返回 `artifact_summary` 与 `artifact_catalog`，把推荐流程说明、评估报告、压测报告、答辩讲稿、原始产物路径、生成命令和更新时间收束成统一协议。
+* `admin/recommendation-config.html` 与 `admin/js/app.js`：后台材料台展示层。
+  当前实验配置页已经扩成“评估与答辩材料”页面，能展示每份材料的入口文件、使用场景、脚本产物路径和最近更新时间。这样后台就不再只是解释算法方案，也开始承担“材料导航台”的职责。
+* `docs/recommendation_pipeline.md`、`docs/recommendation_evaluation.md`、`docs/performance_benchmark.md`、`docs/defense_script.md`：人工结论收敛层。
+  当前这些文档之间已经建立了交叉引用关系，分别承接结构说明、效果结论、性能边界和答辩讲稿；原始数据交给 `docs/generated/`，人工表述则继续保留在结论页中。
+
+这里有三个新的关键架构洞察：
+
+* 当系统开始依赖脚本生成评估材料时，“人工结论页”和“脚本原始产物页”必须分层。
+  否则每次重新跑脚本都会把人写的答辩总结和解释性结论冲掉。当前 `docs/*.md` 与 `docs/generated/*.md` 的分层，实际上已经成为推荐系统材料管理的一部分。
+* 后台实验页一旦开始承担答辩与交接职责，就不应只展示实验能力，还应该展示材料入口。
+  现在 `recommendation_admin.py -> admin/js/app.js -> recommendation-config.html` 已经形成材料目录链路，后续新增评估报告或 A/B 看板时，应优先挂在这条链路上，而不是散落在文档目录里让使用者自己找。
+* 压测脚本真正有价值的时刻，不是它成功输出 Markdown，而是它暴露出下一阶段最值得解决的瓶颈。
+  Phase E5 的 `10000` 商品压测结果里，`recommend_home` p50 已到 `31.7s`，远高于搜索与相关推荐；这说明后续增强版本最优先的技术方向应转向 Redis 预计算推荐或更强缓存，而不是继续增加纯展示型材料。
