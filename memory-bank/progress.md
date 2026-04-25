@@ -2530,3 +2530,32 @@ Step 14:
 * 现在所有 cache key 都带数据库命名空间，这能避免本地多测试库或多环境共用 Redis 时互相污染；后续如果单独写脚本直接读 Redis，请不要再假设 key 以 `products:` 或 `search:` 开头。
 * `find_related_products()` 现在是“Qdrant 优先，baseline 回退”的双路径实现；如果后续继续优化 10k/100k 规模，不要再把协议层改掉，直接继续在 `find_related_products_with_qdrant()` 内部扩大候选控制和缓存策略即可。
 * 推荐缓存键已经按 slot 拆开，`invalidate_recommendation_cache_for_user()` 也同步删除旧格式与新格式 key；后续若再新增推荐展示位，记得把新 slot 加进 `RECOMMENDATION_CACHE_SLOTS`，否则行为发生后该展示位的缓存不会被及时清掉。
+
+### 同日继续推进记录（五十二）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 16：补齐答辩 FAQ 并完成最终回归
+
+新增与修改：
+
+* `docs/defense_script.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `rg -n "怎么证明推荐更好|如何解决冷启动" docs/defense_script.md`
+* `./.venv/bin/python -m pytest backend/tests -q`
+* `./.venv/bin/python -m pytest tests/e2e/test_full_demo_flow.py -q`
+
+结果：
+
+* 已在 `docs/defense_script.md` 补齐第 16 节计划里缺失的两条核心 FAQ：一条回答“怎么证明推荐更好”，明确引用 `Precision@K / Recall@K / NDCG@K / Coverage / Diversity / latency` 这些对比指标；另一条回答“如何解决冷启动”，把 `cold_start` 通道、热门/新品/节令混排和新商品探索位写成统一口径。
+* 当前答辩文档里的高频问题已经覆盖：是不是只算余弦、为什么不是 pgvector、推荐系统完整性、怎么证明更好、如何解决冷启动；与 `memory-bank/shiyige_recommendation_upgrade_plan.md` 第 16 节的问答目标已经对齐。
+* 本轮把 FAQ 补齐后，额外执行了一轮更宽的最终回归，而不是只做文档 grep：后端全量测试结果为 `147 passed`，完整 e2e `tests/e2e/test_full_demo_flow.py` 结果为 `1 passed`，说明前面第 13、14、15 节连续改动后，系统整体仍然稳定。
+
+交接提醒：
+
+* `docs/defense_script.md` 现在已经不只是讲稿，而是推荐系统答辩 FAQ 的统一事实来源；后续如果评估指标、排序器版本或冷启动策略继续变动，优先先改这份文档，再去改其他展示材料，避免口径漂移。
+* 第 16 步的最终回归已经把当前代码状态重新跑到 `backend/tests` 全量和 `test_full_demo_flow`，因此后续如果继续推进第 17 节的增强版本，应从这个提交点往后迭代，不要回退到更早的中间提交再做功能叠加。
