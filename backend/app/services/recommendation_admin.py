@@ -123,10 +123,34 @@ def build_recommendation_metrics(
         .order_by(func.count().desc())
     ).all()
     channel_counter: Counter[str] = Counter()
-    channel_rows = db.execute(select(RecommendationImpressionLog.recall_channels)).all()
-    for row in channel_rows:
-        for channel in row[0] or []:
-            channel_counter[str(channel)] += 1
+    request_channels: dict[str, set[str]] = {}
+    exploration_impression_count = 0
+    cold_start_impression_count = 0
+    new_arrival_impression_count = 0
+    channel_rows = db.execute(
+        select(
+            RecommendationImpressionLog.request_id,
+            RecommendationImpressionLog.recall_channels,
+        )
+    ).all()
+    for request_id, raw_channels in channel_rows:
+        normalized_channels = {
+            str(channel).strip()
+            for channel in (raw_channels or [])
+            if channel is not None and str(channel).strip()
+        }
+        if not normalized_channels:
+            continue
+
+        request_channels.setdefault(str(request_id), set()).update(normalized_channels)
+        for channel in normalized_channels:
+            channel_counter[channel] += 1
+        if "cold_start" in normalized_channels:
+            cold_start_impression_count += 1
+        if "new_arrival" in normalized_channels:
+            new_arrival_impression_count += 1
+        if normalized_channels & {"cold_start", "new_arrival"}:
+            exploration_impression_count += 1
 
     ctr = click_count / impression_count if impression_count else 0.0
     add_to_cart_rate = add_to_cart_count / impression_count if impression_count else 0.0
@@ -135,6 +159,20 @@ def build_recommendation_metrics(
         covered_product_count / active_product_count if active_product_count else 0.0
     )
     fallback_rate = fallback_request_count / request_count if request_count else 0.0
+    cold_start_request_count = sum(
+        1 for channels in request_channels.values() if "cold_start" in channels
+    )
+    exploration_request_count = sum(
+        1 for channels in request_channels.values() if channels & {"cold_start", "new_arrival"}
+    )
+    cold_start_request_rate = cold_start_request_count / request_count if request_count else 0.0
+    exploration_hit_rate = exploration_request_count / request_count if request_count else 0.0
+    new_arrival_share = (
+        new_arrival_impression_count / impression_count if impression_count else 0.0
+    )
+    exploration_impression_share = (
+        exploration_impression_count / impression_count if impression_count else 0.0
+    )
 
     return {
         "request_count": request_count,
@@ -145,11 +183,20 @@ def build_recommendation_metrics(
         "covered_product_count": covered_product_count,
         "unique_user_count": unique_user_count,
         "fallback_request_count": fallback_request_count,
+        "cold_start_request_count": cold_start_request_count,
+        "exploration_request_count": exploration_request_count,
+        "new_arrival_impression_count": new_arrival_impression_count,
+        "cold_start_impression_count": cold_start_impression_count,
+        "exploration_impression_count": exploration_impression_count,
         "ctr": round(ctr, 4),
         "add_to_cart_rate": round(add_to_cart_rate, 4),
         "conversion_rate": round(conversion_rate, 4),
         "coverage_rate": round(coverage_rate, 4),
         "fallback_rate": round(fallback_rate, 4),
+        "cold_start_request_rate": round(cold_start_request_rate, 4),
+        "exploration_hit_rate": round(exploration_hit_rate, 4),
+        "new_arrival_share": round(new_arrival_share, 4),
+        "exploration_impression_share": round(exploration_impression_share, 4),
         "average_latency_ms": round(avg_latency_ms, 3),
         "average_candidate_count": round(avg_candidate_count, 3),
         "average_impressions_per_request": round(avg_impressions_per_request, 3),

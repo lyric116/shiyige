@@ -110,7 +110,7 @@ def test_build_recommendation_metrics_includes_channel_and_fallback_breakdowns(
                     user_id=tracked_user.id,
                     product_id=product_ids[2],
                     rank_position=1,
-                    recall_channels=["trending"],
+                    recall_channels=["trending", "cold_start"],
                     final_score=0.74,
                     reason="当前节令热门",
                 ),
@@ -119,7 +119,7 @@ def test_build_recommendation_metrics_includes_channel_and_fallback_breakdowns(
                     user_id=tracked_user.id,
                     product_id=product_ids[3],
                     rank_position=2,
-                    recall_channels=["item_cooccurrence"],
+                    recall_channels=["item_cooccurrence", "new_arrival"],
                     final_score=0.69,
                     reason="与你购物车商品常被一起浏览",
                 ),
@@ -134,6 +134,15 @@ def test_build_recommendation_metrics_includes_channel_and_fallback_breakdowns(
     assert metrics["unique_user_count"] == 1
     assert metrics["fallback_request_count"] == 1
     assert metrics["fallback_rate"] == 0.5
+    assert metrics["cold_start_request_count"] == 1
+    assert metrics["exploration_request_count"] == 1
+    assert metrics["cold_start_request_rate"] == 0.5
+    assert metrics["exploration_hit_rate"] == 0.5
+    assert metrics["new_arrival_impression_count"] == 1
+    assert metrics["cold_start_impression_count"] == 1
+    assert metrics["exploration_impression_count"] == 2
+    assert metrics["new_arrival_share"] == 0.25
+    assert metrics["exploration_impression_share"] == 0.5
     assert metrics["average_impressions_per_request"] == 2.0
     assert {item["slot"] for item in metrics["slot_breakdown"]} == {"home", "cart"}
     assert any(
@@ -152,6 +161,16 @@ def test_build_recommendation_metrics_includes_channel_and_fallback_breakdowns(
             "channel": "item_cooccurrence",
             "impression_count": 2,
             "appearance_share": 0.5,
+        },
+        {
+            "channel": "cold_start",
+            "impression_count": 1,
+            "appearance_share": 0.25,
+        },
+        {
+            "channel": "new_arrival",
+            "impression_count": 1,
+            "appearance_share": 0.25,
         },
         {
             "channel": "trending",

@@ -71,10 +71,16 @@ async def test_admin_recommendation_debug_returns_profile_and_score_breakdown(
     assert body["data"]["recommendations"][0]["channel_details"]
     assert body["data"]["recommendations"][0]["ranking_features"]
     assert body["data"]["recommendations"][0]["feature_summary"]
+    assert body["data"]["recommendations"][0]["business_rules"]
+    assert body["data"]["recommendations"][0]["selection_trace"]
     assert body["data"]["recommendations"][0]["score_breakdown"]
+    assert isinstance(body["data"]["recommendations"][0]["is_exploration"], bool)
+    assert isinstance(body["data"]["recommendations"][0]["cold_start_candidate"], bool)
     assert body["data"]["recommendations"][0]["embedding_dimension"] > 0
     assert body["data"]["recommendations"][0]["embedding_vector_preview"]
     assert body["data"]["metrics"]["active_ranker"]
+    assert "exploration_candidate_count" in body["data"]["metrics"]
+    assert "category_dedup_trigger_count" in body["data"]["metrics"]
 
     with api_session_factory() as session:
         operation_log = session.scalar(
@@ -142,6 +148,41 @@ async def test_admin_recommendation_debug_supports_lookup_by_user_id(
     )
     assert alias_response.status_code == 200
     assert alias_response.json()["data"]["user"]["id"] == user.id
+
+
+@pytest.mark.asyncio
+async def test_admin_recommendation_debug_exposes_cold_start_signals_for_new_user(
+    api_client,
+    create_admin_user,
+    admin_auth_headers_factory,
+    create_user,
+    seed_product_catalog,
+) -> None:
+    admin_user = create_admin_user(
+        email="admin-debug-cold@example.com",
+        username="admin-debug-cold",
+    )
+    user = create_user(
+        email="rec-debug-cold@example.com",
+        username="rec-debug-cold",
+    )
+    admin_headers = admin_auth_headers_factory(admin_user)
+
+    response = await api_client.get(
+        "/api/v1/admin/recommendations/debug",
+        headers=admin_headers,
+        params={"user_id": user.id, "limit": 5},
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["data"]["metrics"]["cold_start"] is True
+    assert body["data"]["metrics"]["cold_start_candidate_count"] >= 1
+    assert any(item["is_exploration"] for item in body["data"]["recommendations"])
+    assert all(
+        "selection_stage" in (item["selection_trace"] or {})
+        for item in body["data"]["recommendations"]
+    )
 
 
 @pytest.mark.asyncio

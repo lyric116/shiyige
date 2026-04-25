@@ -71,9 +71,9 @@
 * `admin/products.html`：后台商品管理页。
 * `admin/orders.html`：后台订单管理页。
 * `admin/reindex.html`：向量索引状态与重建页。
-* `admin/recommendation-debug.html`：推荐调试台；按用户查看画像、候选拆解和最终打分证据。
+* `admin/recommendation-debug.html`：推荐调试台；按用户查看画像、候选拆解、最终打分证据，以及探索位保留和类目去重轨迹。
 * `admin/recommendation-config.html`：推荐实验配置页；展示 baseline、hybrid、hybrid_rerank、full_pipeline 等方案能力，并通过运行时摘要、能力矩阵和答辩提示卡片把实验方案变成可解释的对比页面。
-* `admin/recommendation-metrics.html`：推荐指标页；聚合推荐请求、曝光、点击、加购、支付转化、槽位分布、召回通道分布和搜索/推荐 pipeline 分布，是推荐系统可观测层的后台展示入口。
+* `admin/recommendation-metrics.html`：推荐指标页；聚合推荐请求、曝光、点击、加购、支付转化、槽位分布、召回通道分布和搜索/推荐 pipeline 分布，并继续展示冷启动请求数、Exploration 命中率和新品召回占比，是推荐系统可观测层的后台展示入口。
 
 ## 5. `front/js/` 脚本文件作用
 
@@ -96,7 +96,7 @@
 
 ## 5.1 `admin/js/` 脚本文件作用
 
-* `admin/js/app.js`：后台统一前端编排层；负责管理员登录态、导航、仪表盘、商品页、订单页、推荐调试页、推荐指标页、实验配置页和索引状态页的数据请求与渲染。
+* `admin/js/app.js`：后台统一前端编排层；负责管理员登录态、导航、仪表盘、商品页、订单页、推荐调试页、推荐指标页、实验配置页和索引状态页的数据请求与渲染。当前还承担冷启动/探索/去重标签、业务规则、保留轨迹和冷启动 KPI 的展示编排。
 
 ## 6. `front/css/` 样式文件作用
 
@@ -157,7 +157,7 @@
 * `backend/app/services/__init__.py`：服务层包入口占位。
 * `backend/app/services/embedding.py`：向量 provider 服务；负责统一 embedding provider 抽象、离线 fallback、本地模型包装以及模型元信息描述。
 * `backend/app/services/embedding_text.py`：向量文本构建服务；负责生成稳定的商品 `embedding_text` 与对应 `content_hash`。
-* `backend/app/services/recommendation_admin.py`：后台聚合服务；负责把推荐日志、搜索日志、实验配置、向量索引状态和运行时信息整理成后台仪表盘/推荐后台页面可直接消费的数据结构。当前还承担推荐 KPI、fallback 比例、召回通道分布、搜索/推荐 pipeline 分布、实验页运行时摘要和能力矩阵目录的聚合职责。
+* `backend/app/services/recommendation_admin.py`：后台聚合服务；负责把推荐日志、搜索日志、实验配置、向量索引状态和运行时信息整理成后台仪表盘/推荐后台页面可直接消费的数据结构。当前还承担推荐 KPI、fallback 比例、召回通道分布、搜索/推荐 pipeline 分布、冷启动请求数、Exploration 命中率、新品召回占比，以及实验页运行时摘要和能力矩阵目录的聚合职责。
 * `backend/app/services/vector_search.py`：向量检索服务；负责商品 embedding 保障、向量相似度计算、语义排序和推荐理由生成。
 * `backend/app/services/recommendations.py`：推荐服务；负责从行为日志构建用户兴趣画像，并基于画像向量和兴趣词返回猜你喜欢结果。
 
@@ -1416,3 +1416,25 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   因为实验能力集合未来还会继续扩展，如果仍由前端自己维护列集合，就会再次出现“后端能力已经变化、实验页还停留在旧文案”的脱节问题。
 * 实验配置页最重要的不是展示配置 JSON，而是把“当前运行时”和“理论方案”并排展示。
   只有这样，页面才能清楚回答“当前是不是已经退回 baseline”“当前 full_pipeline 是否真的生效”，而不是只停留在一份静态方案说明。
+
+### 9.54 冷启动与探索位现在已经形成“排序追踪层 + 后台运营证据层”
+
+第 78 次同日推进把推荐系统里原本藏在排序过程中的冷启动与探索位逻辑，推进成了可被后台直接消费的结构化证据：
+
+* `backend/app/services/business_rules.py`：排序后处理追踪层。
+  当前 `apply_post_ranking_rules()` 不再只负责类目去重和探索位注入，还会把 `selection_trace` 写回候选对象，明确标出该候选是首轮保留、因去重暂缓、结果补位，还是因探索位比例被强制保留。
+* `backend/app/services/recommendation_pipeline.py`：推荐候选证据封装层。
+  当前 `PipelineRecommendationCandidate` 已经不只携带分数、理由和特征，还会把 `business_rules` 与 `selection_trace` 一起带到调试出口，使后续接口和后台页面不需要再重新推断候选为何被保留。
+* `backend/app/api/v1/admin_recommendations.py`：后台调试证据出口层。
+  当前推荐调试接口已显式返回 `is_exploration`、`cold_start_candidate`、`new_arrival_candidate`、`business_rules`、`selection_trace`，并补充候选级冷启动/探索位统计，让页面可以直接展示而不是再写前端推理逻辑。
+* `backend/app/services/recommendation_admin.py`：运营指标反推层。
+  当前聚合逻辑不需要新增日志表，也能直接利用 `RecommendationImpressionLog.recall_channels` 反推出 `cold_start_request_count`、`exploration_hit_rate`、`new_arrival_share` 等运营指标。这使已有埋点第一次具备了冷启动与探索位的运营分析价值。
+* `admin/js/app.js` 与 `admin/recommendation-debug.html` / `admin/recommendation-metrics.html`：后台展示证据层。
+  当前后台不再只展示“召回通道”和“最终分数”，而是能继续展示探索位标签、业务规则、保留轨迹，以及冷启动和新品探索 KPI，使算法策略第一次具备稳定截图价值。
+
+这里有两个新的关键架构洞察：
+
+* 如果排序后处理不输出 `selection_trace`，探索位和类目去重就永远只能停留在“代码里确实写了”，无法变成答辩证据。
+  现在 `business_rules.py -> recommendation_pipeline.py -> admin_recommendations.py -> admin/js/app.js` 已经形成一条完整追踪链路，说明排序后处理也应该被当成可解释协议的一部分，而不是内部黑盒。
+* 冷启动与新品探索的运营指标，不一定要等到新增专门日志表才能开始做。
+  只要曝光日志里已经保存了 `recall_channels`，就可以先通过请求级和曝光级聚合反推出冷启动请求数、Exploration 命中率和新品召回占比。这是当前仓库在比赛工期下最划算的证据化路径。

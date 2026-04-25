@@ -97,6 +97,15 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
     for index, candidate in enumerate(candidates[:limit], start=1):
         product = candidate.product
         embedding = product.embedding
+        recall_channels = list(getattr(candidate, "recall_channels", []))
+        ranking_features = dict(getattr(candidate, "ranking_features", {}))
+        business_rules = dict(getattr(candidate, "business_rules", {}))
+        selection_trace = dict(getattr(candidate, "selection_trace", {}))
+        is_exploration = bool(
+            business_rules.get("exploration_candidate")
+            if isinstance(business_rules, dict)
+            else ranking_features.get("exploration_candidate", 0.0)
+        )
         items.append(
             {
                 "rank": index,
@@ -120,11 +129,16 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
                     "weighted-ranker-v1",
                 ),
                 "ltr_fallback_used": bool(getattr(candidate, "ltr_fallback_used", False)),
-                "ranking_features": dict(getattr(candidate, "ranking_features", {})),
+                "ranking_features": ranking_features,
                 "feature_summary": dict(getattr(candidate, "feature_summary", {})),
                 "feature_highlights": list(getattr(candidate, "feature_highlights", [])),
                 "score_breakdown": dict(getattr(candidate, "score_breakdown", {})),
-                "recall_channels": list(getattr(candidate, "recall_channels", [])),
+                "recall_channels": recall_channels,
+                "business_rules": business_rules,
+                "selection_trace": selection_trace,
+                "is_exploration": is_exploration,
+                "cold_start_candidate": "cold_start" in recall_channels,
+                "new_arrival_candidate": "new_arrival" in recall_channels,
                 "channel_details": [
                     {
                         "channel": detail.recall_channel,
@@ -196,6 +210,23 @@ def debug_recommendations(
     active_products = db.scalar(select(func.count(Product.id)).where(Product.status == 1)) or 0
     candidates = pipeline_run.candidates
     indexed_products = db.scalar(select(func.count(ProductEmbedding.id))) or 0
+    serialized_candidates = serialize_candidates(candidates, limit=limit)
+    exploration_candidate_count = sum(
+        1 for item in serialized_candidates if bool(item.get("is_exploration"))
+    )
+    exploration_injected_count = sum(
+        1
+        for item in serialized_candidates
+        if bool((item.get("selection_trace") or {}).get("exploration_injected"))
+    )
+    category_dedup_trigger_count = sum(
+        1
+        for item in serialized_candidates
+        if bool((item.get("selection_trace") or {}).get("category_dedup_deferred"))
+    )
+    cold_start_candidate_count = sum(
+        1 for item in serialized_candidates if bool(item.get("cold_start_candidate"))
+    )
 
     create_operation_log(
         db,
@@ -243,9 +274,13 @@ def debug_recommendations(
                 "active_ranker": pipeline_run.active_ranker,
                 "ranker_model_version": pipeline_run.ranker_model_version,
                 "ltr_fallback_used": pipeline_run.ltr_fallback_used,
+                "exploration_candidate_count": exploration_candidate_count,
+                "exploration_injected_count": exploration_injected_count,
+                "category_dedup_trigger_count": category_dedup_trigger_count,
+                "cold_start_candidate_count": cold_start_candidate_count,
             },
             "recent_behaviors": serialize_behavior_logs(logs, products_by_id),
-            "recommendations": serialize_candidates(candidates, limit=limit),
+            "recommendations": serialized_candidates,
         },
         status_code=200,
     )

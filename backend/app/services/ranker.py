@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from backend.app.core.config import AppSettings, get_app_settings
 from backend.app.models.product import Product
@@ -51,6 +51,7 @@ class RankedRecommendationCandidate:
     base_score: float
     final_score: float
     reason: str
+    selection_trace: dict[str, object] = field(default_factory=dict)
 
 
 def rank_fused_candidates(

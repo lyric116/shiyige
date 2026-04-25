@@ -210,6 +210,84 @@
 
 * 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E4：冷启动与探索位运营增强**。
 
+### Phase E4：冷启动与探索位运营增强
+
+* 已完成 `recommendation_enhancement_execution_plan.md` 中的 Phase E4。
+* 排序后处理现在会显式记录候选保留轨迹：
+  * `backend/app/services/business_rules.py` 在后排序阶段新增 `selection_trace`
+  * 可区分首轮保留、因类目去重暂缓、结果补位、探索位注入保留
+* 推荐流水线与后台调试接口已补充探索位/冷启动证据：
+  * `backend/app/services/recommendation_pipeline.py` 现在会把 `business_rules` 与 `selection_trace` 一并挂到候选结果上
+  * `backend/app/api/v1/admin_recommendations.py` 现在会返回 `is_exploration`、`cold_start_candidate`、`new_arrival_candidate`、`business_rules`、`selection_trace`
+  * 调试接口 `metrics` 也新增 `exploration_candidate_count`、`exploration_injected_count`、`category_dedup_trigger_count`、`cold_start_candidate_count`
+* 推荐指标聚合已补充冷启动与探索位运营口径：
+  * `cold_start_request_count`
+  * `cold_start_request_rate`
+  * `exploration_request_count`
+  * `exploration_hit_rate`
+  * `new_arrival_impression_count`
+  * `new_arrival_share`
+  * `cold_start_impression_count`
+  * `exploration_impression_count`
+  * `exploration_impression_share`
+* 后台页面也已跟上：
+  * `admin/recommendation-debug.html` 和 `admin/js/app.js` 现在会展示冷启动/探索/去重标签、业务规则和保留轨迹
+  * `admin/recommendation-metrics.html` 和 `admin/js/app.js` 现在会展示冷启动请求数、冷启动请求占比、Exploration 命中率和新品召回占比
+
+### Phase E4 修改文件
+
+* `backend/app/services/ranker.py`
+* `backend/app/services/business_rules.py`
+* `backend/app/services/recommendation_pipeline.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/app/services/recommendation_admin.py`
+* `admin/recommendation-metrics.html`
+* `admin/recommendation-debug.html`
+* `admin/js/app.js`
+* `backend/tests/services/test_recommendation_admin_metrics.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `backend/tests/test_recommendation_pipeline.py`
+* `backend/tests/test_ranker.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+### Phase E4 验证
+
+* `./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_recommendation_pipeline.py -q`
+* `./.venv/bin/python -m pytest backend/tests/test_ranker.py -q`
+* `./.venv/bin/python -m ruff check backend/app/services/ranker.py backend/app/services/business_rules.py backend/app/services/recommendation_pipeline.py backend/app/api/v1/admin_recommendations.py backend/app/services/recommendation_admin.py backend/tests/services/test_recommendation_admin_metrics.py backend/tests/api/test_admin_recommendation_debug.py backend/tests/test_recommendation_pipeline.py backend/tests/test_ranker.py`
+* `node --check admin/js/app.js`
+* `docker compose exec -T nginx sh -lc 'wget -S -O /dev/null http://127.0.0.1/admin/recommendation-debug.html'`
+* `docker compose exec -T nginx sh -lc 'wget -S -O /dev/null http://127.0.0.1/admin/recommendation-metrics.html'`
+* `docker compose exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).read().decode())"`
+
+结果：
+
+* 推荐指标聚合测试 `2 passed`。
+* 后台推荐调试 API 测试 `5 passed`。
+* `test_ranker.py` `3 passed`。
+* `test_recommendation_pipeline.py` 因本机 pytest 环境下 Qdrant 不可达，结果为 `2 skipped`，未出现失败。
+* `ruff check` 通过。
+* 后台脚本语法检查通过。
+* `nginx` 容器内访问 `recommendation-debug.html` 与 `recommendation-metrics.html` 均返回 `200`。
+* `api` 容器内健康检查返回 `{"code":0,"message":"ok"...}`，当前推荐运行时为 `qdrant + multi_recall`，未降级到 baseline。
+
+### Phase E4 当前结论
+
+* 当前推荐系统已经不只是“有探索位策略”，而是能在后台明确回答：
+  * 当前用户是否处于冷启动
+  * 某个候选是否是探索候选
+  * 某个候选是否因探索位比例被保留
+  * 某个候选是否在首轮排序里触发过类目去重
+* 这一步把冷启动和探索位从“算法内部逻辑”推进成了“后台可解释、可截图、可运营”的证据层。
+
+### 下一步起点
+
+* 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E5：评估与答辩收口**。
+
 ## 2026-04-13
 
 ### 完成事项

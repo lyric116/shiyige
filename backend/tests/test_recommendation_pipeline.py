@@ -239,6 +239,14 @@ def test_recommendation_pipeline_returns_cold_start_candidates_for_new_user(
             or "new_arrival" in candidate.recall_channels
             for candidate in pipeline_run.candidates
         )
+        assert any(
+            candidate.business_rules.get("exploration_candidate")
+            for candidate in pipeline_run.candidates
+        )
+        assert all(
+            "selection_stage" in candidate.selection_trace
+            for candidate in pipeline_run.candidates
+        )
         assert pipeline_run.candidates[0].score_breakdown
     finally:
         if client.collection_exists(settings.qdrant_collection_products):

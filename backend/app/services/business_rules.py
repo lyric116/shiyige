@@ -27,6 +27,16 @@ class RankedCandidateLike(Protocol):
     final_score: float
     features: RecommendationRankingFeatures
     business_rules: RecommendationBusinessRules
+    selection_trace: dict[str, object]
+
+
+def update_selection_trace(
+    candidate: RankedCandidateLike,
+    **updates: object,
+) -> None:
+    trace = dict(getattr(candidate, "selection_trace", {}) or {})
+    trace.update(updates)
+    candidate.selection_trace = trace
 
 
 def build_business_rules(features: RecommendationRankingFeatures) -> RecommendationBusinessRules:
@@ -96,13 +106,31 @@ def apply_post_ranking_rules(
     for candidate in ordered:
         if len(selected) >= limit:
             break
+        update_selection_trace(
+            candidate,
+            selection_stage="pending",
+            category_dedup_deferred=False,
+            selected_from_overflow_fill=False,
+            exploration_injected=False,
+        )
         if violates_diversity_constraints(
             candidate,
             selected,
             limit=limit,
             max_consecutive_category=max_consecutive_category,
         ):
+            update_selection_trace(
+                candidate,
+                selection_stage="deferred_by_diversity",
+                category_dedup_deferred=True,
+                selection_reason="首轮排序触发类目/风格去重，暂缓该候选。",
+            )
             continue
+        update_selection_trace(
+            candidate,
+            selection_stage="primary",
+            selection_reason="首轮排序直接保留该候选。",
+        )
         selected.append(candidate)
 
     if len(selected) < limit:
@@ -112,6 +140,12 @@ def apply_post_ranking_rules(
                 break
             if candidate.product.id in selected_ids:
                 continue
+            update_selection_trace(
+                candidate,
+                selection_stage="fallback_fill",
+                selected_from_overflow_fill=True,
+                selection_reason="为补足结果数放宽类目去重限制后保留。",
+            )
             selected.append(candidate)
             selected_ids.add(candidate.product.id)
 
@@ -204,6 +238,13 @@ def inject_exploration_candidates(
         selected_ids.discard(selected[replacement_index].product.id)
         selected[replacement_index] = exploration_candidate
         selected_ids.add(exploration_candidate.product.id)
+        update_selection_trace(
+            exploration_candidate,
+            selection_stage="exploration_injected",
+            exploration_injected=True,
+            selection_reason="为满足探索位比例保留该候选。",
+            exploration_target_count=target_count,
+        )
         current_count += 1
 
 

@@ -50,6 +50,8 @@ class PipelineRecommendationCandidate:
     feature_summary: dict[str, object]
     feature_highlights: list[str]
     score_breakdown: dict[str, float]
+    business_rules: dict[str, object]
+    selection_trace: dict[str, object]
     ranker_name: str
     ranker_model_version: str
     ltr_fallback_used: bool
@@ -289,6 +291,8 @@ def build_pipeline_candidate(
         feature_summary=dict(ranked_candidate.feature_summary),
         feature_highlights=list(ranked_candidate.feature_highlights),
         score_breakdown=dict(ranked_candidate.score_breakdown),
+        business_rules=ranked_candidate.business_rules.to_dict(),
+        selection_trace=dict(ranked_candidate.selection_trace),
         ranker_name=ranked_candidate.ranker_name,
         ranker_model_version=ranked_candidate.ranker_model_version,
         ltr_fallback_used=ranked_candidate.ltr_fallback_used,

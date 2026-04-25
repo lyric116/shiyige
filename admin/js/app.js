@@ -614,6 +614,29 @@
     emptyState?.classList.add("d-none");
     content.classList.remove("d-none");
 
+    function buildRecommendationTraceTags(item) {
+      const tags = [];
+      if (item.cold_start_candidate) {
+        tags.push("冷启动召回");
+      }
+      if (item.new_arrival_candidate) {
+        tags.push("新品召回");
+      }
+      if (item.is_exploration) {
+        tags.push("探索候选");
+      }
+      if (item.selection_trace?.exploration_injected) {
+        tags.push("探索位保留");
+      }
+      if (item.selection_trace?.category_dedup_deferred) {
+        tags.push("触发类目去重");
+      }
+      if (item.selection_trace?.selected_from_overflow_fill) {
+        tags.push("放宽去重补位");
+      }
+      return tags;
+    }
+
     metrics.innerHTML = `
       <article class="metric-card">
         <span class="metric-label">向量模型</span>
@@ -638,6 +661,22 @@
         <div class="metric-value" style="font-size: 1.15rem">${escapeHtml(
           snapshot.metrics.active_ranker
         )}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">冷启动</span>
+        <div class="metric-value">${snapshot.metrics.cold_start ? "是" : "否"}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">探索候选数</span>
+        <div class="metric-value">${snapshot.metrics.exploration_candidate_count ?? 0}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">探索位保留数</span>
+        <div class="metric-value">${snapshot.metrics.exploration_injected_count ?? 0}</div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">类目去重触发数</span>
+        <div class="metric-value">${snapshot.metrics.category_dedup_trigger_count ?? 0}</div>
       </article>
     `;
 
@@ -777,12 +816,28 @@
               ${renderTagList(item.recall_channels)}
             </div>
             <div class="debug-card-section">
+              <strong>冷启动 / 探索 / 去重标签</strong>
+              ${renderTagList(buildRecommendationTraceTags(item))}
+            </div>
+            <div class="debug-card-section">
               <strong>特征高亮</strong>
               ${renderTagList(item.feature_highlights)}
             </div>
             <div class="debug-card-section">
               <strong>命中兴趣词</strong>
               ${renderTagList(item.matched_terms)}
+            </div>
+            <div class="debug-card-section">
+              <strong>业务规则</strong>
+              <pre class="admin-code-block">${escapeHtml(
+                JSON.stringify(item.business_rules || {}, null, 2)
+              )}</pre>
+            </div>
+            <div class="debug-card-section">
+              <strong>保留轨迹</strong>
+              <pre class="admin-code-block">${escapeHtml(
+                JSON.stringify(item.selection_trace || {}, null, 2)
+              )}</pre>
             </div>
             <div class="debug-card-section">
               <strong>排序特征</strong>
@@ -1108,6 +1163,36 @@
         <article class="metric-card">
           <span class="metric-label">Fallback 请求数</span>
           <div class="metric-value">${metrics.fallback_request_count ?? 0}</div>
+        </article>
+      `;
+    }
+
+    const explorationGrid = document.getElementById("recommendation-exploration-kpi-grid");
+    if (explorationGrid) {
+      explorationGrid.innerHTML = `
+        <article class="metric-card">
+          <span class="metric-label">冷启动请求数</span>
+          <div class="metric-value">${metrics.cold_start_request_count ?? 0}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">冷启动请求占比</span>
+          <div class="metric-value">${formatPercent(metrics.cold_start_request_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Exploration 命中率</span>
+          <div class="metric-value">${formatPercent(metrics.exploration_hit_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">新品召回占比</span>
+          <div class="metric-value">${formatPercent(metrics.new_arrival_share)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">探索曝光数</span>
+          <div class="metric-value">${metrics.exploration_impression_count ?? 0}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">冷启动曝光数</span>
+          <div class="metric-value">${metrics.cold_start_impression_count ?? 0}</div>
         </article>
       `;
     }

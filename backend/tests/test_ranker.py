@@ -218,6 +218,16 @@ def test_weighted_ranker_prefers_interest_match_and_keeps_exploration_candidate(
         assert ranked[0].product.id == hanfu_candidate.id
         assert any(candidate.business_rules.exploration_candidate for candidate in ranked)
         assert all(candidate.product.id != no_stock_candidate.id for candidate in ranked)
+        assert all("selection_stage" in candidate.selection_trace for candidate in ranked)
+        retained_exploration = next(
+            candidate
+            for candidate in ranked
+            if candidate.product.id == exploration_candidate.id
+        )
+        assert retained_exploration.selection_trace["selection_stage"] in {
+            "primary",
+            "exploration_injected",
+        }
         assert ranked[0].score_breakdown["recall_score"] > 0
         assert ranked[0].score_breakdown["hybrid_retrieval_score"] > 0
         assert ranked[0].score_breakdown["business_constraints_score"] > 0
