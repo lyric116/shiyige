@@ -26,3 +26,8 @@ async def test_related_products_excludes_self_and_returns_reason(
     assert all(item["id"] != product.id for item in body["data"]["items"])
     assert all(item["reason"] for item in body["data"]["items"])
     assert body["data"]["items"][0]["category"]["name"] == "饰品"
+    assert body["data"]["items"][0]["dense_similarity"]["score"] > 0
+    assert "co_view_co_buy" in body["data"]["items"][0]
+    assert "cultural_match" in body["data"]["items"][0]
+    assert "source_breakdown" in body["data"]["items"][0]
+    assert "diversity_result" in body["data"]["items"][0]

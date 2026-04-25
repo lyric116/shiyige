@@ -32,6 +32,10 @@ async def test_search_endpoint_returns_filtered_products(
     assert body["data"]["items"][0]["reason"]
     assert "关键词命中" in body["data"]["items"][0]["explanations"]
     assert body["data"]["items"][0]["search_mode"] == "keyword"
+    assert body["data"]["items"][0]["final_score"] == body["data"]["items"][0]["score"]
+    assert body["data"]["items"][0]["dense_score"] is None
+    assert body["data"]["items"][0]["matched_terms"]
+    assert body["data"]["items"][0]["pipeline_version"] == "keyword_search"
 
 
 @pytest.mark.asyncio

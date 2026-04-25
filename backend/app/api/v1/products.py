@@ -168,20 +168,31 @@ def serialize_recommendation_item(
     debug: bool = False,
     slot: str = "home",
 ) -> dict[str, object]:
+    feature_summary = dict(getattr(result, "feature_summary", {}))
+    ranking_features = dict(getattr(result, "ranking_features", {}))
+    business_summary = feature_summary.get("business", {})
+    is_exploration = bool(
+        business_summary.get("exploration_candidate")
+        if isinstance(business_summary, dict)
+        else ranking_features.get("exploration_candidate", 0.0)
+    )
     item = {
         **serialize_product_list_item(result.product),
         "score": round(result.score, 6),
+        "final_score": round(result.score, 6),
         "reason": result.reason,
+        "recall_channels": list(getattr(result, "recall_channels", [])),
+        "is_exploration": is_exploration,
         **build_recommendation_source_meta(result, slot=slot),
     }
     if debug:
         item.update(
             {
                 "matched_terms": list(getattr(result, "matched_terms", [])),
-                "recall_channels": list(getattr(result, "recall_channels", [])),
                 "feature_highlights": list(getattr(result, "feature_highlights", [])),
-                "ranking_features": dict(getattr(result, "ranking_features", {})),
-                "feature_summary": dict(getattr(result, "feature_summary", {})),
+                "ranking_features": ranking_features,
+                "rank_features": ranking_features,
+                "feature_summary": feature_summary,
                 "score_breakdown": dict(getattr(result, "score_breakdown", {})),
                 "ranker_name": getattr(result, "ranker_name", "baseline"),
                 "ranker_model_version": getattr(result, "ranker_model_version", "baseline"),
@@ -189,6 +200,23 @@ def serialize_recommendation_item(
             }
         )
     return item
+
+
+def serialize_related_product_item(result) -> dict[str, object]:
+    source_breakdown = dict(getattr(result, "source_breakdown", {}))
+    return {
+        **serialize_product_list_item(result.product),
+        "score": round(result.score, 6),
+        "final_score": round(result.score, 6),
+        "reason": result.reason,
+        "matched_terms": list(getattr(result, "matched_terms", [])),
+        "dense_similarity": dict(source_breakdown.get("dense_similarity", {})),
+        "co_view_co_buy": dict(source_breakdown.get("co_view_co_buy", {})),
+        "cultural_match": dict(source_breakdown.get("cultural_match", {})),
+        "source_breakdown": source_breakdown,
+        "diversity_result": dict(getattr(result, "diversity_result", {})),
+        **build_recommendation_source_meta(result, slot="related"),
+    }
 
 
 @router.get("/products/recommendations")
@@ -439,12 +467,7 @@ def get_related_products(
         message="ok",
         data={
             "items": [
-                {
-                    **serialize_product_list_item(result.product),
-                    "score": round(result.score, 6),
-                    "reason": result.reason,
-                    **build_recommendation_source_meta(result, slot="related"),
-                }
+                serialize_related_product_item(result)
                 for result in results
             ],
             "pipeline": build_runtime_marker(),

@@ -90,6 +90,9 @@ async def test_recommendations_return_different_results_for_different_users(
     assert first_body["data"]["items"][0]["id"] != hanfu_id
     assert second_body["data"]["items"][0]["id"] != accessory_id
     assert first_body["data"]["items"][0]["source_label"] in {"个性化", "热门", "新品探索"}
+    assert isinstance(first_body["data"]["items"][0]["recall_channels"], list)
+    assert first_body["data"]["items"][0]["final_score"] == first_body["data"]["items"][0]["score"]
+    assert isinstance(first_body["data"]["items"][0]["is_exploration"], bool)
     assert [item["id"] for item in first_body["data"]["items"][:3]] != [
         item["id"] for item in second_body["data"]["items"][:3]
     ]
@@ -119,3 +122,6 @@ async def test_recommendations_debug_alias_returns_pipeline_metadata(
     assert "ranker_model_version" in body["data"]["pipeline"]
     assert "ltr_fallback_used" in body["data"]["pipeline"]
     assert "source_label" in body["data"]["items"][0]
+    assert "recall_channels" in body["data"]["items"][0]
+    assert "is_exploration" in body["data"]["items"][0]
+    assert "rank_features" in body["data"]["items"][0]

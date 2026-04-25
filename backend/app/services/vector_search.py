@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Sequence
 
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from backend.app.core.config import AppSettings, get_app_settings
 from backend.app.core.logger import get_logger
 from backend.app.models.product import Product, ProductSku
+from backend.app.services.collaborative_filtering import load_item_cooccurrence_map
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import normalize_text_piece
 from backend.app.services.hybrid_search import hybrid_search_products
@@ -32,6 +33,13 @@ class VectorSearchResult:
     product: Product
     score: float
     reason: str
+    matched_terms: list[str] = field(default_factory=list)
+    dense_score: float | None = None
+    sparse_score: float | None = None
+    rerank_score: float | None = None
+    pipeline_version: str = "baseline"
+    source_breakdown: dict[str, object] = field(default_factory=dict)
+    diversity_result: dict[str, object] = field(default_factory=dict)
 
 
 def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
@@ -136,6 +144,81 @@ def build_related_reason(source: Product, candidate: Product, matched_terms: lis
     return "与当前商品向量相似"
 
 
+def build_related_source_breakdown(
+    *,
+    matched_terms: list[str],
+    dense_similarity: float,
+    cooccurrence_score: float,
+    cultural_match_score: float,
+) -> dict[str, object]:
+    return {
+        "dense_similarity": {
+            "score": round(dense_similarity, 6),
+            "source": "dense vector similarity",
+        },
+        "co_view_co_buy": {
+            "score": round(cooccurrence_score, 6),
+            "source": "item_cooccurrence",
+            "matched": cooccurrence_score > 0,
+        },
+        "cultural_match": {
+            "score": round(cultural_match_score, 6),
+            "matched_terms": list(matched_terms),
+        },
+    }
+
+
+def select_diverse_related_results(
+    results: list[VectorSearchResult],
+    *,
+    limit: int,
+    max_per_category: int = 2,
+) -> list[VectorSearchResult]:
+    selected: list[VectorSearchResult] = []
+    overflow: list[VectorSearchResult] = []
+    category_counts: dict[int | None, int] = {}
+
+    for candidate in results:
+        category_id = candidate.product.category_id
+        current_count = category_counts.get(category_id, 0)
+        if category_id is not None and current_count >= max_per_category:
+            candidate.diversity_result = {
+                "applied": True,
+                "fallback_used": False,
+                "category_count_before": current_count,
+                "note": "首轮多样性筛选暂缓同类目候选",
+            }
+            overflow.append(candidate)
+            continue
+
+        candidate.diversity_result = {
+            "applied": current_count > 0,
+            "fallback_used": False,
+            "category_count_before": current_count,
+            "note": "通过多样性筛选保留",
+        }
+        selected.append(candidate)
+        category_counts[category_id] = current_count + 1
+        if len(selected) >= limit:
+            return selected
+
+    for candidate in overflow:
+        if len(selected) >= limit:
+            break
+        category_id = candidate.product.category_id
+        current_count = category_counts.get(category_id, 0)
+        candidate.diversity_result = {
+            "applied": True,
+            "fallback_used": True,
+            "category_count_before": current_count,
+            "note": "多样性筛选后用于补足结果数",
+        }
+        selected.append(candidate)
+        category_counts[category_id] = current_count + 1
+
+    return selected[:limit]
+
+
 def baseline_semantic_search_products(
     db: Session,
     *,
@@ -184,6 +267,9 @@ def baseline_semantic_search_products(
                 product=product,
                 score=final_score,
                 reason=build_semantic_reason(product, normalized_query, matched_terms),
+                matched_terms=matched_terms,
+                dense_score=similarity_score,
+                pipeline_version="baseline_semantic",
             )
         )
 
@@ -251,6 +337,11 @@ def semantic_search_products(
                         product=result.product,
                         score=result.score,
                         reason=result.reason,
+                        matched_terms=list(result.matched_terms),
+                        dense_score=result.dense_score,
+                        sparse_score=result.sparse_score,
+                        rerank_score=result.rerank_score,
+                        pipeline_version=result.pipeline_version,
                     )
                     for result in hybrid_results
                 ]
@@ -301,6 +392,11 @@ def find_related_products(
     ):
         return []
 
+    cooccurrence_scores = {
+        int(item["product_id"]): float(item["score"])
+        for item in load_item_cooccurrence_map(db).get(str(product_id), [])
+    }
+
     results: list[VectorSearchResult] = []
     for candidate in products:
         if candidate.id == source_product.id:
@@ -316,22 +412,34 @@ def find_related_products(
         )
         similarity_score = (similarity + 1) / 2
         matched_terms = collect_related_matches(source_product, candidate)
-        bonus = 0.0
+        cultural_match_score = 0.0
         if source_product.category_id == candidate.category_id:
-            bonus += 0.25
+            cultural_match_score += 0.25
         if source_product.dynasty_style and source_product.dynasty_style == candidate.dynasty_style:
-            bonus += 0.12
+            cultural_match_score += 0.12
         if source_product.scene_tag and source_product.scene_tag == candidate.scene_tag:
-            bonus += 0.12
+            cultural_match_score += 0.12
         if source_product.craft_type and source_product.craft_type == candidate.craft_type:
-            bonus += 0.1
-        bonus += min(len(set(matched_terms)) * 0.08, 0.24)
+            cultural_match_score += 0.1
+        cultural_match_score += min(len(set(matched_terms)) * 0.08, 0.24)
+        cooccurrence_score = cooccurrence_scores.get(candidate.id, 0.0)
+        cooccurrence_boost = min(cooccurrence_score * 0.05, 0.2)
+        final_score = similarity_score + cultural_match_score + cooccurrence_boost
 
         results.append(
             VectorSearchResult(
                 product=candidate,
-                score=similarity_score + bonus,
+                score=final_score,
                 reason=build_related_reason(source_product, candidate, matched_terms),
+                matched_terms=matched_terms,
+                dense_score=similarity_score,
+                pipeline_version="baseline_related",
+                source_breakdown=build_related_source_breakdown(
+                    matched_terms=matched_terms,
+                    dense_similarity=similarity_score,
+                    cooccurrence_score=cooccurrence_score,
+                    cultural_match_score=cultural_match_score,
+                ),
             )
         )
 
@@ -342,4 +450,4 @@ def find_related_products(
         ),
         reverse=True,
     )
-    return results[:limit]
+    return select_diverse_related_results(results, limit=limit)

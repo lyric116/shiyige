@@ -2407,3 +2407,48 @@ Step 14:
 * 第 12 步最终验收里，本地默认 `backend/dev.db` 暴露出 schema 落后于当前 Alembic 的问题，所以本轮把重建脚本切到了 Compose PostgreSQL：`DATABASE_URL=postgresql+psycopg://shiyige:shiyige@127.0.0.1:5432/shiyige`。后续如果继续用仓库根目录脚本做正式验收，优先沿用 Compose PostgreSQL，而不要假设本地 SQLite 一定已迁移到最新 schema。
 * `docs/performance_benchmark.md` 里的所有结果都明确基于 `local_hash` provider，用来隔离检索和排序开销；如果后续要展示真实 embedding 模型推理耗时，需要额外单独跑一版保留 `fastembed_*` provider 的报告。
 * 当前 10k 结果已经证明 `related_products` 是最急需优化的旧边界；如果后续继续推进 100000 商品规模演示，应优先把该接口迁到 ANN-only 路径，并补用户画像/候选缓存层。
+
+### 同日继续推进记录（四十九）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 13：对齐最终接口规划
+
+新增与修改：
+
+* `backend/app/services/hybrid_search.py`
+* `backend/app/services/vector_search.py`
+* `backend/app/api/v1/search.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/admin_vector_index.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/app/api/v1/router.py`
+* `backend/tests/api/test_search_keyword.py`
+* `backend/tests/api/test_search_semantic.py`
+* `backend/tests/api/test_recommendations.py`
+* `backend/tests/api/test_related_products.py`
+* `backend/tests/api/test_admin_vector_index.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/api/v1/search.py backend/app/api/v1/products.py backend/app/api/v1/admin_vector_index.py backend/app/api/v1/admin_recommendations.py backend/app/api/v1/router.py backend/app/services/hybrid_search.py backend/app/services/vector_search.py backend/tests/api/test_search_keyword.py backend/tests/api/test_search_semantic.py backend/tests/api/test_recommendations.py backend/tests/api/test_related_products.py backend/tests/api/test_admin_vector_index.py backend/tests/api/test_admin_recommendation_debug.py`
+* `./.venv/bin/python -m pytest backend/tests/api/test_search_keyword.py backend/tests/api/test_search_semantic.py backend/tests/api/test_recommendations.py backend/tests/api/test_related_products.py backend/tests/api/test_admin_vector_index.py backend/tests/api/test_admin_recommendation_debug.py -q`
+
+结果：
+
+* 已在 `backend/app/api/v1/search.py` 新增 `GET /api/v1/products/search`，把第 13.1 节要求的 `final_score`、`dense_score`、`sparse_score`、`rerank_score`、`matched_terms`、`reason` 和 `pipeline_version` 正式暴露为公开接口字段，同时保留原有 `/api/v1/search` 与 `/api/v1/search/semantic` 兼容入口。
+* 已把 `backend/app/services/hybrid_search.py` 与 `backend/app/services/vector_search.py` 的中间打分链路补成显式元数据透传，Qdrant hybrid 路径现在不会在 API 层丢掉 dense/sparse/ColBERT 分数；baseline 语义搜索也会返回 `matched_terms`、`dense_score` 和独立 `pipeline_version`。
+* 已把 `backend/app/api/v1/products.py` 的推荐接口扩成第 13.2 节要求的形态：首页推荐现在默认返回 `recall_channels`、`final_score`、`reason` 和 `is_exploration`；当 `debug=true` 时，还会同时返回 `rank_features` 与现有 `ranking_features`，兼顾新协议和旧前端兼容性。
+* 已把相似商品接口补成第 13.3 节要求的来源拆解结构：`GET /api/v1/products/{product_id}/related` 现在会返回 `dense_similarity`、`co_view_co_buy`、`cultural_match`、完整 `source_breakdown` 和 `diversity_result`，而不是只给一个总分和一句理由。
+* 已在 `backend/app/api/v1/admin_vector_index.py` 增加 `GET /api/v1/admin/vector-index/status`、`POST /api/v1/admin/vector-index/rebuild` 和 `POST /api/v1/admin/vector-index/products/{product_id}/reindex`；在 `backend/app/api/v1/admin_recommendations.py` 增加 `GET /api/v1/admin/recommendation/debug` 与 `GET /api/v1/admin/recommendation/metrics`，从而与第 13.4 节建议接口保持一致，同时保留旧的 plural 路径。
+* 在联调中暴露出一个真实路由问题：`/api/v1/products/search` 最初被 `/api/v1/products/{product_id}` 抢先匹配并返回 `422`。已通过调整 `backend/app/api/v1/router.py` 的装载顺序修复，保证固定路径优先于参数路径注册。
+* 本轮专项回归结果为 `14 passed`，覆盖了搜索新别名、推荐字段扩展、相似商品来源拆解、后台索引别名接口和后台推荐 metrics/debug 别名接口，说明第 13 节的公开协议已经稳定可用。
+
+交接提醒：
+
+* `GET /api/v1/products/search` 是新增的最终展示型搜索接口，后续如果再改搜索协议，优先保持它的字段口径稳定，不要只改旧的 `/api/v1/search` 或 `/api/v1/search/semantic`。
+* 当前 `/api/v1/products/{product_id}/related` 的来源拆解已经齐全，但底层仍以 baseline 相似度计算为主，性能优化应留到后续第 15 节单独推进，不要在未补测试前直接改成另一套不可解释返回。
+* 新增的 admin singular 别名路径已经进入测试覆盖；后续如果重构后台 router，必须同时保住 plural 和 singular 两套入口，否则会把文档接口和现有后台页面联调一起打断。

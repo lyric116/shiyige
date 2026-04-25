@@ -77,7 +77,7 @@ def rank_product(product: Product, keyword: str) -> tuple[int, int]:
     return (5, product.id)
 
 
-def build_keyword_reason(product: Product, keyword: str) -> str:
+def collect_keyword_match_details(product: Product, keyword: str) -> tuple[list[str], bool, bool]:
     normalized_keyword = keyword.lower()
     matched_terms: list[str] = []
     tag_match = False
@@ -96,6 +96,12 @@ def build_keyword_reason(product: Product, keyword: str) -> str:
             tag_match = True
     if product.culture_summary and normalized_keyword in product.culture_summary.lower():
         culture_match = True
+
+    return matched_terms, tag_match, culture_match
+
+
+def build_keyword_reason(product: Product, keyword: str) -> str:
+    matched_terms, tag_match, culture_match = collect_keyword_match_details(product, keyword)
 
     reason_parts: list[str] = []
     if matched_terms:
@@ -122,6 +128,137 @@ def build_search_explanations(*, mode: str, reason: str) -> list[str]:
         if item not in deduped:
             deduped.append(item)
     return deduped
+
+
+def round_score(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), 6)
+
+
+def serialize_semantic_search_item(result) -> dict[str, object]:
+    pipeline_version = str(getattr(result, "pipeline_version", "baseline_semantic"))
+    return {
+        **serialize_product_list_item(result.product),
+        "score": round(result.score, 6),
+        "final_score": round(result.score, 6),
+        "dense_score": round_score(getattr(result, "dense_score", None)),
+        "sparse_score": round_score(getattr(result, "sparse_score", None)),
+        "rerank_score": round_score(getattr(result, "rerank_score", None)),
+        "matched_terms": list(getattr(result, "matched_terms", [])),
+        "reason": result.reason,
+        "pipeline_version": pipeline_version,
+        "search_mode": "semantic",
+        "explanations": build_search_explanations(mode="semantic", reason=result.reason),
+    }
+
+
+def build_semantic_search_response(
+    *,
+    request: Request,
+    db: Session,
+    query: str,
+    limit: int,
+    category_id: int | None,
+    min_price: Decimal | None,
+    max_price: Decimal | None,
+    dynasty_style: str | None,
+    craft_type: str | None,
+    scene_tag: str | None,
+    festival_tag: str | None,
+    stock_only: bool,
+    debug: bool = False,
+):
+    timer = RequestTimer.start()
+    pipeline = build_runtime_marker()
+    filters = build_search_filters(
+        category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
+        dynasty_style=dynasty_style,
+        craft_type=craft_type,
+        scene_tag=scene_tag,
+        festival_tag=festival_tag,
+        stock_only=stock_only,
+    )
+    if not query:
+        return build_response(
+            request=request,
+            code=0,
+            message="ok",
+            data={"query": "", "items": [], "total": 0, "pipeline": pipeline},
+            status_code=200,
+        )
+
+    results = semantic_search_products(
+        db,
+        query=query,
+        limit=limit,
+        category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
+        dynasty_style=dynasty_style,
+        craft_type=craft_type,
+        scene_tag=scene_tag,
+        festival_tag=festival_tag,
+        stock_only=stock_only,
+    )
+
+    current_user = get_optional_user_from_request(request, db)
+    log_behavior(
+        db,
+        user=current_user,
+        behavior_type=BEHAVIOR_SEARCH,
+        target_type="semantic_search",
+        ext_json={
+            "query": query,
+            "mode": "semantic",
+            "result_count": len(results),
+            "pipeline": pipeline["active_search_backend"],
+            "filters": serialize_search_filters(filters),
+            "debug": debug,
+        },
+    )
+    serialized_items = [serialize_semantic_search_item(result) for result in results]
+    log_search_request(
+        db,
+        request=request,
+        user_id=current_user.id if current_user is not None else None,
+        query=query,
+        mode="semantic",
+        pipeline_version=str(pipeline["active_search_backend"]),
+        total_results=len(results),
+        latency_ms=timer.elapsed_ms(),
+        filters_json=serialize_search_filters(filters),
+        items=[
+            {
+                "product_id": item["id"],
+                "score": item["score"],
+                "reason": item["reason"],
+            }
+            for item in serialized_items
+        ],
+    )
+    if current_user is not None:
+        invalidate_recommendation_cache_for_user(current_user.id)
+    db.commit()
+
+    return build_response(
+        request=request,
+        code=0,
+        message="ok",
+        data={
+            "query": query,
+            "items": serialized_items,
+            "total": len(results),
+            "pipeline": {
+                **pipeline,
+                "pipeline_version": pipeline["active_search_backend"],
+                "debug": debug,
+            },
+        },
+        status_code=200,
+    )
 
 
 def filter_and_sort_products(
@@ -266,12 +403,20 @@ def search_products(
     items = filtered_products[start:end]
     serialized_items = []
     for index, product in enumerate(items, start=1):
+        matched_terms, _tag_match, _culture_match = collect_keyword_match_details(product, keyword)
         reason = build_keyword_reason(product, keyword)
+        score = round(1.0 / float(index), 6)
         serialized_items.append(
             {
                 **serialize_product_list_item(product),
-                "score": round(1.0 / float(index), 6),
+                "score": score,
+                "final_score": score,
+                "dense_score": None,
+                "sparse_score": None,
+                "rerank_score": None,
+                "matched_terms": matched_terms,
                 "reason": reason,
+                "pipeline_version": "keyword_search",
                 "search_mode": "keyword",
                 "explanations": build_search_explanations(mode="keyword", reason=reason),
             }
@@ -333,37 +478,49 @@ def search_products(
     )
 
 
+@router.get("/products/search")
+def search_products_v2(
+    request: Request,
+    db: Session = Depends(get_db),
+    q: str = Query(min_length=1),
+    category_id: int | None = None,
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
+    dynasty_style: str | None = Query(default=None, max_length=100),
+    craft_type: str | None = Query(default=None, max_length=100),
+    scene_tag: str | None = Query(default=None, max_length=100),
+    festival_tag: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=10, ge=1, le=20),
+    stock_only: bool = Query(default=True),
+    debug: bool = Query(default=False),
+):
+    return build_semantic_search_response(
+        request=request,
+        db=db,
+        query=normalize_keyword(q),
+        limit=limit,
+        category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
+        dynasty_style=dynasty_style,
+        craft_type=craft_type,
+        scene_tag=scene_tag,
+        festival_tag=festival_tag,
+        stock_only=stock_only,
+        debug=debug,
+    )
+
+
 @router.post("/search/semantic")
 def semantic_search(
     payload: SemanticSearchRequest,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    query = normalize_keyword(payload.query)
-    timer = RequestTimer.start()
-    pipeline = build_runtime_marker()
-    filters = build_search_filters(
-        category_id=payload.category_id,
-        min_price=payload.min_price,
-        max_price=payload.max_price,
-        dynasty_style=payload.dynasty_style,
-        craft_type=payload.craft_type,
-        scene_tag=payload.scene_tag,
-        festival_tag=payload.festival_tag,
-        stock_only=payload.stock_only,
-    )
-    if not query:
-        return build_response(
-            request=request,
-            code=0,
-            message="ok",
-            data={"query": "", "items": [], "total": 0, "pipeline": pipeline},
-            status_code=200,
-        )
-
-    results = semantic_search_products(
-        db,
-        query=query,
+    return build_semantic_search_response(
+        request=request,
+        db=db,
+        query=normalize_keyword(payload.query),
         limit=payload.limit,
         category_id=payload.category_id,
         min_price=payload.min_price,
@@ -373,64 +530,4 @@ def semantic_search(
         scene_tag=payload.scene_tag,
         festival_tag=payload.festival_tag,
         stock_only=payload.stock_only,
-    )
-
-    current_user = get_optional_user_from_request(request, db)
-    log_behavior(
-        db,
-        user=current_user,
-        behavior_type=BEHAVIOR_SEARCH,
-        target_type="semantic_search",
-        ext_json={
-            "query": query,
-            "mode": "semantic",
-            "result_count": len(results),
-            "pipeline": pipeline["active_search_backend"],
-            "filters": serialize_search_filters(filters),
-        },
-    )
-    serialized_items = [
-        {
-            **serialize_product_list_item(result.product),
-            "score": round(result.score, 6),
-            "reason": result.reason,
-            "search_mode": "semantic",
-            "explanations": build_search_explanations(mode="semantic", reason=result.reason),
-        }
-        for result in results
-    ]
-    log_search_request(
-        db,
-        request=request,
-        user_id=current_user.id if current_user is not None else None,
-        query=query,
-        mode="semantic",
-        pipeline_version=str(pipeline["active_search_backend"]),
-        total_results=len(results),
-        latency_ms=timer.elapsed_ms(),
-        filters_json=serialize_search_filters(filters),
-        items=[
-            {
-                "product_id": item["id"],
-                "score": item["score"],
-                "reason": item["reason"],
-            }
-            for item in serialized_items
-        ],
-    )
-    if current_user is not None:
-        invalidate_recommendation_cache_for_user(current_user.id)
-    db.commit()
-
-    return build_response(
-        request=request,
-        code=0,
-        message="ok",
-        data={
-            "query": query,
-            "items": serialized_items,
-            "total": len(results),
-            "pipeline": pipeline,
-        },
-        status_code=200,
     )

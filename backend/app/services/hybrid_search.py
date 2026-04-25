@@ -33,6 +33,11 @@ class HybridSearchHit:
     product: Product
     score: float
     reason: str
+    matched_terms: list[str] = field(default_factory=list)
+    dense_score: float | None = None
+    sparse_score: float | None = None
+    rerank_score: float | None = None
+    pipeline_version: str = "qdrant_hybrid"
 
 
 @dataclass(slots=True)
@@ -137,6 +142,11 @@ def hybrid_search_products(
                         has_sparse_match=candidate.has_sparse_match,
                         colbert_promoted=final_rank < candidate.fusion_rank,
                     ),
+                    matched_terms=list(candidate.matched_terms),
+                    dense_score=candidate.dense_score,
+                    sparse_score=candidate.sparse_score,
+                    rerank_score=candidate.colbert_score,
+                    pipeline_version="qdrant_hybrid",
                 )
             )
             if len(results) >= limit:

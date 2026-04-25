@@ -1239,3 +1239,33 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   本轮暴露出的 bug 说明：即使缓存 TTL 只有几秒，只要 collection 生命周期变化比 TTL 更快，runtime marker 就会出现“索引已经写入，但系统还以为没准备好”的错误判断。也就是说，Qdrant 状态缓存不是单纯的性能优化点，而是带有一致性语义的基础设施。
 * 最终验收脚本依赖的数据库必须与当前迁移链保持同构。
   `backend/dev.db` 在本轮暴露出 schema 落后于 Alembic 的事实，所以最终验收改为显式指向 Compose PostgreSQL；这说明当前项目的“正式验收环境”已经不再是临时 SQLite，而是容器化 PostgreSQL + Qdrant 组合。
+
+### 9.48 Phase 13 现在已经形成“协议对齐层 + 字段透传层 + 路由兼容层”的最终接口形态
+
+第 72 次同日推进把推荐系统后半段文档里的接口规划真正落到了可调用 API 上：
+
+* `backend/app/services/hybrid_search.py`：搜索分数透传层。
+  当前 `HybridSearchHit` 已不再只保留一个最终分，而是显式携带 `matched_terms`、`dense_score`、`sparse_score`、`rerank_score` 和 `pipeline_version`。这让 Qdrant hybrid 路径的 dense/sparse/ColBERT 中间证据第一次能够完整穿透到公开接口，而不是在服务层被折叠成一句 `reason`。
+* `backend/app/services/vector_search.py`：搜索与相似商品的兼容协议层。
+  当前 `VectorSearchResult` 已扩成统一元数据容器，baseline 语义搜索会补齐 `matched_terms`、`dense_score` 和 `pipeline_version`，相似商品路径还会额外携带 `source_breakdown` 与 `diversity_result`。这意味着 baseline 与 Qdrant 路径终于开始共享同一套公开协议，而不是“功能上能降级、字段上却完全两套”。
+* `backend/app/api/v1/search.py`：最终搜索接口层。
+  当前新增 `GET /api/v1/products/search`，参数和字段形态对齐了计划文档第 13.1 节，同时保留原有 `/api/v1/search` 与 `/api/v1/search/semantic`。关键词搜索也已补齐 `final_score`、`matched_terms` 和 `pipeline_version`，所以旧页面和新协议现在都能共存。
+* `backend/app/api/v1/products.py`：推荐与相似商品最终协议层。
+  当前首页推荐默认返回 `recall_channels`、`final_score`、`reason` 和 `is_exploration`，debug 模式下还同时暴露 `rank_features` 与旧字段 `ranking_features`；相似商品接口则把 `dense_similarity`、`co_view_co_buy`、`cultural_match`、完整 `source_breakdown` 与 `diversity_result` 一并返回，满足第 13.2 和第 13.3 节的公开结构要求。
+* `backend/app/api/v1/admin_vector_index.py`：索引运维兼容入口层。
+  当前在原有 `/products/status`、`/products/sync` 基础上新增了 `/status`、`/rebuild` 和 `/products/{product_id}/reindex`，使后台索引接口既保留旧页面能用的入口，也拥有文档要求的最终命名。
+* `backend/app/api/v1/admin_recommendations.py`：后台推荐兼容入口层。
+  当前新增 `alias_router`，把 `/api/v1/admin/recommendations/...` 与 `/api/v1/admin/recommendation/...` 双轨并存，同时补齐 `GET /metrics`。这样后台页面、测试和最终答辩文档不需要在 singular/plural 命名之间二选一。
+* `backend/app/api/v1/router.py`：路由优先级守护层。
+  当前把 `search_router` 的注册顺序提前到 `products_router` 之前，明确避免 `/api/v1/products/search` 被 `/api/v1/products/{product_id}` 抢先匹配。Phase 13 之后，固定路径与参数路径的注册顺序已成为显式约束，而不再是“碰巧能用”的隐含行为。
+* `backend/tests/api/test_search_semantic.py`、`backend/tests/api/test_recommendations.py`、`backend/tests/api/test_related_products.py`、`backend/tests/api/test_admin_vector_index.py`、`backend/tests/api/test_admin_recommendation_debug.py`：Phase 13 接口契约测试层。
+  当前这些测试已经把新搜索别名、推荐新增字段、相似商品来源拆解和后台 singular/plural 别名路径都锁定下来，后续如果有人继续改接口命名或返回字段，会先在这里暴露出来。
+
+这里有三个新的关键架构洞察：
+
+* “最终接口规划”真正困难的部分不是再加几个字段，而是让中间证据沿链路不丢失。
+  现在 `hybrid_search.py -> vector_search.py -> search.py` 已经形成了完整透传链，dense/sparse/ColBERT 的中间分数不再在服务边界被吞掉；这比单纯在接口层临时拼几个空字段更接近真实可解释系统。
+* 在兼容旧前端和引入新协议时，最稳的策略不是替换，而是别名并存。
+  当前搜索、推荐后台和索引后台都采用“保留旧入口 + 增加新入口 + 统一测试覆盖”的方式推进，因此可以继续往前实现第 14 和第 15 节，而不需要先做一轮高风险的 API 迁移。
+* FastAPI 里固定路径和参数路径的注册顺序本身就是架构约束。
+  本轮 `/api/v1/products/search` 被 `/api/v1/products/{product_id}` 抢匹配并返回 `422`，说明“路径设计正确”并不等于“运行时一定命中正确处理器”；当接口开始向最终命名收拢时，router 装载顺序必须被视为正式设计的一部分。

@@ -16,6 +16,7 @@ from backend.app.tasks.qdrant_index_tasks import (
 router = APIRouter(prefix="/admin/vector-index", tags=["admin-vector-index"])
 
 
+@router.get("/status")
 @router.get("/products/status")
 def get_vector_index_status(
     request: Request,
@@ -37,6 +38,39 @@ def get_vector_index_status(
         code=0,
         message="ok",
         data={"status": status_payload},
+        status_code=200,
+    )
+
+
+@router.post("/rebuild")
+def rebuild_vector_index(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    result = sync_products_to_qdrant(
+        db,
+        mode="full",
+        product_ids=None,
+    )
+
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_vector_index_rebuild",
+        target_type="product_embedding",
+        detail_json={
+            "mode": "full",
+            "result": result,
+        },
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="vector index rebuild completed",
+        data={"result": result},
         status_code=200,
     )
 
@@ -76,6 +110,42 @@ def sync_vector_index(
         request=request,
         code=0,
         message="vector index sync completed",
+        data={"result": result},
+        status_code=200,
+    )
+
+
+@router.post("/products/{product_id}/reindex")
+def reindex_single_product(
+    product_id: int,
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    result = sync_products_to_qdrant(
+        db,
+        mode="incremental",
+        product_ids=[product_id],
+    )
+
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_vector_index_reindex_product",
+        target_type="product_embedding",
+        target_id=product_id,
+        detail_json={
+            "mode": "incremental",
+            "product_ids": [product_id],
+            "result": result,
+        },
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="product reindex completed",
         data={"result": result},
         status_code=200,
     )

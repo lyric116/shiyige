@@ -10,7 +10,10 @@ from backend.app.models.product import Product
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.models.user import User
 from backend.app.services.embedding import get_embedding_provider
-from backend.app.services.recommendation_admin import build_experiment_payload
+from backend.app.services.recommendation_admin import (
+    build_experiment_payload,
+    build_recommendation_dashboard_payload,
+)
 from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
 from backend.app.services.recommendations import (
     collect_product_ids_from_log,
@@ -19,6 +22,7 @@ from backend.app.services.recommendations import (
 )
 
 router = APIRouter(prefix="/admin/recommendations", tags=["admin-recommendations"])
+alias_router = APIRouter(prefix="/admin/recommendation", tags=["admin-recommendations"])
 
 
 def round_vector_preview(values: list[float] | None, *, size: int = 8) -> list[float]:
@@ -143,6 +147,7 @@ def serialize_candidates(candidates, *, limit: int) -> list[dict[str, object]]:
     return items
 
 
+@alias_router.get("/debug")
 @router.get("/debug")
 def debug_recommendations(
     request: Request,
@@ -241,6 +246,39 @@ def debug_recommendations(
             },
             "recent_behaviors": serialize_behavior_logs(logs, products_by_id),
             "recommendations": serialize_candidates(candidates, limit=limit),
+        },
+        status_code=200,
+    )
+
+
+@alias_router.get("/metrics")
+@router.get("/metrics")
+def get_recommendation_metrics(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    payload = build_recommendation_dashboard_payload(db)
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_recommendation_metrics",
+        target_type="recommendation_metrics",
+        detail_json={
+            "request_count": payload["recommendation_metrics"]["request_count"],
+            "active_recommendation_backend": payload["runtime"]["active_recommendation_backend"],
+        },
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="ok",
+        data={
+            "runtime": payload["runtime"],
+            "metrics": payload["recommendation_metrics"],
+            "search_metrics": payload["search_metrics"],
         },
         status_code=200,
     )
