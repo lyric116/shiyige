@@ -11,6 +11,8 @@ from backend.app.core.redis import get_redis_client
 
 PRODUCT_DETAIL_CACHE_TTL = 120
 RECOMMENDATIONS_CACHE_TTL = 90
+PRECOMPUTED_RECOMMENDATION_CACHE_TTL = 900
+PRECOMPUTED_RECOMMENDATION_STATUS_TTL = 60 * 60 * 24 * 30
 RELATED_PRODUCTS_CACHE_TTL = 120
 SEMANTIC_SEARCH_CACHE_TTL = 60
 SEARCH_SUGGESTIONS_CACHE_TTL = 180
@@ -80,6 +82,20 @@ def build_recommendation_cache_key(
     return build_cache_key("products", "recommendations", user_id, slot, limit)
 
 
+def build_precomputed_recommendation_cache_key(
+    *,
+    user_id: int,
+    slot: str,
+    limit: int,
+    backend: str,
+) -> str:
+    return build_cache_key("recommendation", "precomputed", user_id, slot, backend, limit)
+
+
+def build_precomputed_recommendation_status_key() -> str:
+    return build_cache_key("recommendation", "precomputed", "status")
+
+
 def build_user_profile_cache_key(user_id: int) -> str:
     return build_cache_key("recommendation", "profile", user_id)
 
@@ -98,6 +114,14 @@ def invalidate_recommendation_cache_for_user(user_id: int) -> None:
             for backend in RECOMMENDATION_CACHE_BACKENDS:
                 delete_cache_key(
                     build_recommendation_cache_key(
+                        user_id=user_id,
+                        slot=slot,
+                        limit=limit,
+                        backend=backend,
+                    )
+                )
+                delete_cache_key(
+                    build_precomputed_recommendation_cache_key(
                         user_id=user_id,
                         slot=slot,
                         limit=limit,

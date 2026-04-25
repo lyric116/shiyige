@@ -73,6 +73,26 @@
         </section>
 
         <section class="admin-panel">
+          <div class="admin-table-panel-header">
+            <div>
+              <h2>Redis 预计算推荐</h2>
+              <p>针对当前推荐主链路延迟偏高的问题，优先预热首页与购物车推荐快照。</p>
+            </div>
+            <button
+              id="recommendation-precompute-warm-button"
+              class="admin-button"
+              type="button"
+            >
+              预热首页/购物车推荐
+            </button>
+          </div>
+          <p id="recommendation-precompute-summary" class="page-copy">
+            正在加载预计算推荐状态...
+          </p>
+          <div id="recommendation-precompute-grid" class="admin-metadata-grid"></div>
+        </section>
+
+        <section class="admin-panel">
           <h2>评估与答辩材料</h2>
           <p id="recommendation-config-artifact-summary" class="page-copy">
             正在加载推荐升级相关的评估报告、压测报告和答辩材料...

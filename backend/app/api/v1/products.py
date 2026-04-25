@@ -24,25 +24,23 @@ from backend.app.services.cache import (
     invalidate_recommendation_cache_for_user,
     set_cached_json,
 )
+from backend.app.services.precomputed_recommendations import (
+    get_precomputed_recommendation_snapshot,
+    record_recommendation_precompute_served,
+)
+from backend.app.services.recommendation_delivery import (
+    build_recommendation_source_meta,
+    resolve_recommendation_payload,
+)
 from backend.app.services.recommendation_logging import (
     RequestTimer,
     log_recommendation_action,
     log_recommendation_request,
 )
-from backend.app.services.recommendation_pipeline import run_recommendation_pipeline
-from backend.app.services.recommendations import recommend_products_for_user
 from backend.app.services.vector_search import find_related_products
-from backend.app.services.vector_store import build_runtime_marker, probe_vector_store_runtime
+from backend.app.services.vector_store import build_runtime_marker
 
 router = APIRouter(tags=["catalog"])
-
-RECOMMENDATION_SOURCE_LABELS = {
-    "personalized": "个性化",
-    "similar": "相似商品",
-    "hot": "热门",
-    "new": "新品探索",
-    "seasonal": "节令主题",
-}
 
 
 def serialize_category(category: Category) -> dict[str, object]:
@@ -111,37 +109,6 @@ def serialize_product_detail(product: Product) -> dict[str, object]:
             for sku in product.skus
         ],
     }
-
-
-def build_recommendation_source_meta(result, *, slot: str) -> dict[str, str]:
-    recall_channels = list(getattr(result, "recall_channels", []))
-    reason = str(getattr(result, "reason", ""))
-
-    if slot in {"related", "cart", "order_complete"} or "related_products" in recall_channels:
-        source_type = "similar"
-    elif "collaborative_user" in recall_channels or "item_cooccurrence" in recall_channels:
-        source_type = "personalized"
-    elif "content_profile" in recall_channels or "sparse_interest" in recall_channels:
-        source_type = "personalized"
-    elif "trending" in recall_channels and ("节" in reason or "节令" in reason):
-        source_type = "seasonal"
-    elif "trending" in recall_channels:
-        source_type = "hot"
-    elif "new_arrival" in recall_channels or "cold_start" in recall_channels:
-        source_type = "new"
-    elif "节" in reason or "节令" in reason:
-        source_type = "seasonal"
-    elif slot == "home":
-        source_type = "personalized"
-    else:
-        source_type = "similar"
-
-    return {
-        "source_type": source_type,
-        "source_label": RECOMMENDATION_SOURCE_LABELS[source_type],
-    }
-
-
 @router.get("/categories")
 def list_categories(
     request: Request,
@@ -162,46 +129,6 @@ def list_categories(
         },
         status_code=200,
     )
-
-
-def serialize_recommendation_item(
-    result,
-    *,
-    debug: bool = False,
-    slot: str = "home",
-) -> dict[str, object]:
-    feature_summary = dict(getattr(result, "feature_summary", {}))
-    ranking_features = dict(getattr(result, "ranking_features", {}))
-    business_summary = feature_summary.get("business", {})
-    is_exploration = bool(
-        business_summary.get("exploration_candidate")
-        if isinstance(business_summary, dict)
-        else ranking_features.get("exploration_candidate", 0.0)
-    )
-    item = {
-        **serialize_product_list_item(result.product),
-        "score": round(result.score, 6),
-        "final_score": round(result.score, 6),
-        "reason": result.reason,
-        "recall_channels": list(getattr(result, "recall_channels", [])),
-        "is_exploration": is_exploration,
-        **build_recommendation_source_meta(result, slot=slot),
-    }
-    if debug:
-        item.update(
-            {
-                "matched_terms": list(getattr(result, "matched_terms", [])),
-                "feature_highlights": list(getattr(result, "feature_highlights", [])),
-                "ranking_features": ranking_features,
-                "rank_features": ranking_features,
-                "feature_summary": feature_summary,
-                "score_breakdown": dict(getattr(result, "score_breakdown", {})),
-                "ranker_name": getattr(result, "ranker_name", "baseline"),
-                "ranker_model_version": getattr(result, "ranker_model_version", "baseline"),
-                "ltr_fallback_used": bool(getattr(result, "ltr_fallback_used", False)),
-            }
-        )
-    return item
 
 
 def serialize_related_product_item(result) -> dict[str, object]:
@@ -232,11 +159,65 @@ def get_product_recommendations(
     debug: bool = Query(default=False),
 ):
     pipeline = build_runtime_marker()
+    backend = str(pipeline["active_recommendation_backend"])
+    if not debug:
+        precomputed_snapshot = get_precomputed_recommendation_snapshot(
+            user_id=current_user.id,
+            slot=slot,
+            limit=limit,
+            backend=backend,
+        )
+        if isinstance(precomputed_snapshot, dict):
+            record_recommendation_precompute_served(slot=slot, hit=True)
+            snapshot_items = precomputed_snapshot.get("items", [])
+            snapshot_pipeline = dict(precomputed_snapshot.get("pipeline") or {})
+            effective_pipeline = {
+                **pipeline,
+                **snapshot_pipeline,
+                "slot": slot,
+                "cache_source": "precomputed",
+                "precomputed_generated_at": precomputed_snapshot.get("generated_at"),
+            }
+            log_recommendation_request(
+                db,
+                request=request,
+                user_id=current_user.id,
+                slot=slot,
+                pipeline_version=str(effective_pipeline["recommendation_pipeline_version"]),
+                model_version=str(
+                    effective_pipeline.get(
+                        "ranker_model_version",
+                        effective_pipeline.get("active_ranker", "cache"),
+                    )
+                ),
+                candidate_count=len(snapshot_items),
+                final_items=[
+                    {
+                        "product_id": item["id"],
+                        "score": item.get("score", 0.0),
+                        "reason": item.get("reason", ""),
+                        "recall_channels": item.get("recall_channels", []),
+                    }
+                    for item in snapshot_items
+                ],
+                latency_ms=0.0,
+                fallback_used=bool(effective_pipeline["degraded_to_baseline"]),
+            )
+            db.commit()
+            return build_response(
+                request=request,
+                code=0,
+                message="ok",
+                data={"items": snapshot_items, "pipeline": effective_pipeline},
+                status_code=200,
+            )
+        record_recommendation_precompute_served(slot=slot, hit=False)
+
     cache_key = build_recommendation_cache_key(
         user_id=current_user.id,
         slot=slot,
         limit=limit,
-        backend=str(pipeline["active_recommendation_backend"]),
+        backend=backend,
     )
     cached_items = get_cached_json(cache_key)
     if not debug and isinstance(cached_items, list):
@@ -265,47 +246,23 @@ def get_product_recommendations(
             request=request,
             code=0,
             message="ok",
-            data={"items": cached_items, "pipeline": {**pipeline, "slot": slot}},
+            data={
+                "items": cached_items,
+                "pipeline": {**pipeline, "slot": slot, "cache_source": "cache"},
+            },
             status_code=200,
         )
 
     timer = RequestTimer.start()
-    runtime = probe_vector_store_runtime()
-    if runtime.active_recommendation_backend == "multi_recall":
-        pipeline_run = run_recommendation_pipeline(
-            db,
-            user_id=current_user.id,
-            limit=limit,
-        )
-        items = [
-            serialize_recommendation_item(candidate, debug=debug, slot=slot)
-            for candidate in pipeline_run.candidates[:limit]
-        ]
-        pipeline.update(
-            {
-                "active_ranker": pipeline_run.active_ranker,
-                "ranker_model_version": pipeline_run.ranker_model_version,
-                "ltr_fallback_used": pipeline_run.ltr_fallback_used,
-            }
-        )
-    else:
-        results = recommend_products_for_user(
-            db,
-            user_id=current_user.id,
-            limit=limit,
-            force_baseline=True,
-        )
-        items = [
-            serialize_recommendation_item(result, debug=debug, slot=slot)
-            for result in results
-        ]
-        pipeline.update(
-            {
-                "active_ranker": "baseline",
-                "ranker_model_version": "baseline",
-                "ltr_fallback_used": False,
-            }
-        )
+    payload = resolve_recommendation_payload(
+        db,
+        user_id=current_user.id,
+        limit=limit,
+        slot=slot,
+        debug=debug,
+    )
+    items = payload.items
+    pipeline = {**payload.pipeline, "cache_source": "realtime"}
 
     if not debug:
         set_cached_json(

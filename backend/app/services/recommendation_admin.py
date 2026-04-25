@@ -15,6 +15,9 @@ from backend.app.models.recommendation_analytics import (
     SearchRequestLog,
 )
 from backend.app.models.recommendation_experiment import RecommendationExperiment
+from backend.app.services.precomputed_recommendations import (
+    get_recommendation_precompute_summary,
+)
 from backend.app.services.vector_store import VectorStoreRuntime, probe_vector_store_runtime
 from backend.app.tasks.qdrant_index_tasks import get_product_index_status
 
@@ -309,6 +312,7 @@ def build_experiment_payload(
     active_key = derive_active_experiment_key(vector_runtime)
     capability_catalog = build_experiment_capability_catalog()
     artifact_catalog = build_recommendation_artifact_catalog()
+    precompute_summary = get_recommendation_precompute_summary()
     active_rows = db.scalars(
         select(RecommendationExperiment)
         .where(RecommendationExperiment.is_active.is_(True))
@@ -450,6 +454,7 @@ def build_experiment_payload(
         ],
         "artifact_summary": build_recommendation_artifact_summary(artifact_catalog),
         "artifact_catalog": artifact_catalog,
+        "precompute_summary": precompute_summary,
         "items": items,
     }
 

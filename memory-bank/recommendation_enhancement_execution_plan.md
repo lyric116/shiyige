@@ -305,6 +305,39 @@ git commit -m "backend: add redis precomputed recommendations"
 
 利用现有 `pipeline_version`、推荐请求日志和曝光日志，形成后台 A/B 看板，让不同实验版本的流量占比、CTR、CVR 和 fallback 情况可以直接对比。
 
+**具体任务**
+
+1. 在后台聚合层补充实验看板指标：
+   * experiment traffic share
+   * request count
+   * CTR / add-to-cart rate / CVR
+   * fallback rate
+   * average latency
+2. 按实验版本拆解：
+   * `pipeline_version`
+   * `model_version`
+   * `slot`
+3. 在后台页面增加实验看板区：
+   * top experiment cards
+   * 实验流量分布表
+   * baseline / full_pipeline 对比摘要
+4. 补充测试：
+   * 后台聚合测试
+   * 后台 API 测试
+
+**验证**
+
+```bash
+./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q
+./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q
+```
+
+**建议提交信息**
+
+```bash
+git commit -m "admin: add recommendation ab dashboard"
+```
+
 ### Phase E8：10 万商品压测扩展
 
 **目标**
@@ -315,6 +348,20 @@ git commit -m "backend: add redis precomputed recommendations"
 
 ## 六、下一步起点
 
-当前正在执行：
+当前阶段已完成：
 
 * **Phase E6：Redis 预计算推荐**
+
+当前完成情况：
+
+* 已新增 Redis 预计算快照层，并支持按 `user_id + slot + backend + limit` 预热首页与购物车推荐。
+* 推荐接口现已形成“预计算 -> 在线缓存 -> 实时推荐”的三层返回路径，并通过 `cache_source` 暴露命中来源。
+* 后台实验配置页已能展示预热状态并触发一键预热。
+* 已完成验证：
+  * `./.venv/bin/python -m pytest backend/tests/integration/test_cache_behavior.py -q`
+  * `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py -q`
+  * `./.venv/bin/python -m pytest backend/tests -q`
+
+当前正在执行：
+
+* **Phase E7：A/B 实验看板**

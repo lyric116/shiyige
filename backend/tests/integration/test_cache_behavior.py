@@ -13,6 +13,10 @@ from backend.app.models.base import Base
 from backend.app.models.product import Product
 from backend.app.models.user import User, UserBehaviorLog, UserProfile
 from backend.app.services import cache as cache_service
+from backend.app.services.precomputed_recommendations import (
+    get_recommendation_precompute_summary,
+    warm_precomputed_recommendations,
+)
 from backend.app.services.recommendations import build_user_interest_profile
 from backend.scripts.seed_base_data import seed_base_data
 from backend.tests.api.test_recommendations import create_user_preference_trace
@@ -357,3 +361,84 @@ def test_user_interest_profile_is_cached_and_reused(
     with api_session_factory() as session:
         cached_profile = build_user_interest_profile(session, user_id=user.id)
         assert cached_profile.behavior_count == 1
+
+
+@pytest.mark.asyncio
+async def test_precomputed_recommendations_are_served_and_invalidated(
+    monkeypatch,
+    api_session_factory,
+    api_client,
+    create_user,
+    auth_headers_factory,
+    seed_product_catalog,
+) -> None:
+    fake_cache = FakeCacheBackend()
+    monkeypatch.setattr(cache_service, "get_cache_backend", lambda: fake_cache)
+
+    user = create_user(
+        email="cache-precompute@example.com",
+        username="cache-precompute",
+    )
+    headers = auth_headers_factory(user)
+
+    with api_session_factory() as session:
+        product = session.scalar(select(Product).where(Product.name == "点翠发簪"))
+        assert product is not None
+        assert product.default_sku is not None
+        product_id = product.id
+        sku_id = product.default_sku.id
+
+    await create_user_preference_trace(
+        api_client,
+        headers,
+        product_id,
+        sku_id,
+        "古风发簪",
+    )
+
+    with api_session_factory() as session:
+        warm_result = warm_precomputed_recommendations(
+            session,
+            slots=["home", "cart"],
+            limit=6,
+            user_ids=[user.id],
+            max_users=1,
+        )
+
+    assert warm_result["snapshot_count"] == 2
+    assert any(":recommendation:precomputed:" in key for key in fake_cache.store)
+
+    first_response = await api_client.get(
+        "/api/v1/products/recommendations",
+        headers=headers,
+        params={"slot": "home", "limit": 6},
+    )
+    first_body = first_response.json()
+
+    assert first_response.status_code == 200
+    assert first_body["data"]["pipeline"]["cache_source"] == "precomputed"
+    assert first_body["data"]["pipeline"]["slot"] == "home"
+
+    summary_after_hit = get_recommendation_precompute_summary()
+    assert summary_after_hit["hit_count"] >= 1
+    assert summary_after_hit["last_snapshot_count"] == 2
+
+    search_response = await api_client.get(
+        "/api/v1/search",
+        headers=headers,
+        params={"q": "步摇"},
+    )
+    assert search_response.status_code == 200
+
+    second_response = await api_client.get(
+        "/api/v1/products/recommendations",
+        headers=headers,
+        params={"slot": "home", "limit": 6},
+    )
+    second_body = second_response.json()
+
+    assert second_response.status_code == 200
+    assert second_body["data"]["pipeline"]["cache_source"] == "realtime"
+
+    summary_after_miss = get_recommendation_precompute_summary()
+    assert summary_after_miss["miss_count"] >= 1

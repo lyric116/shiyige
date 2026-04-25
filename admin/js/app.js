@@ -341,6 +341,114 @@
       .join("");
   }
 
+  function renderPrecomputeSummary(summary) {
+    const hitCount = Number(summary.hit_count || 0);
+    const missCount = Number(summary.miss_count || 0);
+    const total = hitCount + missCount;
+    const slots = Array.isArray(summary.last_slots) ? summary.last_slots.join(" / ") : "-";
+    return `最近一次预热时间：${formatDateTime(summary.last_warmed_at)}；最近一次预热槽位：${
+      slots || "-"
+    }；最近一次预热用户数：${summary.last_warmed_user_count || 0}；当前预计算命中率：${
+      total ? formatPercent(summary.hit_rate) : "0.00%"
+    }。`;
+  }
+
+  function renderPrecomputeMetadata(summary) {
+    const slotStats = summary.slot_stats || {};
+    const slotCards = Object.keys(slotStats).length
+      ? Object.entries(slotStats)
+          .map(function ([slot, item]) {
+            return `
+              <article class="admin-metadata-card">
+                <h3>${escapeHtml(slot)}</h3>
+                <div class="admin-kv-grid">
+                  <div class="admin-kv-item">
+                    <strong>命中次数</strong>
+                    <span>${item.hit_count ?? 0}</span>
+                  </div>
+                  <div class="admin-kv-item">
+                    <strong>未命中次数</strong>
+                    <span>${item.miss_count ?? 0}</span>
+                  </div>
+                  <div class="admin-kv-item">
+                    <strong>命中率</strong>
+                    <span>${formatPercent(item.hit_rate)}</span>
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("")
+      : "";
+
+    return `
+      <article class="admin-metadata-card">
+        <h3>预热概况</h3>
+        <div class="admin-kv-grid">
+          <div class="admin-kv-item">
+            <strong>最近预热时间</strong>
+            <span>${escapeHtml(formatDateTime(summary.last_warmed_at))}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>最近预热快照数</strong>
+            <span>${summary.last_snapshot_count ?? 0}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>最近预热用户数</strong>
+            <span>${summary.last_warmed_user_count ?? 0}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>缓存 TTL</strong>
+            <span>${summary.ttl_seconds ?? 0}s</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>最近预热后端</strong>
+            <span>${escapeHtml(summary.last_backend || "-")}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>最近预热 limit</strong>
+            <span>${summary.last_limit ?? 0}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>总命中次数</strong>
+            <span>${summary.hit_count ?? 0}</span>
+          </div>
+          <div class="admin-kv-item">
+            <strong>总未命中次数</strong>
+            <span>${summary.miss_count ?? 0}</span>
+          </div>
+        </div>
+      </article>
+      ${slotCards}
+    `;
+  }
+
+  async function warmRecommendationPrecompute(button) {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "预热中...";
+    }
+
+    try {
+      const payload = await request(
+        "/api/v1/admin/recommendations/precompute/warm?slots=home&slots=cart&limit=6&max_users=20",
+        { method: "POST" }
+      );
+      showFlash(
+        `预热完成：共生成 ${payload.data.snapshot_count || 0} 份推荐快照。`,
+        "success"
+      );
+      await loadRecommendationConfigPage();
+    } catch (error) {
+      showFlash(error?.payload?.message || "预热推荐快照失败。", "danger");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "预热首页/购物车推荐";
+      }
+    }
+  }
+
   function renderDashboard(summary) {
     document.getElementById("summary-users").textContent = String(summary.users_total);
     document.getElementById("summary-products").textContent = String(summary.products_total);
@@ -1029,6 +1137,9 @@
     const matrixBody = document.getElementById("recommendation-config-matrix-body");
     const list = document.getElementById("recommendation-config-list");
     const notes = document.getElementById("recommendation-config-notes");
+    const precomputeSummary = document.getElementById("recommendation-precompute-summary");
+    const precomputeGrid = document.getElementById("recommendation-precompute-grid");
+    const precomputeButton = document.getElementById("recommendation-precompute-warm-button");
     const artifactSummary = document.getElementById("recommendation-config-artifact-summary");
     const artifactList = document.getElementById("recommendation-config-artifact-list");
     const runtime = payload.data.runtime_summary || {};
@@ -1140,6 +1251,17 @@
     }
     if (notes) {
       notes.innerHTML = renderComparisonNotes(payload.data.comparison_notes || []);
+    }
+    if (precomputeSummary) {
+      precomputeSummary.textContent = renderPrecomputeSummary(payload.data.precompute_summary || {});
+    }
+    if (precomputeGrid) {
+      precomputeGrid.innerHTML = renderPrecomputeMetadata(payload.data.precompute_summary || {});
+    }
+    if (precomputeButton) {
+      precomputeButton.onclick = function () {
+        void warmRecommendationPrecompute(precomputeButton);
+      };
     }
     if (artifactSummary) {
       const summary = payload.data.artifact_summary || {};

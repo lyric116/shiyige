@@ -3,8 +3,25 @@ from sqlalchemy import select
 
 from backend.app.models.admin import OperationLog
 from backend.app.models.product import Product
+from backend.app.services import cache as cache_service
+from backend.app.services.precomputed_recommendations import warm_precomputed_recommendations
 from backend.app.services.vector_store import VectorStoreRuntime
 from backend.tests.api.test_recommendations import create_user_preference_trace
+
+
+class FakeCacheBackend:
+    def __init__(self):
+        self.store: dict[str, str] = {}
+
+    def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        self.store[key] = value
+        return True
+
+    def delete(self, key: str) -> int:
+        return int(self.store.pop(key, None) is not None)
 
 
 @pytest.mark.asyncio
@@ -317,3 +334,67 @@ async def test_admin_recommendation_metrics_endpoint_returns_runtime_and_metrics
         )
         assert operation_log is not None
         assert operation_log.action == "admin_recommendation_metrics"
+
+
+@pytest.mark.asyncio
+async def test_admin_recommendation_precompute_endpoints_return_status_and_can_warm(
+    api_client,
+    api_session_factory,
+    create_admin_user,
+    admin_auth_headers_factory,
+    create_user,
+    monkeypatch,
+    seed_product_catalog,
+) -> None:
+    fake_cache = FakeCacheBackend()
+    monkeypatch.setattr(cache_service, "get_cache_backend", lambda: fake_cache)
+
+    admin_user = create_admin_user(
+        email="admin-precompute@example.com",
+        username="admin-precompute",
+    )
+    user = create_user(
+        email="precompute-user@example.com",
+        username="precompute-user",
+    )
+    headers = admin_auth_headers_factory(admin_user)
+
+    with api_session_factory() as session:
+        warm_precomputed_recommendations(
+            session,
+            slots=["home", "cart"],
+            limit=4,
+            user_ids=[user.id],
+            max_users=1,
+        )
+
+    status_response = await api_client.get(
+        "/api/v1/admin/recommendation/precompute/status",
+        headers=headers,
+    )
+    status_body = status_response.json()
+
+    assert status_response.status_code == 200
+    assert status_body["data"]["last_snapshot_count"] == 2
+    assert status_body["data"]["last_warmed_user_count"] == 1
+
+    warm_response = await api_client.post(
+        "/api/v1/admin/recommendations/precompute/warm?slots=home&limit=3&max_users=1",
+        headers=headers,
+    )
+    warm_body = warm_response.json()
+
+    assert warm_response.status_code == 200
+    assert warm_body["data"]["snapshot_count"] == 1
+    assert warm_body["data"]["summary"]["last_limit"] == 3
+    assert any(":recommendation:precomputed:" in key for key in fake_cache.store)
+
+    experiments_response = await api_client.get(
+        "/api/v1/admin/recommendations/experiments",
+        headers=headers,
+    )
+    experiments_body = experiments_response.json()
+
+    assert experiments_response.status_code == 200
+    assert experiments_body["data"]["precompute_summary"]["last_snapshot_count"] >= 1
+    assert "home" in experiments_body["data"]["precompute_summary"]["supported_slots"]

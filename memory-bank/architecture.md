@@ -1464,3 +1464,31 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在 `recommendation_admin.py -> admin/js/app.js -> recommendation-config.html` 已经形成材料目录链路，后续新增评估报告或 A/B 看板时，应优先挂在这条链路上，而不是散落在文档目录里让使用者自己找。
 * 压测脚本真正有价值的时刻，不是它成功输出 Markdown，而是它暴露出下一阶段最值得解决的瓶颈。
   Phase E5 的 `10000` 商品压测结果里，`recommend_home` p50 已到 `31.7s`，远高于搜索与相关推荐；这说明后续增强版本最优先的技术方向应转向 Redis 预计算推荐或更强缓存，而不是继续增加纯展示型材料。
+
+### 9.56 Phase E6 现在已经形成“推荐响应组装层 + Redis 预计算快照层 + 后台预热运营层”的性能形态
+
+第 80 次同日推进把 E5 暴露出的高延迟瓶颈，推进成了可被后台直接操作的预计算能力：
+
+* `backend/app/services/recommendation_delivery.py`：推荐响应组装层。
+  当前这个新模块统一承接推荐结果序列化、来源标签生成和运行时推荐 payload 组装。Phase E6 之后，实时推荐接口和预计算快照都复用同一套 `items + pipeline` 结构，不再分别在 API 层和预热层各自维护一套推荐响应拼装逻辑。
+* `backend/app/services/precomputed_recommendations.py`：Redis 预计算快照层。
+  当前这个新模块负责按 `user_id + slot + backend + limit` 生成快照、写入 Redis、维护预热摘要，并记录命中次数、未命中次数和按槽位拆分的命中率。它还负责解析“指定用户列表”和“自动扫描活跃用户”两种预热入口，使预热不再只是临时脚本行为，而是正式服务层能力。
+* `backend/app/services/cache.py`：统一缓存与快照失效层。
+  当前除了原有在线缓存 key 外，又新增了 `recommendation:precomputed` 快照 key 与状态 key；`invalidate_recommendation_cache_for_user()` 也已经扩展成同时清理在线缓存和预计算快照。这意味着用户行为发生后，个性化推荐的所有缓存层都会一起失效，不会再出现“实时缓存已清、预热快照还在”的状态漂移。
+* `backend/app/api/v1/products.py`：三层推荐返回编排层。
+  当前推荐接口的执行顺序已经变成“预计算快照优先 -> 在线缓存 -> 实时推荐流水线”。并且 `pipeline` 元数据里新增了 `cache_source` 和 `precomputed_generated_at`，让前端、联调和后台调试都能明确知道当前结果究竟来自预热、普通缓存还是实时计算。
+* `backend/app/api/v1/admin_recommendations.py`：后台预热操作层。
+  当前新增 `GET /admin/recommendation/precompute/status` 与 `POST /admin/recommendations/precompute/warm`，并保留 singular / plural 兼容入口。这样管理员已经可以直接通过后台 API 查看预热状态、手动触发首页/购物车推荐预热，而不需要再进容器或跑单独脚本。
+* `backend/app/services/recommendation_admin.py`、`admin/recommendation-config.html`、`admin/js/app.js`：预热运营展示层。
+  当前实验配置页已经不只展示实验能力和材料目录，还会继续展示 Redis 预热概况、预热槽位、最近预热时间、命中率和一键预热按钮。实验配置页因此开始兼具“实验解释”和“推荐运营控制台”的双重角色。
+* `backend/tests/integration/test_cache_behavior.py` 与 `backend/tests/api/test_admin_recommendation_debug.py`：预计算链路回归层。
+  当前新增测试已经把“预热写入 -> 接口命中 -> 用户行为后失效 -> 后台状态可见”这条链路固定下来，后续如果有人重构缓存层或后台预热接口，会首先在这里暴露问题。
+
+这里有三个新的关键架构洞察：
+
+* 预计算推荐不应该直接覆盖原有在线缓存，而应该成为一层独立快照。
+  只有这样，系统才能区分“请求时临时算出来并缓存的结果”和“后台主动预热好的结果”，后续做命中率统计、A/B 对比或运营解释时才不会把两类缓存混成一团。
+* 一旦引入预计算层，推荐系统的真正边界就不再只是“怎么算”，还包括“什么时候失效”。
+  本轮把预计算快照失效直接挂到现有 `invalidate_recommendation_cache_for_user()` 上，说明用户行为驱动的失效边界已经成为推荐系统设计的一部分，而不是 Redis 层面的实现细节。
+* 当性能优化已经能通过后台触发时，后台页面本身就成为系统调优的一环。
+  现在 `recommendation-config.html` 已经可以展示预热状态并触发预热，这意味着后台不再只是演示页面，而开始承担运行期调优入口；后续的 A/B 看板和更大规模压测，也应该沿着这条“后台可操作”路线继续扩展。

@@ -2901,3 +2901,69 @@ Step 14:
 * 现在 `docs/` 里的推荐文档分成两层：人工整理结论继续留在 `docs/recommendation_*.md`，脚本最新原始产物统一落到 `docs/generated/`；后续不要再把脚本输出路径改回人工文档本身。
 * 本轮压测最重要的新发现不是“脚本能跑”，而是 `GET /api/v1/recommendations?slot=home` 在 `10000` 商品规模下 p50 已到 `31.7s`。这已经明确说明下一步增强应该优先处理推荐结果预计算或更强缓存，而不是继续堆展示层页面。
 * 实验配置页现在已经承担“材料目录”职责；后续如果再新增评估报告、A/B 报表或 Redis 预计算说明，优先把入口挂到 `artifact_catalog`，避免后台和文档再次分裂。
+
+### 同日继续推进记录（五十四）
+
+已继续完成：
+
+* Recommendation Enhancement Phase E6：Redis 预计算推荐
+
+新增与修改：
+
+* `backend/app/services/recommendation_delivery.py`
+* `backend/app/services/precomputed_recommendations.py`
+* `backend/app/services/cache.py`
+* `backend/app/services/recommendation_admin.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/admin_recommendations.py`
+* `backend/tests/integration/test_cache_behavior.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-config.html`
+* `admin/js/app.js`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/api/v1/products.py backend/app/api/v1/admin_recommendations.py backend/app/services/cache.py backend/app/services/recommendation_admin.py backend/app/services/recommendation_delivery.py backend/app/services/precomputed_recommendations.py backend/tests/integration/test_cache_behavior.py backend/tests/api/test_admin_recommendation_debug.py`
+* `node --check admin/js/app.js`
+* `./.venv/bin/python -m pytest backend/tests/integration/test_cache_behavior.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py -q`
+* `docker compose exec -T nginx sh -lc 'wget -S -O /dev/null http://127.0.0.1/admin/recommendation-config.html'`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已新增 `backend/app/services/recommendation_delivery.py`，把推荐结果序列化和运行时组装抽成共享服务层，API 实时计算与 Redis 预计算快照现在共用同一套公开返回结构，不再需要两份推荐字段拼装逻辑并行维护。
+* 已新增 `backend/app/services/precomputed_recommendations.py`，支持：
+  * 按 `user_id + slot + backend + limit` 生成推荐快照
+  * 自动扫描活跃用户或按指定用户列表预热
+  * 记录最近预热时间、快照数、命中次数、未命中次数和按槽位拆分的命中率
+* `backend/app/api/v1/products.py` 现在已经形成三层推荐返回路径：
+  * 优先命中 Redis 预计算快照
+  * 其次命中原有在线缓存
+  * 最后回退实时推荐流水线
+* 推荐接口返回的 `pipeline` 现在新增 `cache_source`，可明确区分 `precomputed`、`cache` 和 `realtime`；当命中预计算快照时，还会返回 `precomputed_generated_at`，方便后台和联调时判断是否真的吃到了预热结果。
+* `backend/app/services/cache.py` 的失效逻辑已扩展到预计算快照。用户发生搜索、浏览、加购、下单、支付等行为后，原有推荐缓存和预计算推荐快照会一起清掉，避免旧快照长期污染个性化结果。
+* `backend/app/api/v1/admin_recommendations.py` 已新增：
+  * `GET /api/v1/admin/recommendation/precompute/status`
+  * `POST /api/v1/admin/recommendations/precompute/warm`
+  并保留 singular / plural 兼容入口。
+* `backend/app/services/recommendation_admin.py` 现在会把 `precompute_summary` 合并进实验配置聚合结果，`admin/recommendation-config.html` 与 `admin/js/app.js` 也已增加预计算状态区和一键预热按钮。
+* 新增自动化回归已覆盖：
+  * 预热写入 Redis 快照
+  * 推荐接口命中预计算快照
+  * 用户行为后快照失效并回退实时链路
+  * 后台预热状态接口与预热触发接口
+* 本轮专项测试结果为：
+  * `backend/tests/integration/test_cache_behavior.py`：`4 passed`
+  * `backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py`：`8 passed`
+  * 后端全量回归：`152 passed`
+* 当前仍有大量既有 `datetime.utcnow()` 弃用警告，但本轮没有新增失败，功能已稳定落地。
+
+交接提醒：
+
+* 预计算推荐没有直接覆盖原有在线缓存，而是额外加了一层 `precomputed` 快照。这样可以把“预热生成”和“请求时临时缓存”区分开来，后续做命中率统计和 A/B 看板时才有可解释空间。
+* 预热服务当前优先覆盖 `home` 与 `cart` 两个槽位；如果后续要扩到 `order_complete` 或其他推荐展示位，应先确认该展示位的失效边界，再决定是否加入预热列表，而不是直接复制同样配置。
+* 本轮已经把 `recommend_home` 的高延迟问题转成了可运营的预热能力；下一步更合适的方向是继续做 A/B 实验看板，把 `precomputed / realtime / fallback` 的流量与效果差异展示出来，而不是再次只做底层埋点。

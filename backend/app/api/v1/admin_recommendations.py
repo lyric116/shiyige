@@ -10,6 +10,11 @@ from backend.app.models.product import Product
 from backend.app.models.recommendation import ProductEmbedding
 from backend.app.models.user import User
 from backend.app.services.embedding import get_embedding_provider
+from backend.app.services.precomputed_recommendations import (
+    get_recommendation_precompute_summary,
+    normalize_precompute_slots,
+    warm_precomputed_recommendations,
+)
 from backend.app.services.recommendation_admin import (
     build_experiment_payload,
     build_recommendation_dashboard_payload,
@@ -333,6 +338,89 @@ def list_recommendation_experiments(
         action="admin_recommendation_experiments",
         target_type="recommendation_experiment",
         detail_json={"active_key": payload["active_key"]},
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="ok",
+        data=payload,
+        status_code=200,
+    )
+
+
+@alias_router.get("/precompute/status")
+@router.get("/precompute/status")
+def get_recommendation_precompute_status(
+    request: Request,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    payload = get_recommendation_precompute_summary()
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_recommendation_precompute_status",
+        target_type="recommendation_precompute",
+        detail_json={
+            "last_warmed_at": payload.get("last_warmed_at"),
+            "last_snapshot_count": payload.get("last_snapshot_count"),
+        },
+    )
+    db.commit()
+    return build_response(
+        request=request,
+        code=0,
+        message="ok",
+        data=payload,
+        status_code=200,
+    )
+
+
+@alias_router.post("/precompute/warm")
+@router.post("/precompute/warm")
+def warm_recommendation_precompute(
+    request: Request,
+    slots: list[str] = Query(default=["home", "cart"]),
+    limit: int = Query(default=6, ge=1, le=20),
+    max_users: int = Query(default=20, ge=1, le=200),
+    user_ids: str | None = Query(default=None),
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    normalized_slots = normalize_precompute_slots(slots)
+    try:
+        parsed_user_ids = [
+            int(raw_id.strip())
+            for raw_id in (user_ids or "").split(",")
+            if raw_id.strip()
+        ] or None
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="user_ids must be a comma separated integer list",
+        ) from exc
+    payload = warm_precomputed_recommendations(
+        db,
+        slots=normalized_slots,
+        limit=limit,
+        user_ids=parsed_user_ids,
+        max_users=max_users,
+    )
+    create_operation_log(
+        db,
+        admin_user=current_admin,
+        request=request,
+        action="admin_warm_recommendation_precompute",
+        target_type="recommendation_precompute",
+        detail_json={
+            "slots": normalized_slots,
+            "limit": limit,
+            "max_users": max_users,
+            "user_ids": parsed_user_ids or [],
+            "snapshot_count": payload["snapshot_count"],
+        },
     )
     db.commit()
     return build_response(
