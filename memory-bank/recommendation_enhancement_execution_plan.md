@@ -229,12 +229,12 @@ git commit -m "docs: finalize recommendation enhancement artifacts"
 
 当前正在执行：
 
-* **Phase E1：推荐指标可观测页**
+* **Phase E4：冷启动与探索位运营增强**
 
 当前阶段完成标准：
 
-* 后台存在独立“推荐指标”页面；
-* 推荐指标接口返回通道拆解、fallback 统计、槽位分布与 pipeline 分布；
-* 至少有一条自动化测试覆盖新增指标聚合逻辑；
+* 推荐调试接口能直接看出候选是否命中探索位、冷启动逻辑和多样性调整；
+* 后台指标页能展示冷启动请求、探索位命中率和新品召回占比；
+* 至少有一组自动化测试覆盖探索位或冷启动相关的新字段；
 * 通过验证后更新 `memory-bank/progress.md` 与 `memory-bank/architecture.md`；
 * 单独 git 提交。

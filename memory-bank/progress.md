@@ -161,6 +161,55 @@
 
 * 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E3：前台推荐证据展示增强**。
 
+### Phase E3：前台推荐证据展示增强
+
+* 已完成 `recommendation_enhancement_execution_plan.md` 中的 Phase E3。
+* `front/js/main.js` 现在不只负责全站通用交互，还统一承担推荐卡片证据渲染：
+  * 新增 `buildRecommendationHighlights()`
+  * `renderEvidence()` 现会组合来源标签、解释标签和亮点标签
+* 前台推荐证据会优先展示以下信息：
+  * `feature_highlights`
+  * `matched_terms`
+  * `is_exploration`
+  * `ltr_fallback_used`
+  * `source_breakdown`
+  * `diversity_result`
+  * 首页推荐的 `recall_channels`
+* 首页、商品详情页、购物车页和下单完成页都已经通过 `window.shiyigeRecommendationUI.renderProductCard()` 复用统一证据渲染逻辑，因此本阶段无需分别复制一套推荐理由 UI。
+
+### Phase E3 修改文件
+
+* `front/js/main.js`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+### Phase E3 验证
+
+* `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_related_products.py -q`
+* `node --check front/js/main.js`
+* `curl -L -I http://127.0.0.1/`
+* `curl -L -I http://127.0.0.1/product.html`
+* `curl -L -I http://127.0.0.1/cart.html`
+* `curl -L -I http://127.0.0.1/checkout.html`
+
+结果：
+
+* 推荐接口测试 `2 passed`。
+* 相似商品接口测试 `1 passed`。
+* 前台通用脚本语法检查通过。
+* 首页、商品详情页、购物车页和结算页入口均返回 `200`。
+
+### Phase E3 当前结论
+
+* 当前前台推荐模块已经从“只显示推荐结果”提升到“同时显示推荐证据”。
+* 这一步对展示和答辩很关键，因为它把后台已经存在的召回通道、探索位、匹配词和排序回退信息前移到了用户界面。
+
+### 下一步起点
+
+* 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E4：冷启动与探索位运营增强**。
+
 ## 2026-04-13
 
 ### 完成事项

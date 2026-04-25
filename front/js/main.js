@@ -355,6 +355,63 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
     return dedupeLabels(labels);
   }
 
+  function buildRecommendationHighlights(item, options = {}) {
+    const labels = [];
+
+    if (Array.isArray(item?.feature_highlights) && item.feature_highlights.length > 0) {
+      labels.push(...item.feature_highlights.slice(0, 3));
+    }
+
+    if (Array.isArray(item?.matched_terms) && item.matched_terms.length > 0) {
+      item.matched_terms.slice(0, 2).forEach(function (term) {
+        labels.push(`命中：${term}`);
+      });
+    }
+
+    if (item?.is_exploration) {
+      labels.push("探索位");
+    }
+
+    if (item?.ltr_fallback_used) {
+      labels.push("LTR 回退");
+    }
+
+    const sourceBreakdown = item?.source_breakdown || {};
+    if (sourceBreakdown?.dense_similarity?.score > 0) {
+      labels.push("语义相似");
+    }
+    if (sourceBreakdown?.co_view_co_buy?.score > 0) {
+      labels.push("共看共购");
+    }
+    if (sourceBreakdown?.cultural_match?.score > 0) {
+      labels.push("文化标签匹配");
+    }
+    if (item?.diversity_result?.diversified) {
+      labels.push("多样性打散");
+    }
+
+    if (
+      options.context === "home" &&
+      (!item?.source_label || item?.source_label === "猜你喜欢") &&
+      Array.isArray(item?.recall_channels)
+    ) {
+      if (item.recall_channels.includes("trending")) {
+        labels.push("近期热度");
+      }
+      if (item.recall_channels.includes("new_arrival")) {
+        labels.push("新品探索");
+      }
+      if (
+        item.recall_channels.includes("collaborative_user") ||
+        item.recall_channels.includes("item_cooccurrence")
+      ) {
+        labels.push("协同偏好");
+      }
+    }
+
+    return dedupeLabels(labels);
+  }
+
   function renderChips(labels, options = {}) {
     const normalized = dedupeLabels(labels);
     if (!normalized.length) {
@@ -372,6 +429,7 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
   function renderEvidence(item, options = {}) {
     const sourceMeta = buildSourceMeta(item, options);
     const explanationLabels = buildSearchExplanations(item, options);
+    const highlightLabels = buildRecommendationHighlights(item, options);
     const chips = [];
 
     if (!options.hideSource) {
@@ -383,6 +441,9 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
     }
     if (explanationLabels.length > 0) {
       chips.push(renderChips(explanationLabels, { tone: "explanation" }));
+    }
+    if (highlightLabels.length > 0) {
+      chips.push(renderChips(highlightLabels, { tone: "info" }));
     }
 
     const chipRow = chips.length
