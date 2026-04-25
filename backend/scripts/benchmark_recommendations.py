@@ -40,6 +40,12 @@ OUTPUT_PATH = Path("docs/generated/performance_benchmark_latest.md")
 QDRANT_LOCAL_URL = "http://127.0.0.1:6333"
 SEARCH_QUERIES = ["汉服", "香囊", "非遗", "礼盒", "刺绣", "春日汉服", "国风送礼"]
 SEMANTIC_QUERIES = ["春日汉服穿搭", "适合送礼的传统文创", "非遗家居陈设"]
+BENCHMARK_ENDPOINTS = (
+    "search_keyword",
+    "search_semantic",
+    "recommend_home",
+    "related_products",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +65,55 @@ class BenchmarkRow:
     p95_latency_ms: float
     p99_latency_ms: float
     notes: str
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Benchmark recommendation endpoints")
+    parser.add_argument("--products", type=int, default=1000, help="Target total product count")
+    parser.add_argument("--users", type=int, default=200, help="Synthetic user count")
+    parser.add_argument(
+        "--requests",
+        type=int,
+        default=None,
+        help="Requests per endpoint; defaults to a size derived from --users",
+    )
+    parser.add_argument(
+        "--search-requests",
+        type=int,
+        default=None,
+        help="Override search keyword request count",
+    )
+    parser.add_argument(
+        "--semantic-requests",
+        type=int,
+        default=None,
+        help="Override semantic search request count",
+    )
+    parser.add_argument(
+        "--recommendation-requests",
+        type=int,
+        default=None,
+        help="Override home recommendation request count",
+    )
+    parser.add_argument(
+        "--related-requests",
+        type=int,
+        default=None,
+        help="Override related products request count",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("standard", "light"),
+        default="standard",
+        help="Use light mode to clamp endpoint samples and skip heavy prep steps",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=8,
+        help="Concurrent request count for HTTP benchmarks",
+    )
+    return parser
 
 
 def resolve_app_settings() -> AppSettings:
@@ -310,6 +365,44 @@ def resolve_related_request_count(sample_count: int) -> int:
     return min(sample_count, 24)
 
 
+def resolve_sample_plan(
+    *,
+    user_count: int,
+    request_count: int | None,
+    mode: str,
+    search_requests: int | None = None,
+    semantic_requests: int | None = None,
+    recommendation_requests: int | None = None,
+    related_requests: int | None = None,
+) -> dict[str, int]:
+    default_count = resolve_request_count(request_count, user_count)
+    if mode == "light":
+        plan = {
+            "search_keyword": min(default_count, 20),
+            "search_semantic": min(max(default_count // 2, 8), 16),
+            "recommend_home": min(max(default_count // 2, 6), 12),
+            "related_products": min(max(default_count // 2, 6), 12),
+        }
+    else:
+        plan = {
+            "search_keyword": default_count,
+            "search_semantic": default_count,
+            "recommend_home": default_count,
+            "related_products": resolve_related_request_count(default_count),
+        }
+
+    overrides = {
+        "search_keyword": search_requests,
+        "search_semantic": semantic_requests,
+        "recommend_home": recommendation_requests,
+        "related_products": related_requests,
+    }
+    for endpoint, value in overrides.items():
+        if value is not None:
+            plan[endpoint] = max(int(value), 1)
+    return plan
+
+
 def build_keyword_specs(
     *,
     users: list[BenchmarkUserContext],
@@ -430,10 +523,9 @@ async def run_http_benchmarks(
     *,
     users: list[BenchmarkUserContext],
     product_ids: list[int],
-    sample_count: int,
+    sample_plan: dict[str, int],
     concurrency: int,
 ) -> list[BenchmarkRow]:
-    related_sample_count = resolve_related_request_count(sample_count)
     app = create_app()
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(
@@ -449,21 +541,30 @@ async def run_http_benchmarks(
             await benchmark_requests(
                 client,
                 endpoint="search_keyword",
-                specs=build_keyword_specs(users=users, sample_count=sample_count),
+                specs=build_keyword_specs(
+                    users=users,
+                    sample_count=sample_plan["search_keyword"],
+                ),
                 notes="GET /api/v1/search",
                 concurrency=concurrency,
             ),
             await benchmark_requests(
                 client,
                 endpoint="search_semantic",
-                specs=build_semantic_specs(users=users, sample_count=sample_count),
+                specs=build_semantic_specs(
+                    users=users,
+                    sample_count=sample_plan["search_semantic"],
+                ),
                 notes="POST /api/v1/search/semantic",
                 concurrency=concurrency,
             ),
             await benchmark_requests(
                 client,
                 endpoint="recommend_home",
-                specs=build_recommendation_specs(users=users, sample_count=sample_count),
+                specs=build_recommendation_specs(
+                    users=users,
+                    sample_count=sample_plan["recommend_home"],
+                ),
                 notes="GET /api/v1/recommendations?slot=home",
                 concurrency=concurrency,
             ),
@@ -473,11 +574,11 @@ async def run_http_benchmarks(
                 specs=build_related_specs(
                     product_ids=product_ids,
                     users=users,
-                    sample_count=related_sample_count,
+                    sample_count=sample_plan["related_products"],
                 ),
                 notes=(
                     "GET /api/v1/products/{id}/related "
-                    f"(sampled={related_sample_count})"
+                    f"(sampled={sample_plan['related_products']})"
                 ),
                 concurrency=concurrency,
             ),
@@ -489,9 +590,11 @@ def render_markdown(
     *,
     products: int,
     users: int,
-    sample_count: int,
+    sample_plan: dict[str, int],
     concurrency: int,
+    mode: str,
     dataset_result: dict[str, int],
+    preparation: dict[str, object],
     runtime_summary: dict[str, object],
     settings: AppSettings,
 ) -> str:
@@ -502,7 +605,8 @@ def render_markdown(
         "",
         f"* target_products: `{products}`",
         f"* target_users: `{users}`",
-        f"* requests_per_endpoint: `{sample_count}`",
+        f"* mode: `{mode}`",
+        f"* requests_by_endpoint: `{sample_plan}`",
         f"* concurrency: `{concurrency}`",
         f"* synthetic_catalog: `{dataset_result}`",
         (
@@ -512,6 +616,10 @@ def render_markdown(
             f"colbert={settings.colbert_embedding_provider}`"
         ),
         f"* runtime: `{runtime_summary}`",
+        "",
+        "## Preparation",
+        "",
+        f"* preparation: `{preparation}`",
         "",
         "## Metrics",
         "",
@@ -535,6 +643,11 @@ def benchmark_recommendations(
     products: int,
     users: int,
     request_count: int | None,
+    search_requests: int | None,
+    semantic_requests: int | None,
+    recommendation_requests: int | None,
+    related_requests: int | None,
+    mode: str,
     concurrency: int,
 ) -> dict[str, object]:
     prepare_isolated_database()
@@ -544,19 +657,26 @@ def benchmark_recommendations(
     apply_runtime_settings(settings)
     try:
         Base.metadata.create_all(bind=session.get_bind())
+        seed_started_at = perf_counter()
         seed_base_data(session)
+        seed_latency_ms = round((perf_counter() - seed_started_at) * 1000, 3)
+        dataset_started_at = perf_counter()
         dataset_result = ensure_synthetic_catalog(session, target_products=products)
+        dataset_latency_ms = round((perf_counter() - dataset_started_at) * 1000, 3)
         product_ids = session.scalars(
             select(Product.id).where(Product.status == 1).order_by(Product.id.asc())
         ).all()
+        user_seed_started_at = perf_counter()
         benchmark_users = ensure_benchmark_users(
             session,
             target_users=users,
             product_ids=product_ids,
         )
+        user_seed_latency_ms = round((perf_counter() - user_seed_started_at) * 1000, 3)
 
         qdrant_available = settings.vector_db_provider == "qdrant"
-        if qdrant_available:
+        heavy_prep_enabled = qdrant_available and mode != "light"
+        if heavy_prep_enabled:
             sync_started_at = perf_counter()
             sync_result = sync_products_to_qdrant(
                 session,
@@ -578,12 +698,29 @@ def benchmark_recommendations(
             collaborative_latency_ms = 0.0
 
         runtime_summary = probe_vector_store_runtime(settings).to_dict()
-        sample_count = resolve_request_count(request_count, users)
+        sample_plan = resolve_sample_plan(
+            user_count=users,
+            request_count=request_count,
+            mode=mode,
+            search_requests=search_requests,
+            semantic_requests=semantic_requests,
+            recommendation_requests=recommendation_requests,
+            related_requests=related_requests,
+        )
+        preparation = {
+            "seed_base_data_ms": seed_latency_ms,
+            "dataset_generation_ms": dataset_latency_ms,
+            "benchmark_user_seed_ms": user_seed_latency_ms,
+            "reindex_products_qdrant_ms": sync_latency_ms,
+            "build_collaborative_index_ms": collaborative_latency_ms,
+            "heavy_prep_enabled": heavy_prep_enabled,
+            "mode": mode,
+        }
         http_rows = asyncio.run(
             run_http_benchmarks(
                 users=benchmark_users,
                 product_ids=product_ids,
-                sample_count=sample_count,
+                sample_plan=sample_plan,
                 concurrency=concurrency,
             )
         )
@@ -594,7 +731,9 @@ def benchmark_recommendations(
                 candidate_count=int(sync_result.get("indexed", 0)),
                 notes=(
                     "sync_products_to_qdrant(mode=full)"
-                    if qdrant_available
+                    if heavy_prep_enabled
+                    else "skipped: light mode disables heavy prep steps"
+                    if mode == "light"
                     else "skipped: qdrant unavailable in current script runtime"
                 ),
             ),
@@ -604,7 +743,9 @@ def benchmark_recommendations(
                 candidate_count=int(collaborative_result.get("indexed_users", 0)),
                 notes=(
                     "build_collaborative_index"
-                    if qdrant_available
+                    if heavy_prep_enabled
+                    else "skipped: light mode disables heavy prep steps"
+                    if mode == "light"
                     else "skipped: qdrant unavailable in current script runtime"
                 ),
             ),
@@ -617,9 +758,11 @@ def benchmark_recommendations(
                 rows,
                 products=products,
                 users=users,
-                sample_count=sample_count,
+                sample_plan=sample_plan,
                 concurrency=concurrency,
+                mode=mode,
                 dataset_result=dataset_result,
+                preparation=preparation,
                 runtime_summary=runtime_summary,
                 settings=settings,
             ),
@@ -628,8 +771,10 @@ def benchmark_recommendations(
         return {
             "products": products,
             "users": users,
-            "request_count": sample_count,
+            "mode": mode,
+            "sample_plan": sample_plan,
             "concurrency": concurrency,
+            "preparation": preparation,
             "runtime": runtime_summary,
             "dataset": dataset_result,
             "rows": [asdict(row) for row in rows],
@@ -640,27 +785,18 @@ def benchmark_recommendations(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark recommendation endpoints")
-    parser.add_argument("--products", type=int, default=1000, help="Target total product count")
-    parser.add_argument("--users", type=int, default=200, help="Synthetic user count")
-    parser.add_argument(
-        "--requests",
-        type=int,
-        default=None,
-        help="Requests per endpoint; defaults to a size derived from --users",
-    )
-    parser.add_argument(
-        "--concurrency",
-        type=int,
-        default=8,
-        help="Concurrent request count for HTTP benchmarks",
-    )
+    parser = build_arg_parser()
     args = parser.parse_args()
 
     result = benchmark_recommendations(
         products=args.products,
         users=args.users,
         request_count=args.requests,
+        search_requests=args.search_requests,
+        semantic_requests=args.semantic_requests,
+        recommendation_requests=args.recommendation_requests,
+        related_requests=args.related_requests,
+        mode=args.mode,
         concurrency=max(args.concurrency, 1),
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))

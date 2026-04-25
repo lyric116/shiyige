@@ -818,7 +818,7 @@ def build_recommendation_artifact_catalog() -> list[dict[str, object]]:
             "usage": "回答“系统能跑多大规模、瓶颈在哪里”。",
             "generation_command": (
                 "./.venv/bin/python backend/scripts/benchmark_recommendations.py "
-                "--products 10000 --users 200"
+                "--products 10000 --users 200 --mode standard"
             ),
             "generated_path": "docs/generated/performance_benchmark_latest.md",
         },

@@ -3028,3 +3028,71 @@ Step 14:
 * 实验看板当前基于推荐日志聚合，不额外引入新表。这意味着后续如果想继续扩展实验指标，优先复用 `RecommendationRequestLog / Impression / Click / Conversion` 这条链路，而不是再平行造一套实验埋点。
 * 看板里的 `top_variants` 是按实验版本聚合，表格里的 `items` 是按“实验版本 x slot”聚合。后续如果要做更细粒度的流量分析，应保持这两层语义分离，不要把卡片和表格混成一种口径。
 * 现在后台已经能同时回答三个问题：当前启用了哪些能力、当前预热状态如何、当前实验效果如何。下一步更自然的方向是扩展大规模压测入口，而不是再补纯展示性卡片。
+
+### 同日继续推进记录（五十六）
+
+已继续完成：
+
+* Recommendation Enhancement Phase E8：10 万商品压测扩展
+
+新增与修改：
+
+* `backend/scripts/benchmark_recommendations.py`
+* `backend/tests/scripts/test_benchmark_recommendations.py`
+* `backend/app/services/recommendation_admin.py`
+* `docs/performance_benchmark.md`
+* `docs/generated/performance_benchmark_latest.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/scripts/benchmark_recommendations.py backend/tests/scripts/test_benchmark_recommendations.py backend/app/services/recommendation_admin.py`
+* `python -m py_compile backend/scripts/benchmark_recommendations.py`
+* `./.venv/bin/python -m pytest backend/tests/scripts/test_benchmark_recommendations.py -q`
+* `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* `backend/scripts/benchmark_recommendations.py` 现在已支持：
+  * `--mode standard|light`
+  * `--search-requests`
+  * `--semantic-requests`
+  * `--recommendation-requests`
+  * `--related-requests`
+  这意味着压测脚本不再只能“一刀切”地给所有接口同一请求量，而是能按接口单独加压。
+* 已把压测脚本的输出补成更完整的结构：
+  * `mode`
+  * `sample_plan`
+  * `preparation`
+  * 原有 `rows`
+  当前压测 Markdown 也会显式记录数据集准备耗时、用户种子耗时、是否跳过重型索引准备，以及各端点的采样计划。
+* 轻量模式已正式落地：`mode=light` 时，脚本会保留完整输出结构，但缩小各接口采样量，并跳过重型索引准备步骤，适合先验证 `20000 ~ 100000` 商品量级下脚本本身是否可执行。
+* 已新增脚本级测试 `backend/tests/scripts/test_benchmark_recommendations.py`，覆盖：
+  * 参数解析
+  * 轻量模式采样计划
+  * Markdown 输出结构
+* `docs/performance_benchmark.md` 已补充大规模执行建议，明确区分：
+  * 本地先跑 `light` 模式
+  * 最终答辩材料再跑 `standard` 模式
+  * 按端点单独放大量的覆盖参数
+* `backend/app/services/recommendation_admin.py` 里的压测材料命令也已同步升级为 `--mode standard`，避免后台材料台继续展示旧命令。
+* 本轮实际压测命令：
+  * `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light`
+  已成功生成新的 `docs/generated/performance_benchmark_latest.md`，关键结果为：
+  * `dataset_generation_ms = 15582.811`
+  * `benchmark_user_seed_ms = 2305.205`
+  * `sample_plan = {search_keyword: 20, search_semantic: 10, recommend_home: 10, related_products: 10}`
+  * `recommend_home` p50 已达到 `101830.522ms`
+  * 轻量模式下重型索引准备被显式标记为 `skipped: light mode disables heavy prep steps`
+* 后端全量回归结果为 `156 passed`，只有既有的 `datetime.utcnow()` 弃用警告，没有新增失败。
+
+交接提醒：
+
+* 现在压测脚本已经不只是“跑一次 1 万商品”，而是具备了两种用途：
+  * `standard` 模式用于生成正式材料
+  * `light` 模式用于先验证更大规模是否可跑
+* 本轮最重要的新结论不是脚本支持了更多参数，而是 `20000` 商品轻量模式下 `recommend_home` p50 已超过 `100s`。这说明下一阶段如果继续做推荐系统增强，优先级已经明显转向更强的召回裁剪、预计算覆盖面扩展或排序链路进一步拆分，而不是继续单纯扩商品量。
+* 这份增强执行计划到 E8 已全部完成；后续如果继续推进，建议从升级计划第 `17.2` 节剩余项里继续选择下一轮增强目标。

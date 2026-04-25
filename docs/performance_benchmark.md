@@ -6,7 +6,18 @@
 * 评估报告：`docs/recommendation_evaluation.md`
 * 答辩讲稿：`docs/defense_script.md`
 * 最新脚本原始产物：`docs/generated/performance_benchmark_latest.md`
-* 重新生成命令：`./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 200`
+* 重新生成命令：`./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 10000 --users 200 --mode standard`
+
+## 大规模执行建议
+
+* 本地先跑轻量模式：`./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light`
+* 若只想放大某个接口压力，可单独覆盖：
+  * `--search-requests`
+  * `--semantic-requests`
+  * `--recommendation-requests`
+  * `--related-requests`
+* 轻量模式会保留完整输出结构，但会缩小 HTTP 样本并跳过重型索引准备步骤，适合先验证 `20000 ~ 100000` 商品量级下脚本是否能安全跑完。
+* 标准模式仍保留完整索引准备与多接口压测，更适合生成最终答辩材料。
 
 ## 1. 目标
 

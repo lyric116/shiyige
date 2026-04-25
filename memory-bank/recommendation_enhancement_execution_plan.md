@@ -364,7 +364,7 @@ git commit -m "admin: add recommendation ab dashboard"
 **验证**
 
 ```bash
-./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20
+./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light
 ./.venv/bin/python -m pytest backend/tests -q
 ```
 
@@ -380,17 +380,29 @@ git commit -m "bench: extend large-scale recommendation benchmark"
 
 当前阶段已完成：
 
-* **Phase E7：A/B 实验看板**
+* **Phase E8：10 万商品压测扩展**
 
 当前完成情况：
 
-* 已在实验配置页补齐 A/B 实验效果看板，可展示流量最高实验版本、baseline 对比卡片和版本 x 槽位的效果表格。
-* 后台实验接口现已返回 `experiment_dashboard`，并把 CTR、CVR、fallback 和平均延迟直接聚合成结构化看板数据。
+* 压测脚本现已支持 `standard / light` 两种模式，以及按端点单独覆盖请求量。
+* 已成功执行一轮更大规模的实际验证：
+  * `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light`
+* 最新压测原始产物已记录 `sample_plan` 与 `preparation`，说明大规模压测入口已经真正跑通。
 * 已完成验证：
-  * `./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q`
-  * `./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q`
+  * `./.venv/bin/python -m pytest backend/tests/scripts/test_benchmark_recommendations.py -q`
+  * `./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20 --mode light`
   * `./.venv/bin/python -m pytest backend/tests -q`
 
-当前正在执行：
+当前结论：
 
-* **Phase E8：10 万商品压测扩展**
+* 当前这份推荐增强执行计划 `E1 ~ E8` 已全部完成。
+
+---
+
+## 七、后续可选增强
+
+如果继续推进，可从原升级计划第 `17.2` 节剩余增强项中继续开启下一轮：
+
+1. LightGBM LambdaMART 排序训练与接入
+2. 更完整的节令 / 文化知识图谱
+3. 多模态商品图像 embedding
