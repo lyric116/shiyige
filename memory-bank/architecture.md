@@ -1269,3 +1269,31 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前搜索、推荐后台和索引后台都采用“保留旧入口 + 增加新入口 + 统一测试覆盖”的方式推进，因此可以继续往前实现第 14 和第 15 节，而不需要先做一轮高风险的 API 迁移。
 * FastAPI 里固定路径和参数路径的注册顺序本身就是架构约束。
   本轮 `/api/v1/products/search` 被 `/api/v1/products/{product_id}` 抢匹配并返回 `422`，说明“路径设计正确”并不等于“运行时一定命中正确处理器”；当接口开始向最终命名收拢时，router 装载顺序必须被视为正式设计的一部分。
+
+### 9.49 Phase 14 现在已经形成“分组加权层 + LTR 阈值守护层 + 强业务过滤层”的排序形态
+
+第 73 次同日推进把第 14 节里的排序建议从“文档目标”推进成了线上 ranker 的正式结构：
+
+* `backend/app/services/ranker.py`：分组加权排序层。
+  当前 `score_weighted_candidate()` 已从旧的三段式启发式权重，重构成 8 组显式分数结构：`hybrid_retrieval_score`、`colbert_rerank_score`、`collaborative_group_score`、`user_interest_score`、`product_quality_score`、`trend_freshness_score`、`business_constraints_score` 和 `diversity_exploration_score`。这样后台 debug 的 `score_breakdown` 已经能直接映射到答辩里要讲的排序公式，而不是只能解释成“召回分 + 兴趣分 + 质量分”。
+* `backend/app/services/ranker.py`：强业务过滤守护层。
+  当前在进入加权打分前就会基于 `business_rules` 直接剔除未上架或无库存候选，不再让这些候选只靠 `-2.0` 罚分去“尽量排后”。这把“库存状态”从软特征提升成了真正的业务边界，也修复了专项回归里暴露出的无库存商品仍可能进入 TopN 的问题。
+* `backend/app/core/config.py`：LTR 上线阈值配置入口。
+  当前新增 `recommendation_ltr_min_training_samples`，让 LTR 是否允许接流量不再只由“有没有模型文件”决定，而是多了一个最小训练样本量约束。Phase 14 之后，LTR 的启用条件终于开始接近真实线上规则。
+* `backend/app/services/ltr_ranker.py`：LTR 模型元数据守护层。
+  当前 `JsonWeightLTRRanker` 已能读取 `training_sample_count`，并在样本量低于阈值时直接返回 `None`，从而触发 `weighted_ranker` 回退。同时这里还新增了 `LTR_EVENT_LABEL_WEIGHTS`，把 `impression_no_click / click / add_to_cart / pay_order` 的保留训练标签口径固定下来，为后续真正的离线训练脚本提供单一事实来源。
+* `backend/tests/test_ranker.py`：排序行为回归层。
+  当前不仅继续锁定“兴趣匹配优先于弱内容相似”和“模型缺失时回退 weighted”，还新增了“训练样本量不足时回退 LTR”的测试，并明确验证新的 `hybrid_retrieval_score` 与 `business_constraints_score` 已进入 `score_breakdown`。
+* `backend/tests/unit/test_settings.py`：配置默认值守护层。
+  当前新增了 `recommendation_ltr_min_training_samples` 的默认值校验，保证后续环境变量或配置重构不会悄悄把这个阈值删掉。
+* `docs/ranking_design.md`：排序公式文档层。
+  当前不再只写“weighted ranker 存在”，而是明确列出了 8 组权重和 LTR 最小样本阈值回退规则，使排序层的实现和文档再次对齐。
+
+这里有三个新的关键架构洞察：
+
+* 当推荐系统进入统一排序阶段后，最重要的不是“分数越多越好”，而是分数分组必须能被稳定解释。
+  现在 `score_breakdown` 里已经把 hybrid、ColBERT、协同过滤、兴趣、质量、趋势、新鲜度、业务约束和探索分开展示；这使排序器终于从“一个复杂公式”变成了“若干可定位、可调权、可汇报的模块”。
+* LTR 的上线门槛不能只看模型文件是否存在，还必须看训练样本量是否站得住。
+  当前 `training_sample_count + recommendation_ltr_min_training_samples` 的组合，使“低样本伪模型误上线”这个风险第一次被正式约束住；这比简单的“文件加载成功就切换”更接近真实系统治理。
+* 有些业务规则不适合留在加权公式里当软信号。
+  无库存与未上架状态本轮被前移成 ranker 的硬过滤，说明排序层并不是所有约束都要被连续分值吸收；一旦某个规则本身代表“结果根本不该展示”，它就应该被提升为明确边界，而不是继续和其他分数混算。

@@ -52,6 +52,7 @@ class AppSettings(BaseSettings):
     recommendation_pipeline_version: str = "v1"
     recommendation_ranker: str = "weighted_ranker"
     recommendation_ltr_model_path: str | None = None
+    recommendation_ltr_min_training_samples: int = 200
     recommendation_exploration_ratio: float = 0.15
     recommendation_max_consecutive_category: int = 2
 

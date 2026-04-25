@@ -24,6 +24,16 @@ from backend.app.services.recommendation_explainer import (
 )
 
 WEIGHTED_RANKER_MODEL_VERSION = "weighted-ranker-v1"
+WEIGHTED_RANKER_GROUP_WEIGHTS = {
+    "hybrid_retrieval_score": 0.25,
+    "colbert_rerank_score": 0.20,
+    "collaborative_group_score": 0.15,
+    "user_interest_score": 0.15,
+    "product_quality_score": 0.10,
+    "trend_freshness_score": 0.05,
+    "business_constraints_score": 0.05,
+    "diversity_exploration_score": 0.05,
+}
 
 
 @dataclass(slots=True)
@@ -67,6 +77,8 @@ def rank_fused_candidates(
             context=context,
         )
         business_rules = build_business_rules(features)
+        if not business_rules.is_listed or not business_rules.has_stock:
+            continue
         weighted_breakdown = score_weighted_candidate(features, business_rules)
 
         ranker_name = "weighted_ranker"
@@ -134,47 +146,119 @@ def score_weighted_candidate(
 ) -> dict[str, float]:
     normalized = features.to_normalized_dict()
 
+    hybrid_retrieval_score = bound_score(
+        normalized["dense_recall_score"] * 0.34
+        + normalized["sparse_recall_score"] * 0.24
+        + normalized["rrf_fusion_score"] * 0.24
+        + normalized["recall_channel_count"] * 0.12
+        + normalized["best_channel_rank"] * 0.06
+    )
+    colbert_rerank_score = bound_score(normalized["colbert_rerank_score"])
+    collaborative_group_score = bound_score(
+        normalized["collaborative_score"] * 0.65
+        + normalized["item_cooccurrence_score"] * 0.35
+    )
+    user_interest_score = bound_score(
+        normalized["category_match"] * 0.12
+        + normalized["tag_match_count"] * 0.14
+        + normalized["dynasty_match"] * 0.08
+        + normalized["craft_match"] * 0.06
+        + normalized["scene_match"] * 0.06
+        + normalized["festival_match"] * 0.06
+        + normalized["price_affinity"] * 0.08
+        + normalized["user_recent_interest_score"] * 0.18
+        + normalized["user_long_term_interest_score"] * 0.22
+    )
+    product_quality_score = bound_score(
+        normalized["sales_count"] * 0.18
+        + normalized["conversion_rate"] * 0.18
+        + normalized["add_to_cart_rate"] * 0.14
+        + normalized["rating_avg"] * 0.12
+        + normalized["review_count"] * 0.08
+        + normalized["stock_available"] * 0.10
+        + normalized["content_quality_score"] * 0.12
+        - normalized["return_rate"] * 0.08
+    )
+    trend_freshness_score = bound_score(
+        normalized["freshness_score"] * 0.65
+        + normalized["festival_theme_match"] * 0.15
+        + normalized["is_editorial_pick"] * 0.20
+    )
+    business_constraints_score = bound_score(
+        normalized["is_listed"] * 0.35
+        + normalized["has_stock"] * 0.35
+        + normalized["price_filter_pass"] * 0.10
+        + (1.0 - normalized["recently_exposed"]) * 0.10
+        + (1.0 - normalized["already_purchased"]) * 0.10
+    )
+    diversity_exploration_score = bound_score(
+        normalized["exploration_candidate"] * 0.65
+        + (1.0 - normalized["recently_exposed"]) * 0.35
+    )
+
+    hybrid_retrieval_contribution = (
+        hybrid_retrieval_score * WEIGHTED_RANKER_GROUP_WEIGHTS["hybrid_retrieval_score"]
+    )
+    colbert_contribution = (
+        colbert_rerank_score * WEIGHTED_RANKER_GROUP_WEIGHTS["colbert_rerank_score"]
+    )
+    collaborative_contribution = (
+        collaborative_group_score * WEIGHTED_RANKER_GROUP_WEIGHTS["collaborative_group_score"]
+    )
+    interest_contribution = (
+        user_interest_score * WEIGHTED_RANKER_GROUP_WEIGHTS["user_interest_score"]
+    )
+    quality_contribution = (
+        product_quality_score * WEIGHTED_RANKER_GROUP_WEIGHTS["product_quality_score"]
+    )
+    trend_contribution = (
+        trend_freshness_score * WEIGHTED_RANKER_GROUP_WEIGHTS["trend_freshness_score"]
+    )
+    business_constraints_contribution = (
+        business_constraints_score
+        * WEIGHTED_RANKER_GROUP_WEIGHTS["business_constraints_score"]
+    )
+    diversity_contribution = (
+        diversity_exploration_score
+        * WEIGHTED_RANKER_GROUP_WEIGHTS["diversity_exploration_score"]
+    )
+
     recall_score = (
-        normalized["dense_recall_score"] * 0.16
-        + normalized["sparse_recall_score"] * 0.12
-        + normalized["colbert_rerank_score"] * 0.08
-        + normalized["collaborative_score"] * 0.10
-        + normalized["item_cooccurrence_score"] * 0.06
-        + normalized["rrf_fusion_score"] * 0.16
-        + normalized["recall_channel_count"] * 0.06
-        + normalized["best_channel_rank"] * 0.04
+        hybrid_retrieval_contribution + colbert_contribution + collaborative_contribution
     )
-    interest_score = (
-        normalized["category_match"] * 0.08
-        + normalized["tag_match_count"] * 0.07
-        + normalized["dynasty_match"] * 0.04
-        + normalized["craft_match"] * 0.03
-        + normalized["scene_match"] * 0.03
-        + normalized["festival_match"] * 0.03
-        + normalized["price_affinity"] * 0.04
-        + normalized["user_recent_interest_score"] * 0.06
-        + normalized["user_long_term_interest_score"] * 0.08
-    )
-    quality_score = (
-        normalized["sales_count"] * 0.05
-        + normalized["conversion_rate"] * 0.04
-        + normalized["add_to_cart_rate"] * 0.03
-        + normalized["rating_avg"] * 0.03
-        + normalized["review_count"] * 0.02
-        + normalized["stock_available"] * 0.03
-        + normalized["freshness_score"] * 0.03
-        + normalized["content_quality_score"] * 0.03
-        - normalized["return_rate"] * 0.03
-    )
+    interest_score = interest_contribution
+    quality_score = quality_contribution + trend_contribution
 
     business_adjustments = compute_business_adjustments(
         features,
         rules=business_rules,
     )
-    base_score = recall_score + interest_score + quality_score
+    base_score = (
+        recall_score
+        + interest_score
+        + quality_score
+        + business_constraints_contribution
+        + diversity_contribution
+    )
     final_score = base_score + business_adjustments["business_total"]
 
     return {
+        "hybrid_retrieval_score": round(hybrid_retrieval_score, 6),
+        "colbert_rerank_score": round(colbert_rerank_score, 6),
+        "collaborative_group_score": round(collaborative_group_score, 6),
+        "user_interest_score": round(user_interest_score, 6),
+        "product_quality_score": round(product_quality_score, 6),
+        "trend_freshness_score": round(trend_freshness_score, 6),
+        "business_constraints_score": round(business_constraints_score, 6),
+        "diversity_exploration_score": round(diversity_exploration_score, 6),
+        "hybrid_retrieval_contribution": round(hybrid_retrieval_contribution, 6),
+        "colbert_contribution": round(colbert_contribution, 6),
+        "collaborative_contribution": round(collaborative_contribution, 6),
+        "interest_contribution": round(interest_contribution, 6),
+        "quality_contribution": round(quality_contribution, 6),
+        "trend_contribution": round(trend_contribution, 6),
+        "business_constraints_contribution": round(business_constraints_contribution, 6),
+        "diversity_contribution": round(diversity_contribution, 6),
         "recall_score": round(recall_score, 6),
         "interest_score": round(interest_score, 6),
         "quality_score": round(quality_score, 6),
@@ -185,3 +269,7 @@ def score_weighted_candidate(
         "base_score": round(base_score, 6),
         "final_score": round(final_score, 6),
     }
+
+
+def bound_score(value: float) -> float:
+    return max(0.0, min(float(value), 1.0))

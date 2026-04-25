@@ -55,11 +55,17 @@ Current feature groups include:
 
 Its score is split into:
 
-* recall score
-* interest score
-* quality score
-* business boost / penalty
-* exploration boost
+* `hybrid_retrieval_score` with weight `0.25`
+* `colbert_rerank_score` with weight `0.20`
+* `collaborative_group_score` with weight `0.15`
+* `user_interest_score` with weight `0.15`
+* `product_quality_score` with weight `0.10`
+* `trend_freshness_score` with weight `0.05`
+* `business_constraints_score` with weight `0.05`
+* `diversity_exploration_score` with weight `0.05`
+
+The weighted sum becomes `base_score`; then `business_boost / penalty` and
+`exploration_boost` are applied as post-score adjustments to produce `final_score`.
 
 `backend/app/services/ltr_ranker.py` reserves the `ltr_ranker` entry.
 
@@ -67,7 +73,15 @@ Current behavior:
 
 * if `RECOMMENDATION_RANKER=weighted_ranker`, use the weighted ranker directly
 * if `RECOMMENDATION_RANKER=ltr_ranker` and a JSON model file exists, load the JSON feature weights
+* if the JSON model declares `training_sample_count` below `RECOMMENDATION_LTR_MIN_TRAINING_SAMPLES`, fall back to `weighted_ranker`
 * if `RECOMMENDATION_RANKER=ltr_ranker` but the model file is absent, fall back to `weighted_ranker`
+
+Reserved training labels for future offline LTR training are:
+
+* `impression_no_click = -0.1`
+* `click = 0.2`
+* `add_to_cart = 0.6`
+* `pay_order = 1.0`
 
 ## Post-processing
 

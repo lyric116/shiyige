@@ -2452,3 +2452,41 @@ Step 14:
 * `GET /api/v1/products/search` 是新增的最终展示型搜索接口，后续如果再改搜索协议，优先保持它的字段口径稳定，不要只改旧的 `/api/v1/search` 或 `/api/v1/search/semantic`。
 * 当前 `/api/v1/products/{product_id}/related` 的来源拆解已经齐全，但底层仍以 baseline 相似度计算为主，性能优化应留到后续第 15 节单独推进，不要在未补测试前直接改成另一套不可解释返回。
 * 新增的 admin singular 别名路径已经进入测试覆盖；后续如果重构后台 router，必须同时保住 plural 和 singular 两套入口，否则会把文档接口和现有后台页面联调一起打断。
+
+### 同日继续推进记录（五十）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 14：落实排序公式建议与 LTR 回退阈值
+
+新增与修改：
+
+* `backend/app/core/config.py`
+* `backend/app/services/ltr_ranker.py`
+* `backend/app/services/ranker.py`
+* `backend/tests/unit/test_settings.py`
+* `backend/tests/test_ranker.py`
+* `docs/ranking_design.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/core/config.py backend/app/services/ltr_ranker.py backend/app/services/ranker.py backend/tests/unit/test_settings.py backend/tests/test_ranker.py docs/ranking_design.md`
+* `./.venv/bin/python -m pytest backend/tests/unit/test_settings.py backend/tests/test_ranker.py backend/tests/test_recommendation_pipeline.py backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py -q`
+
+结果：
+
+* 已在 `backend/app/services/ranker.py` 把 `weighted_ranker` 改成 8 个分组权重结构，显式对齐第 14.1 节建议：`hybrid_retrieval_score=0.25`、`colbert_rerank_score=0.20`、`collaborative_group_score=0.15`、`user_interest_score=0.15`、`product_quality_score=0.10`、`trend_freshness_score=0.05`、`business_constraints_score=0.05`、`diversity_exploration_score=0.05`。
+* 旧的 `recall_score / interest_score / quality_score / business_total / final_score` 兼容字段仍然保留，但 `score_breakdown` 现在会同时输出新的分组原始分与 contribution，答辩和后台调试都能直接对应到排序公式，而不是只能看到三段粗粒度分数。
+* 已在 `backend/app/services/ranker.py` 前移一个更强的业务约束：未上架或无库存候选不会再只靠惩罚分“尽量排后”，而是直接在 ranker 阶段剔除。专项回归里正是这个调整修复了“无库存候选仍可能进入 TopN”的真实问题。
+* 已在 `backend/app/core/config.py` 新增 `recommendation_ltr_min_training_samples`，并在 `backend/app/services/ltr_ranker.py` 增加 `training_sample_count` 阈值判断；当 JSON LTR 模型声明的训练样本量低于阈值时，系统现在会自动回退到 `weighted_ranker`，符合第 14.2 节的上线策略。
+* `backend/app/services/ltr_ranker.py` 同时新增了未来离线训练要用的 `LTR_EVENT_LABEL_WEIGHTS` 预留常量，已把 `impression_no_click / click / add_to_cart / pay_order` 的弱负样本、弱正样本、中正样本和强正样本权重固定下来，避免后续训练脚本再另起一套口径。
+* 已更新 `docs/ranking_design.md`，把新的 8 组权重、LTR 最小样本阈值回退规则和保留训练标签写进正式文档，不再只在代码里隐式存在。
+* 本轮专项回归结果为 `14 passed`，覆盖配置默认值、weighted ranker 行为、LTR 模型缺失回退、LTR 样本阈值回退、推荐流水线和推荐调试 API，说明第 14 节改动已经稳定落地。
+
+交接提醒：
+
+* 当前 `weighted_ranker` 已经具备计划里的 8 组显式权重，但 `WEIGHTED_RANKER_MODEL_VERSION` 仍保留旧值 `weighted-ranker-v1` 以避免打穿现有日志与页面联调；如果后续要正式升级模型版本号，需要同步评估脚本和答辩材料中的口径。
+* `recommendation_ltr_min_training_samples` 只在模型 JSON 明确写入 `training_sample_count` 时才会生效；这保证旧模型文件仍可兼容，但也意味着后续训练脚本若想启用阈值保护，必须显式写出该元数据。
+* 现在无库存候选会在 ranker 阶段被跳过；后续如果新增“预售可推荐”之类业务模式，不要直接回退成只靠惩罚分，而应显式扩展 `business_rules` 和 ranker 过滤条件。

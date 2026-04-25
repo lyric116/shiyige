@@ -35,6 +35,7 @@ def test_app_settings_use_safe_defaults(monkeypatch) -> None:
     assert settings.vector_db_provider == "qdrant"
     assert settings.qdrant_url == "http://qdrant:6333"
     assert settings.recommendation_pipeline_version == "v1"
+    assert settings.recommendation_ltr_min_training_samples == 200
 
 
 def test_infrastructure_settings_raise_clear_error_when_required_env_missing(monkeypatch) -> None:

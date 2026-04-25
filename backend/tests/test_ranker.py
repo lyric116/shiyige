@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -218,6 +219,8 @@ def test_weighted_ranker_prefers_interest_match_and_keeps_exploration_candidate(
         assert any(candidate.business_rules.exploration_candidate for candidate in ranked)
         assert all(candidate.product.id != no_stock_candidate.id for candidate in ranked)
         assert ranked[0].score_breakdown["recall_score"] > 0
+        assert ranked[0].score_breakdown["hybrid_retrieval_score"] > 0
+        assert ranked[0].score_breakdown["business_constraints_score"] > 0
     finally:
         session.close()
 
@@ -286,5 +289,133 @@ def test_ranker_falls_back_to_weighted_when_ltr_model_is_not_available(
         assert ranked[0].ranker_name == "weighted_ranker"
         assert ranked[0].ltr_fallback_used is True
         assert ranked[0].score_breakdown["ltr_model_score"] == 0.0
+    finally:
+        session.close()
+
+
+def test_ranker_requires_enough_ltr_training_samples(
+    db_engine,
+    tmp_path,
+) -> None:
+    Base.metadata.create_all(db_engine)
+    session = Session(db_engine)
+    try:
+        seed_base_data(session)
+        user = create_user(
+            session,
+            email="ranker-threshold@example.com",
+            username="ranker-threshold",
+        )
+        add_user_trace(session, user_id=user.id, product_id=1)
+
+        candidate_product = session.scalar(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.media_items),
+            )
+            .where(Product.name == "宋风褙子套装")
+        )
+        assert candidate_product is not None
+
+        candidate = build_candidate(
+            product_id=candidate_product.id,
+            recall_items=[
+                RecallItem(
+                    product_id=candidate_product.id,
+                    recall_channel="content_profile",
+                    recall_score=0.88,
+                    rank_in_channel=1,
+                    matched_terms=["汉服"],
+                ),
+                RecallItem(
+                    product_id=candidate_product.id,
+                    recall_channel="collaborative_user",
+                    recall_score=4.2,
+                    rank_in_channel=1,
+                    matched_terms=["汉服"],
+                ),
+            ],
+            matched_terms=["汉服"],
+            fusion_score=0.1,
+            score=0.62,
+        )
+
+        context = build_ranking_feature_context(
+            session,
+            user_id=user.id,
+            top_terms=["汉服"],
+            consumed_product_ids={1},
+            recent_product_ids=[1],
+            logs=session.scalars(
+                select(UserBehaviorLog)
+                .where(UserBehaviorLog.user_id == user.id)
+                .order_by(UserBehaviorLog.created_at.asc(), UserBehaviorLog.id.asc())
+            ).all(),
+            candidate_product_ids=[candidate_product.id],
+        )
+
+        model_path = tmp_path / "ltr-ranker.json"
+        model_path.write_text(
+            json.dumps(
+                {
+                    "model_version": "ltr-json-threshold",
+                    "training_sample_count": 80,
+                    "weights": {
+                        "dense_recall_score": 0.6,
+                        "collaborative_score": 0.4,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        ranked = rank_fused_candidates(
+            [candidate],
+            products_by_id={candidate_product.id: candidate_product},
+            context=context,
+            limit=1,
+            settings=AppSettings(
+                recommendation_ranker="ltr_ranker",
+                recommendation_ltr_model_path=str(model_path),
+                recommendation_ltr_min_training_samples=100,
+            ),
+        )
+
+        assert ranked[0].ranker_name == "weighted_ranker"
+        assert ranked[0].ltr_fallback_used is True
+
+        model_path.write_text(
+            json.dumps(
+                {
+                    "model_version": "ltr-json-threshold",
+                    "training_sample_count": 180,
+                    "weights": {
+                        "dense_recall_score": 0.6,
+                        "collaborative_score": 0.4,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        ranked = rank_fused_candidates(
+            [candidate],
+            products_by_id={candidate_product.id: candidate_product},
+            context=context,
+            limit=1,
+            settings=AppSettings(
+                recommendation_ranker="ltr_ranker",
+                recommendation_ltr_model_path=str(model_path),
+                recommendation_ltr_min_training_samples=100,
+            ),
+        )
+
+        assert ranked[0].ranker_name == "ltr_ranker"
+        assert ranked[0].ranker_model_version == "ltr-json-threshold"
+        assert ranked[0].ltr_fallback_used is False
+        assert ranked[0].score_breakdown["ltr_model_score"] > 0
     finally:
         session.close()
