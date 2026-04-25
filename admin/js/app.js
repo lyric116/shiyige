@@ -259,6 +259,36 @@
       .join("");
   }
 
+  function renderCapabilityFlag(enabled) {
+    return enabled
+      ? '<span class="admin-status">启用</span>'
+      : '<span class="empty-state">-</span>';
+  }
+
+  function renderComparisonNotes(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return '<div class="result-card">当前没有可展示的答辩提示。</div>';
+    }
+
+    return items
+      .map(function (item, index) {
+        return `
+          <article class="debug-card">
+            <div class="debug-card-header">
+              <div>
+                <p class="admin-eyebrow">答辩提示 ${index + 1}</p>
+                <h3>实验解释要点</h3>
+              </div>
+            </div>
+            <div class="debug-card-section">
+              <p class="page-copy mb-0">${escapeHtml(item)}</p>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
   function renderDashboard(summary) {
     document.getElementById("summary-users").textContent = String(summary.users_total);
     document.getElementById("summary-products").textContent = String(summary.products_total);
@@ -887,15 +917,120 @@
   async function loadRecommendationConfigPage() {
     const payload = await request("/api/v1/admin/recommendations/experiments");
     const activeCopy = document.getElementById("recommendation-config-active");
+    const runtimeGrid = document.getElementById("recommendation-config-runtime-grid");
+    const matrixHeadRow = document.getElementById("recommendation-config-matrix-head-row");
+    const matrixBody = document.getElementById("recommendation-config-matrix-body");
     const list = document.getElementById("recommendation-config-list");
+    const notes = document.getElementById("recommendation-config-notes");
+    const runtime = payload.data.runtime_summary || {};
+    const capabilityCatalog = payload.data.capability_catalog || [];
+    const items = payload.data.items || [];
 
     if (activeCopy) {
       activeCopy.textContent = `当前激活方案：${
         payload.data.active_key || "unknown"
-      }。这组配置决定搜索与推荐链路当前启用哪些召回和排序能力。`;
+      }。这组配置决定搜索与推荐链路当前启用哪些召回和排序能力。${
+        runtime.degraded_to_baseline
+          ? "当前运行时已降级到 baseline，请优先检查 Qdrant 可用性和索引状态。"
+          : "当前运行时未降级，可直接用于展示完整推荐链路。"
+      }`;
+    }
+    if (runtimeGrid) {
+      runtimeGrid.innerHTML = `
+        <article class="admin-metadata-card">
+          <h3>推荐运行时</h3>
+          <div class="admin-kv-grid">
+            <div class="admin-kv-item">
+              <strong>推荐后端</strong>
+              <span>${escapeHtml(runtime.active_recommendation_backend || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>搜索后端</strong>
+              <span>${escapeHtml(runtime.active_search_backend || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>排序器</strong>
+              <span>${escapeHtml(runtime.configured_recommendation_ranker || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>Pipeline 版本</strong>
+              <span>${escapeHtml(runtime.recommendation_pipeline_version || "-")}</span>
+            </div>
+          </div>
+        </article>
+        <article class="admin-metadata-card">
+          <h3>向量库状态</h3>
+          <div class="admin-kv-grid">
+            <div class="admin-kv-item">
+              <strong>Qdrant 可用</strong>
+              <span>${runtime.qdrant_available ? "是" : "否"}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>当前 provider</strong>
+              <span>${escapeHtml(runtime.configured_provider || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>降级到 baseline</strong>
+              <span>${runtime.degraded_to_baseline ? "是" : "否"}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>Qdrant URL</strong>
+              <span>${escapeHtml(runtime.qdrant_url || "-")}</span>
+            </div>
+          </div>
+          <div class="debug-card-section">
+            <strong>Qdrant 错误</strong>
+            <span>${escapeHtml(runtime.qdrant_error || "无")}</span>
+          </div>
+        </article>
+      `;
+    }
+    if (matrixHeadRow) {
+      matrixHeadRow.innerHTML = `
+        <th>方案</th>
+        ${capabilityCatalog
+          .map(function (capability) {
+            return `<th title="${escapeHtml(capability.description || "")}">${escapeHtml(
+              capability.label || capability.key
+            )}</th>`;
+          })
+          .join("")}
+      `;
+    }
+    if (matrixBody) {
+      matrixBody.innerHTML = renderBreakdownTableRows(
+        items,
+        [
+          {
+            key: "name",
+            render: function (item) {
+              return `
+                <div>
+                  <strong>${escapeHtml(item.name || item.key)}</strong>
+                  <div class="text-muted">${escapeHtml(item.strategy || "-")}</div>
+                </div>
+              `;
+            },
+          },
+          ...capabilityCatalog.map(function (capability) {
+            return {
+              key: capability.key,
+              render: function (item) {
+                return renderCapabilityFlag(
+                  Array.isArray(item.capabilities) && item.capabilities.includes(capability.key)
+                );
+              },
+            };
+          }),
+        ],
+        "当前没有实验方案数据。"
+      );
     }
     if (list) {
-      list.innerHTML = renderExperimentCards(payload.data.items || []);
+      list.innerHTML = renderExperimentCards(items);
+    }
+    if (notes) {
+      notes.innerHTML = renderComparisonNotes(payload.data.comparison_notes || []);
     }
   }
 

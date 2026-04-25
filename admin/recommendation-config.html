@@ -41,8 +41,35 @@
         </section>
 
         <section class="admin-panel">
+          <h2>当前运行时</h2>
+          <div id="recommendation-config-runtime-grid" class="admin-metadata-grid"></div>
+        </section>
+
+        <section class="admin-table-panel">
+          <div class="admin-table-panel-header">
+            <h2>能力矩阵</h2>
+            <p>用统一表格对比每个实验方案到底启用了哪些能力，答辩时可直接说明系统不是“只算余弦”。</p>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr id="recommendation-config-matrix-head-row">
+                  <th>方案</th>
+                </tr>
+              </thead>
+              <tbody id="recommendation-config-matrix-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-panel">
           <h2>实验方案清单</h2>
           <div id="recommendation-config-list" class="debug-card-grid"></div>
+        </section>
+
+        <section class="admin-panel">
+          <h2>答辩解释提示</h2>
+          <div id="recommendation-config-notes" class="debug-card-grid"></div>
         </section>
       </main>
     </div>

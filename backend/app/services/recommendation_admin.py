@@ -251,6 +251,7 @@ def build_experiment_payload(
 ) -> dict[str, object]:
     vector_runtime = runtime or probe_vector_store_runtime()
     active_key = derive_active_experiment_key(vector_runtime)
+    capability_catalog = build_experiment_capability_catalog()
     active_rows = db.scalars(
         select(RecommendationExperiment)
         .where(RecommendationExperiment.is_active.is_(True))
@@ -370,6 +371,26 @@ def build_experiment_payload(
 
     return {
         "active_key": active_key,
+        "runtime_summary": {
+            "configured_provider": vector_runtime.configured_provider,
+            "active_search_backend": vector_runtime.active_search_backend,
+            "active_recommendation_backend": vector_runtime.active_recommendation_backend,
+            "configured_recommendation_ranker": vector_runtime.configured_recommendation_ranker,
+            "recommendation_pipeline_version": vector_runtime.recommendation_pipeline_version,
+            "degraded_to_baseline": vector_runtime.degraded_to_baseline,
+            "qdrant_available": vector_runtime.qdrant_available,
+            "qdrant_url": vector_runtime.qdrant_url,
+            "qdrant_error": vector_runtime.qdrant_error,
+        },
+        "capability_catalog": capability_catalog,
+        "comparison_notes": [
+            "baseline 用于保留旧版 Python 全量余弦链路，方便和新链路做对照。",
+            (
+                "hybrid / hybrid_rerank 重点展示 dense + sparse + ColBERT "
+                "的搜索升级，不再只靠单一路径召回。"
+            ),
+            "full_pipeline 代表当前推荐主链路：多路召回、协同过滤、排序器、多样性与探索并存。",
+        ],
         "items": items,
     }
 
@@ -416,3 +437,58 @@ def derive_active_experiment_key(runtime: VectorStoreRuntime) -> str:
     if runtime.active_search_backend == "qdrant_hybrid":
         return "hybrid_rerank"
     return "hybrid"
+
+
+def build_experiment_capability_catalog() -> list[dict[str, str]]:
+    return [
+        {
+            "key": "dense_similarity",
+            "label": "Dense 语义",
+            "description": "保留旧版 embedding 相似度基线能力。",
+        },
+        {
+            "key": "rule_bonus",
+            "label": "规则加分",
+            "description": "旧版标签、类目、场景规则加分链路。",
+        },
+        {
+            "key": "baseline_compare",
+            "label": "Baseline 对照",
+            "description": "允许与旧版推荐逻辑做效果和延迟对比。",
+        },
+        {
+            "key": "dense_recall",
+            "label": "Dense Recall",
+            "description": "Qdrant dense 向量召回。",
+        },
+        {
+            "key": "sparse_recall",
+            "label": "Sparse Recall",
+            "description": "关键词 / BM25 风格 sparse 召回。",
+        },
+        {
+            "key": "rrf_fusion",
+            "label": "RRF 融合",
+            "description": "dense 与 sparse 候选融合。",
+        },
+        {
+            "key": "colbert_rerank",
+            "label": "ColBERT 重排",
+            "description": "候选重排，不依赖全量 ANN。",
+        },
+        {
+            "key": "collaborative_filtering",
+            "label": "协同过滤",
+            "description": "相似用户与共现召回能力。",
+        },
+        {
+            "key": "ltr_or_weighted_ranker",
+            "label": "统一排序器",
+            "description": "Weighted ranker / LTR 排序入口。",
+        },
+        {
+            "key": "diversity_rules",
+            "label": "多样性/探索",
+            "description": "类目打散、探索位与冷启动混排。",
+        },
+    ]

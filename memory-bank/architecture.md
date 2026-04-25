@@ -72,7 +72,7 @@
 * `admin/orders.html`：后台订单管理页。
 * `admin/reindex.html`：向量索引状态与重建页。
 * `admin/recommendation-debug.html`：推荐调试台；按用户查看画像、候选拆解和最终打分证据。
-* `admin/recommendation-config.html`：推荐实验配置页；展示 baseline、hybrid、hybrid_rerank、full_pipeline 等方案能力。
+* `admin/recommendation-config.html`：推荐实验配置页；展示 baseline、hybrid、hybrid_rerank、full_pipeline 等方案能力，并通过运行时摘要、能力矩阵和答辩提示卡片把实验方案变成可解释的对比页面。
 * `admin/recommendation-metrics.html`：推荐指标页；聚合推荐请求、曝光、点击、加购、支付转化、槽位分布、召回通道分布和搜索/推荐 pipeline 分布，是推荐系统可观测层的后台展示入口。
 
 ## 5. `front/js/` 脚本文件作用
@@ -157,7 +157,7 @@
 * `backend/app/services/__init__.py`：服务层包入口占位。
 * `backend/app/services/embedding.py`：向量 provider 服务；负责统一 embedding provider 抽象、离线 fallback、本地模型包装以及模型元信息描述。
 * `backend/app/services/embedding_text.py`：向量文本构建服务；负责生成稳定的商品 `embedding_text` 与对应 `content_hash`。
-* `backend/app/services/recommendation_admin.py`：后台聚合服务；负责把推荐日志、搜索日志、实验配置、向量索引状态和运行时信息整理成后台仪表盘/推荐后台页面可直接消费的数据结构。当前还承担推荐 KPI、fallback 比例、召回通道分布和搜索/推荐 pipeline 分布的聚合职责。
+* `backend/app/services/recommendation_admin.py`：后台聚合服务；负责把推荐日志、搜索日志、实验配置、向量索引状态和运行时信息整理成后台仪表盘/推荐后台页面可直接消费的数据结构。当前还承担推荐 KPI、fallback 比例、召回通道分布、搜索/推荐 pipeline 分布、实验页运行时摘要和能力矩阵目录的聚合职责。
 * `backend/app/services/vector_search.py`：向量检索服务；负责商品 embedding 保障、向量相似度计算、语义排序和推荐理由生成。
 * `backend/app/services/recommendations.py`：推荐服务；负责从行为日志构建用户兴趣画像，并基于画像向量和兴趣词返回猜你喜欢结果。
 
@@ -1388,3 +1388,21 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   现在 `recommendation_admin.py -> admin/js/app.js -> recommendation-metrics.html` 已经构成一条专门的可观测链路，这使项目从“实现了推荐”走向“能证明自己实现了推荐”。
 * 当后台开始展示召回通道与 fallback 分布后，日志字段就不再只是埋点细节，而是后台协议的一部分。
   这意味着后续继续做实验对比、冷启动展示和评估页面时，应该优先复用现有指标聚合层，而不是各个页面各算一套统计口径。
+
+### 9.53 实验配置页现在开始具备“能力矩阵层”，而不只是“方案卡片层”
+
+第 77 次同日推进把推荐实验页从静态卡片说明，推进成了结构化对比页面：
+
+* `backend/app/services/recommendation_admin.py`：实验对比聚合层。
+  当前 `build_experiment_payload()` 不再只返回 `active_key + items`，而是同时返回 `runtime_summary`、`capability_catalog` 和 `comparison_notes`。这使实验页不需要自行猜测当前运行时，也不需要把能力字段硬编码在前端。
+* `admin/recommendation-config.html`：实验对比展示层。
+  当前页面新增了运行时摘要区、能力矩阵表和答辩提示卡片，已经从“展示有哪些方案”升级成“解释这些方案有什么差异、当前系统到底跑在哪个方案上”。
+* `admin/js/app.js`：实验页编排层。
+  当前实验页渲染逻辑已经开始把 `capability_catalog` 当成后端协议消费，这意味着前端不再直接写死“dense/sparse/ColBERT/协同过滤”的列集合，后续继续扩展能力时只需要在聚合层加目录定义即可。
+
+这里有两个新的关键架构洞察：
+
+* 当实验页开始承担答辩解释职责后，“能力目录”就应该成为后端输出，而不是前端常量。
+  因为实验能力集合未来还会继续扩展，如果仍由前端自己维护列集合，就会再次出现“后端能力已经变化、实验页还停留在旧文案”的脱节问题。
+* 实验配置页最重要的不是展示配置 JSON，而是把“当前运行时”和“理论方案”并排展示。
+  只有这样，页面才能清楚回答“当前是不是已经退回 baseline”“当前 full_pipeline 是否真的生效”，而不是只停留在一份静态方案说明。

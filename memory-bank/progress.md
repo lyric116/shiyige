@@ -112,6 +112,55 @@
 
 * 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E2：实验对比台增强**。
 
+### Phase E2：实验对比台增强
+
+* 已完成 `recommendation_enhancement_execution_plan.md` 中的 Phase E2。
+* `backend/app/services/recommendation_admin.py` 现在会在实验配置接口里返回：
+  * `runtime_summary`
+  * `capability_catalog`
+  * `comparison_notes`
+* `admin/recommendation-config.html` 已升级为真正的实验对比台：
+  * 增加当前运行时区块
+  * 增加能力矩阵表
+  * 增加答辩解释提示卡片
+* `admin/js/app.js` 已支持实验页渲染能力矩阵和运行时降级说明。
+* `backend/tests/api/test_admin_recommendation_debug.py` 已补充实验配置接口对新字段的断言。
+
+### Phase E2 修改文件
+
+* `backend/app/services/recommendation_admin.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-config.html`
+* `admin/js/app.js`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### Phase E2 验证
+
+* `./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q`
+* `./.venv/bin/python -m ruff check backend/app/services/recommendation_admin.py backend/tests/api/test_admin_recommendation_debug.py`
+* `node --check admin/js/app.js`
+* `curl -I http://127.0.0.1/admin/recommendation-config.html`
+
+结果：
+
+* `test_admin_recommendation_debug.py` 通过，实验接口现已覆盖新增返回字段。
+* `ruff check` 通过。
+* 后台脚本语法检查通过。
+* `http://127.0.0.1/admin/recommendation-config.html` 返回 `200`。
+
+### Phase E2 当前结论
+
+* 后台实验页现在不再只是“卡片列表”，而是能直接说明：
+  * 当前是否降级到 baseline
+  * 当前搜索/推荐后端是什么
+  * 每个实验方案到底启用了哪些能力
+* 这一步把实验配置从“文档性页面”推进成了“答辩解释页面”。
+
+### 下一步起点
+
+* 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E3：前台推荐证据展示增强**。
+
 ## 2026-04-13
 
 ### 完成事项
