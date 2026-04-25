@@ -34,6 +34,31 @@
 
 * 下一步应修复 `backend/alembic/versions/20260424_12_recommendation_logging.py`，让已有日志表但 Alembic 版本未前进的数据库也能顺利升级。
 
+### 继续推进记录
+
+* 已修复 `backend/alembic/versions/20260424_12_recommendation_logging.py`，把日志表迁移改为幂等升级。
+* 新迁移逻辑会在升级时先检查表与索引是否存在：已存在的表跳过建表，缺失的索引补建，避免 PostgreSQL 数据卷处于“表已在库中、Alembic 版本仍停在旧 revision”时反复报 `DuplicateTable`。
+* 重新构建并启动 `api` 容器后，当前数据库已从 `20260424_11` 成功升级到 `20260424_12`，`uvicorn` 已正常启动。
+
+### 追加修改文件
+
+* `backend/alembic/versions/20260424_12_recommendation_logging.py`
+
+### 追加验证
+
+* `docker compose up -d --build api`
+* `docker compose logs --tail=200 api`
+* `docker compose exec -T postgres psql -U shiyige -d shiyige -c "select version_num from alembic_version;"`
+* `curl -i http://127.0.0.1/api/v1/health`
+* `curl -L -I http://127.0.0.1/admin/`
+
+结果：
+
+* Alembic 已成功执行 `20260424_11 -> 20260424_12`。
+* `alembic_version` 当前为 `20260424_12`。
+* `http://127.0.0.1/api/v1/health` 返回 `200`。
+* `http://127.0.0.1/admin/` 返回 `302 -> /admin/index.html -> 200`。
+
 ## 2026-04-13
 
 ### 完成事项

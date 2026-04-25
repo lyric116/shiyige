@@ -319,6 +319,14 @@
 
 ### 9.7 当前测试体系已经从“入口存在”升级到“业务回归”
 
+### 9.8 Compose 启动对迁移状态和 Nginx 精确路由都很敏感
+
+当前本地启动链路里有两个容易把系统卡死的点：
+
+* `nginx/default.conf` 中 `location = /admin/` 不能直接把精确匹配 URI `alias` 到单个文件，否则访问 `/admin/` 时会触发错误的目录索引拼接；当前实现改为显式跳转到 `/admin/index.html`。
+* `backend/scripts/start_api.sh` 会在启动时循环执行 `alembic upgrade head`，因此只要任意一个迁移对“已有表但旧 revision”的数据库不兼容，整个 API 容器就会一直停在迁移阶段，外部表现为 `/api/*` 统一 `502`。
+* `backend/alembic/versions/20260424_12_recommendation_logging.py` 现在承担的不只是“新库建表”，还承担“修复旧数据卷升级路径”的职责；它的 `upgrade()` 已经按表和索引做幂等处理，能从 `20260424_11` 平滑恢复到 `20260424_12`。
+
 现在测试不再只是证明服务能启动，而是已经覆盖：
 
 * 用户域 API 回归
