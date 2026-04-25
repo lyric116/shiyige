@@ -2490,3 +2490,43 @@ Step 14:
 * 当前 `weighted_ranker` 已经具备计划里的 8 组显式权重，但 `WEIGHTED_RANKER_MODEL_VERSION` 仍保留旧值 `weighted-ranker-v1` 以避免打穿现有日志与页面联调；如果后续要正式升级模型版本号，需要同步评估脚本和答辩材料中的口径。
 * `recommendation_ltr_min_training_samples` 只在模型 JSON 明确写入 `training_sample_count` 时才会生效；这保证旧模型文件仍可兼容，但也意味着后续训练脚本若想启用阈值保护，必须显式写出该元数据。
 * 现在无库存候选会在 ranker 阶段被跳过；后续如果新增“预售可推荐”之类业务模式，不要直接回退成只靠惩罚分，而应显式扩展 `business_rules` 和 ranker 过滤条件。
+
+### 同日继续推进记录（五十一）
+
+已继续完成：
+
+* Recommendation Upgrade Phase 15：落实缓存与相似商品性能优化
+
+新增与修改：
+
+* `backend/app/services/cache.py`
+* `backend/app/services/recommendations.py`
+* `backend/app/services/vector_search.py`
+* `backend/app/api/v1/products.py`
+* `backend/app/api/v1/search.py`
+* `backend/tests/integration/test_cache_behavior.py`
+* `backend/tests/test_hybrid_search.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/cache.py backend/app/services/recommendations.py backend/app/api/v1/products.py backend/app/api/v1/search.py backend/app/services/vector_search.py backend/tests/integration/test_cache_behavior.py backend/tests/test_hybrid_search.py`
+* `./.venv/bin/python -m pytest backend/tests/integration/test_cache_behavior.py backend/tests/test_hybrid_search.py backend/tests/api/test_related_products.py backend/tests/api/test_recommendations.py backend/tests/api/test_search_semantic.py -q`
+
+结果：
+
+* 已在 `backend/app/services/cache.py` 新增 `SEMANTIC_SEARCH_CACHE_TTL`、`RELATED_PRODUCTS_CACHE_TTL`、`USER_PROFILE_CACHE_TTL`，并把推荐缓存键扩成 `user_id + slot + backend + limit`，修复了旧实现里 `home/cart/order_complete` 可能共用同一条缓存的结构性问题。
+* 已在 `backend/app/services/cache.py` 把所有 cache key 加上基于 `DATABASE_URL` 的命名空间前缀。这个改动源自本轮真实暴露的问题：测试进程共用同一个 Redis 时，新增的用户画像缓存会把不同数据库实例里相同 `user_id` 的画像串起来；现在这个跨环境污染已经被隔离。
+* 已在 `backend/app/services/recommendations.py` 给 `UserInterestProfile` 增加可序列化缓存快照，`build_user_interest_profile()` 现在会优先读取缓存命中的画像，并在用户行为导致 `invalidate_recommendation_cache_for_user()` 时一起失效，从而落实第 15.1.7 节里“缓存最终结果和中间用户画像”的要求。
+* 已在 `backend/app/api/v1/search.py` 给语义搜索和最终搜索别名接口接入结果缓存；相同 query + filter + backend 的请求在非 debug 模式下会直接命中缓存，同时仍然保留行为日志与搜索日志落库，避免性能优化把评估链路打断。
+* 已在 `backend/app/api/v1/products.py` 给相关推荐接入缓存，并把推荐列表缓存键修成 slot-aware 结构；专项测试已经验证 `home` 与 `cart` 会落成不同 cache key，不再相互覆盖。
+* 已在 `backend/app/services/vector_search.py` 增加 `find_related_products_with_qdrant()`，当向量库 ready 时，`/api/v1/products/{product_id}/related` 会优先走 Qdrant dense 召回，再补 co-view/co-buy 和文化匹配分，最后保留已有的 `source_breakdown` 与 `diversity_result` 协议；Qdrant 不可用时仍自动回退 baseline。
+* 已扩展 `backend/tests/integration/test_cache_behavior.py`，现在会同时验证语义搜索缓存、推荐缓存 slot 隔离、相关推荐缓存以及用户画像缓存命中行为；并在 `backend/tests/test_hybrid_search.py` 新增了 `qdrant_related` 路径的回归测试。
+* 本轮专项回归结果为 `12 passed`，说明第 15 节的缓存层、Qdrant 相似商品优化和命名空间隔离都已经稳定落地。
+
+交接提醒：
+
+* 现在所有 cache key 都带数据库命名空间，这能避免本地多测试库或多环境共用 Redis 时互相污染；后续如果单独写脚本直接读 Redis，请不要再假设 key 以 `products:` 或 `search:` 开头。
+* `find_related_products()` 现在是“Qdrant 优先，baseline 回退”的双路径实现；如果后续继续优化 10k/100k 规模，不要再把协议层改掉，直接继续在 `find_related_products_with_qdrant()` 内部扩大候选控制和缓存策略即可。
+* 推荐缓存键已经按 slot 拆开，`invalidate_recommendation_cache_for_user()` 也同步删除旧格式与新格式 key；后续若再新增推荐展示位，记得把新 slot 加进 `RECOMMENDATION_CACHE_SLOTS`，否则行为发生后该展示位的缓存不会被及时清掉。

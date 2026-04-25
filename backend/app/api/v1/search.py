@@ -16,6 +16,7 @@ from backend.app.services.behavior import (
 )
 from backend.app.services.cache import (
     SEARCH_SUGGESTIONS_CACHE_TTL,
+    SEMANTIC_SEARCH_CACHE_TTL,
     build_cache_key,
     get_cached_json,
     invalidate_recommendation_cache_for_user,
@@ -190,6 +191,78 @@ def build_semantic_search_response(
             status_code=200,
         )
 
+    cache_key = build_cache_key(
+        "search",
+        "semantic",
+        pipeline["active_search_backend"],
+        query,
+        limit,
+        category_id,
+        min_price,
+        max_price,
+        dynasty_style,
+        craft_type,
+        scene_tag,
+        festival_tag,
+        stock_only,
+    )
+    current_user = get_optional_user_from_request(request, db)
+    cached_items = get_cached_json(cache_key)
+    if not debug and isinstance(cached_items, list):
+        log_behavior(
+            db,
+            user=current_user,
+            behavior_type=BEHAVIOR_SEARCH,
+            target_type="semantic_search",
+            ext_json={
+                "query": query,
+                "mode": "semantic",
+                "result_count": len(cached_items),
+                "pipeline": pipeline["active_search_backend"],
+                "filters": serialize_search_filters(filters),
+                "debug": debug,
+                "cache_hit": True,
+            },
+        )
+        log_search_request(
+            db,
+            request=request,
+            user_id=current_user.id if current_user is not None else None,
+            query=query,
+            mode="semantic",
+            pipeline_version=str(pipeline["active_search_backend"]),
+            total_results=len(cached_items),
+            latency_ms=0.0,
+            filters_json=serialize_search_filters(filters),
+            items=[
+                {
+                    "product_id": item["id"],
+                    "score": item["score"],
+                    "reason": item["reason"],
+                }
+                for item in cached_items
+            ],
+        )
+        if current_user is not None:
+            invalidate_recommendation_cache_for_user(current_user.id)
+        db.commit()
+        return build_response(
+            request=request,
+            code=0,
+            message="ok",
+            data={
+                "query": query,
+                "items": cached_items,
+                "total": len(cached_items),
+                "pipeline": {
+                    **pipeline,
+                    "pipeline_version": pipeline["active_search_backend"],
+                    "debug": debug,
+                },
+            },
+            status_code=200,
+        )
+
     results = semantic_search_products(
         db,
         query=query,
@@ -204,7 +277,6 @@ def build_semantic_search_response(
         stock_only=stock_only,
     )
 
-    current_user = get_optional_user_from_request(request, db)
     log_behavior(
         db,
         user=current_user,
@@ -220,6 +292,12 @@ def build_semantic_search_response(
         },
     )
     serialized_items = [serialize_semantic_search_item(result) for result in results]
+    if not debug:
+        set_cached_json(
+            cache_key,
+            serialized_items,
+            ttl_seconds=SEMANTIC_SEARCH_CACHE_TTL,
+        )
     log_search_request(
         db,
         request=request,

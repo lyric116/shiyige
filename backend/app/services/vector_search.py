@@ -17,6 +17,7 @@ from backend.app.services.embedding import EmbeddingProvider, get_embedding_prov
 from backend.app.services.embedding_text import normalize_text_piece
 from backend.app.services.hybrid_search import hybrid_search_products
 from backend.app.services.product_index_document import product_has_available_stock
+from backend.app.services.recall_content import recall_related_product_candidates
 from backend.app.services.search_filters import (
     SearchFilters,
     build_search_filters,
@@ -168,6 +169,24 @@ def build_related_source_breakdown(
     }
 
 
+def compute_related_cultural_match_score(
+    source: Product,
+    candidate: Product,
+    matched_terms: list[str],
+) -> float:
+    score = 0.0
+    if source.category_id == candidate.category_id:
+        score += 0.25
+    if source.dynasty_style and source.dynasty_style == candidate.dynasty_style:
+        score += 0.12
+    if source.scene_tag and source.scene_tag == candidate.scene_tag:
+        score += 0.12
+    if source.craft_type and source.craft_type == candidate.craft_type:
+        score += 0.1
+    score += min(len(set(matched_terms)) * 0.08, 0.24)
+    return score
+
+
 def select_diverse_related_results(
     results: list[VectorSearchResult],
     *,
@@ -217,6 +236,116 @@ def select_diverse_related_results(
         category_counts[category_id] = current_count + 1
 
     return selected[:limit]
+
+
+def load_related_products_by_id(
+    db: Session,
+    *,
+    product_ids: list[int],
+) -> dict[int, Product]:
+    if not product_ids:
+        return {}
+
+    products = db.scalars(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.tags),
+            selectinload(Product.skus).selectinload(ProductSku.inventory),
+            selectinload(Product.embedding),
+        )
+        .where(Product.id.in_(product_ids), Product.status == 1)
+    ).unique().all()
+
+    return {
+        product.id: product
+        for product in products
+        if product_has_available_stock(product)
+    }
+
+
+def find_related_products_with_qdrant(
+    db: Session,
+    *,
+    product_id: int,
+    limit: int,
+    settings: AppSettings,
+    client: QdrantClient | None = None,
+) -> list[VectorSearchResult]:
+    source_product = db.scalar(
+        select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.tags),
+            selectinload(Product.skus).selectinload(ProductSku.inventory),
+        )
+        .where(Product.id == product_id, Product.status == 1)
+    )
+    if source_product is None or not product_has_available_stock(source_product):
+        return []
+
+    recall_items = recall_related_product_candidates(
+        [product_id],
+        consumed_product_ids=set(),
+        limit=max(limit * 3, 12),
+        settings=settings,
+        client=client,
+    )
+    if not recall_items:
+        return []
+
+    products_by_id = load_related_products_by_id(
+        db,
+        product_ids=[item.product_id for item in recall_items],
+    )
+    cooccurrence_scores = {
+        int(item["product_id"]): float(item["score"])
+        for item in load_item_cooccurrence_map(db).get(str(product_id), [])
+    }
+
+    results: list[VectorSearchResult] = []
+    for item in recall_items:
+        candidate = products_by_id.get(item.product_id)
+        if candidate is None:
+            continue
+
+        matched_terms = list(item.matched_terms) or collect_related_matches(
+            source_product,
+            candidate,
+        )
+        cultural_match_score = compute_related_cultural_match_score(
+            source_product,
+            candidate,
+            matched_terms,
+        )
+        cooccurrence_score = cooccurrence_scores.get(candidate.id, 0.0)
+        cooccurrence_boost = min(cooccurrence_score * 0.05, 0.2)
+        dense_similarity = float(item.recall_score)
+        results.append(
+            VectorSearchResult(
+                product=candidate,
+                score=dense_similarity + cultural_match_score + cooccurrence_boost,
+                reason=build_related_reason(source_product, candidate, matched_terms),
+                matched_terms=matched_terms,
+                dense_score=dense_similarity,
+                pipeline_version="qdrant_related",
+                source_breakdown=build_related_source_breakdown(
+                    matched_terms=matched_terms,
+                    dense_similarity=dense_similarity,
+                    cooccurrence_score=cooccurrence_score,
+                    cultural_match_score=cultural_match_score,
+                ),
+            )
+        )
+
+    results.sort(
+        key=lambda item: (
+            item.score,
+            item.product.id,
+        ),
+        reverse=True,
+    )
+    return select_diverse_related_results(results, limit=limit)
 
 
 def baseline_semantic_search_products(
@@ -368,7 +497,31 @@ def find_related_products(
     product_id: int,
     limit: int = 4,
     provider: EmbeddingProvider | None = None,
+    settings: AppSettings | None = None,
+    client: QdrantClient | None = None,
 ) -> list[VectorSearchResult]:
+    app_settings = settings or get_app_settings()
+    if provider is None:
+        runtime = probe_vector_store_runtime(app_settings)
+        if runtime.active_search_backend == "qdrant_hybrid":
+            try:
+                qdrant_results = find_related_products_with_qdrant(
+                    db,
+                    product_id=product_id,
+                    limit=limit,
+                    settings=app_settings,
+                    client=client,
+                )
+                if qdrant_results:
+                    return qdrant_results
+            except Exception as exc:  # pragma: no cover - runtime fallback protection
+                logger.warning(
+                    "Qdrant related-products search failed, falling back to baseline. "
+                    "product_id=%s error=%s",
+                    product_id,
+                    exc,
+                )
+
     embedding_provider = provider or get_embedding_provider()
     ensure_product_embeddings(db, embedding_provider)
     db.expire_all()
@@ -412,16 +565,11 @@ def find_related_products(
         )
         similarity_score = (similarity + 1) / 2
         matched_terms = collect_related_matches(source_product, candidate)
-        cultural_match_score = 0.0
-        if source_product.category_id == candidate.category_id:
-            cultural_match_score += 0.25
-        if source_product.dynasty_style and source_product.dynasty_style == candidate.dynasty_style:
-            cultural_match_score += 0.12
-        if source_product.scene_tag and source_product.scene_tag == candidate.scene_tag:
-            cultural_match_score += 0.12
-        if source_product.craft_type and source_product.craft_type == candidate.craft_type:
-            cultural_match_score += 0.1
-        cultural_match_score += min(len(set(matched_terms)) * 0.08, 0.24)
+        cultural_match_score = compute_related_cultural_match_score(
+            source_product,
+            candidate,
+            matched_terms,
+        )
         cooccurrence_score = cooccurrence_scores.get(candidate.id, 0.0)
         cooccurrence_boost = min(cooccurrence_score * 0.05, 0.2)
         final_score = similarity_score + cultural_match_score + cooccurrence_boost

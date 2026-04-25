@@ -14,6 +14,12 @@ from backend.app.core.logger import get_logger
 from backend.app.models.product import Product, ProductSku
 from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import UserBehaviorLog
+from backend.app.services.cache import (
+    USER_PROFILE_CACHE_TTL,
+    build_user_profile_cache_key,
+    get_cached_json,
+    set_cached_json,
+)
 from backend.app.services.embedding import EmbeddingProvider, get_embedding_provider
 from backend.app.services.embedding_text import build_embedding_content_hash, normalize_text_piece
 from backend.app.services.product_index_document import product_has_available_stock
@@ -44,6 +50,55 @@ class RecommendationCandidate:
     similarity: float
     vector_score: float
     term_bonus: float
+
+
+def isoformat_or_none(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
+
+
+def parse_iso_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def serialize_user_interest_profile(profile: UserInterestProfile) -> dict[str, object]:
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "model_name": profile.model_name,
+        "profile_text": profile.profile_text,
+        "embedding_vector": profile.embedding_vector,
+        "content_hash": profile.content_hash,
+        "behavior_count": profile.behavior_count,
+        "last_event_at": isoformat_or_none(profile.last_event_at),
+        "last_built_at": isoformat_or_none(profile.last_built_at),
+        "qdrant_user_point_id": profile.qdrant_user_point_id,
+        "profile_version": profile.profile_version,
+        "last_synced_at": isoformat_or_none(profile.last_synced_at),
+        "ext_json": dict(profile.ext_json or {}),
+    }
+
+
+def build_cached_user_interest_profile(payload: dict[str, object]) -> UserInterestProfile:
+    profile = UserInterestProfile(
+        user_id=int(payload["user_id"]),
+        model_name=str(payload["model_name"]),
+    )
+    profile.id = int(payload["id"]) if payload.get("id") is not None else None
+    profile.profile_text = payload.get("profile_text")
+    profile.embedding_vector = payload.get("embedding_vector")
+    profile.content_hash = payload.get("content_hash")
+    profile.behavior_count = int(payload.get("behavior_count") or 0)
+    profile.last_event_at = parse_iso_datetime(payload.get("last_event_at"))
+    profile.last_built_at = parse_iso_datetime(payload.get("last_built_at"))
+    profile.qdrant_user_point_id = payload.get("qdrant_user_point_id")
+    profile.profile_version = payload.get("profile_version")
+    profile.last_synced_at = parse_iso_datetime(payload.get("last_synced_at"))
+    profile.ext_json = dict(payload.get("ext_json") or {})
+    return profile
 
 
 def load_user_behavior_logs(db: Session, user_id: int) -> list[UserBehaviorLog]:
@@ -147,6 +202,15 @@ def build_user_interest_profile(
 ) -> UserInterestProfile:
     settings = get_app_settings()
     embedding_provider = provider or get_embedding_provider()
+    cache_key = build_user_profile_cache_key(user_id)
+    cached_profile = get_cached_json(cache_key)
+    if isinstance(cached_profile, dict):
+        if (
+            cached_profile.get("model_name") == embedding_provider.descriptor.model_name
+            and cached_profile.get("profile_version") == settings.recommendation_pipeline_version
+        ):
+            return build_cached_user_interest_profile(cached_profile)
+
     ensure_product_embeddings(db, embedding_provider)
     db.expire_all()
 
@@ -207,6 +271,11 @@ def build_user_interest_profile(
     db.add(profile)
     db.commit()
     db.refresh(profile)
+    set_cached_json(
+        cache_key,
+        serialize_user_interest_profile(profile),
+        ttl_seconds=USER_PROFILE_CACHE_TTL,
+    )
     return profile
 
 

@@ -18,7 +18,7 @@ from backend.app.services.embedding_registry import get_embedding_bundle
 from backend.app.services.hybrid_search import RecallCandidate, fuse_recall_candidates
 from backend.app.services.qdrant_client import create_qdrant_client, get_qdrant_connection_status
 from backend.app.services.search_reranker import reciprocal_rank_score, score_colbert_maxsim
-from backend.app.services.vector_search import semantic_search_products
+from backend.app.services.vector_search import find_related_products, semantic_search_products
 from backend.app.tasks.qdrant_index_tasks import sync_products_to_qdrant
 from backend.scripts.seed_base_data import seed_base_data
 
@@ -216,6 +216,52 @@ def test_semantic_search_uses_qdrant_hybrid_and_respects_stock_filters(
 
         assert product.id not in stock_only_ids
         assert product.id in include_oos_ids
+    finally:
+        if client.collection_exists(settings.qdrant_collection_products):
+            client.delete_collection(settings.qdrant_collection_products)
+        client.close()
+
+
+def test_related_products_use_qdrant_candidates_when_vector_store_is_ready(
+    seeded_session: Session,
+) -> None:
+    settings = build_settings(f"shiyige_products_related_{uuid.uuid4().hex[:8]}")
+    status = get_qdrant_connection_status(settings)
+    if not status.available:
+        pytest.skip("Qdrant is not reachable for related-products test")
+
+    client = create_qdrant_client(settings)
+    bundle = get_embedding_bundle(settings)
+    try:
+        if client.collection_exists(settings.qdrant_collection_products):
+            client.delete_collection(settings.qdrant_collection_products)
+
+        sync_products_to_qdrant(
+            seeded_session,
+            mode="full",
+            settings=settings,
+            client=client,
+            bundle=bundle,
+        )
+
+        source_product = seeded_session.scalar(
+            select(Product).where(Product.name == "点翠发簪")
+        )
+        assert source_product is not None
+
+        results = find_related_products(
+            seeded_session,
+            product_id=source_product.id,
+            limit=3,
+            settings=settings,
+            client=client,
+        )
+
+        assert results
+        assert results[0].product.id != source_product.id
+        assert results[0].pipeline_version == "qdrant_related"
+        assert results[0].dense_score is not None
+        assert results[0].source_breakdown["dense_similarity"]["score"] > 0
     finally:
         if client.collection_exists(settings.qdrant_collection_products):
             client.delete_collection(settings.qdrant_collection_products)

@@ -11,8 +11,9 @@ from backend.app.core.security import create_access_token, hash_password
 from backend.app.main import create_app
 from backend.app.models.base import Base
 from backend.app.models.product import Product
-from backend.app.models.user import User, UserProfile
+from backend.app.models.user import User, UserBehaviorLog, UserProfile
 from backend.app.services import cache as cache_service
+from backend.app.services.recommendations import build_user_interest_profile
 from backend.scripts.seed_base_data import seed_base_data
 from backend.tests.api.test_recommendations import create_user_preference_trace
 
@@ -167,6 +168,27 @@ async def test_product_detail_search_suggestions_and_recommendations_are_cached(
     assert second_suggestion_response.status_code == 200
     assert second_suggestion_response.json()["data"]["items"][0]["keyword"] == "故宫宫廷香囊"
 
+    semantic_response = await api_client.get(
+        "/api/v1/products/search",
+        params={"q": "发簪", "limit": 3},
+    )
+    assert semantic_response.status_code == 200
+    semantic_cached_name = semantic_response.json()["data"]["items"][0]["name"]
+
+    with api_session_factory() as session:
+        semantic_product = session.scalar(select(Product).where(Product.id == accessory_id))
+        assert semantic_product is not None
+        semantic_product.name = "缓存后改名的发簪"
+        session.add(semantic_product)
+        session.commit()
+
+    semantic_cached_response = await api_client.get(
+        "/api/v1/products/search",
+        params={"q": "发簪", "limit": 3},
+    )
+    assert semantic_cached_response.status_code == 200
+    assert semantic_cached_response.json()["data"]["items"][0]["name"] == semantic_cached_name
+
     user = create_user(
         email="cache-rec@example.com",
         username="cache-rec",
@@ -207,6 +229,37 @@ async def test_product_detail_search_suggestions_and_recommendations_are_cached(
     assert second_recommendation_response.status_code == 200
     assert second_items[0]["id"] == cached_product_id
     assert second_items[0]["name"] == cached_product_name
+
+    slot_response = await api_client.get(
+        "/api/v1/products/recommendations",
+        headers=headers,
+        params={"slot": "cart"},
+    )
+    assert slot_response.status_code == 200
+    assert any(":home:" in key for key in fake_cache.store)
+    assert any(":cart:" in key for key in fake_cache.store)
+
+    related_response = await api_client.get(
+        f"/api/v1/products/{accessory_id}/related",
+        params={"limit": 3},
+    )
+    assert related_response.status_code == 200
+    related_cached_id = related_response.json()["data"]["items"][0]["id"]
+    related_cached_name = related_response.json()["data"]["items"][0]["name"]
+
+    with api_session_factory() as session:
+        related_product = session.get(Product, related_cached_id)
+        assert related_product is not None
+        related_product.name = "缓存后改名的关联商品"
+        session.add(related_product)
+        session.commit()
+
+    related_cached_response = await api_client.get(
+        f"/api/v1/products/{accessory_id}/related",
+        params={"limit": 3},
+    )
+    assert related_cached_response.status_code == 200
+    assert related_cached_response.json()["data"]["items"][0]["name"] == related_cached_name
 
 
 @pytest.mark.asyncio
@@ -257,3 +310,50 @@ async def test_recommendation_cache_is_invalidated_after_user_behavior(
     second_ids = [item["id"] for item in second_response.json()["data"]["items"][:3]]
 
     assert first_ids != second_ids
+
+
+def test_user_interest_profile_is_cached_and_reused(
+    monkeypatch,
+    api_session_factory,
+    create_user,
+    seed_product_catalog,
+) -> None:
+    fake_cache = FakeCacheBackend()
+    monkeypatch.setattr(cache_service, "get_cache_backend", lambda: fake_cache)
+
+    user = create_user(
+        email="cache-profile@example.com",
+        username="cache-profile",
+    )
+
+    with api_session_factory() as session:
+        product = session.scalar(select(Product).where(Product.name == "明制襦裙"))
+        assert product is not None
+        session.add(
+            UserBehaviorLog(
+                user_id=user.id,
+                behavior_type="view_product",
+                target_type="product",
+                target_id=product.id,
+            )
+        )
+        session.commit()
+
+    with api_session_factory() as session:
+        profile = build_user_interest_profile(session, user_id=user.id)
+        assert profile.behavior_count == 1
+
+    cache_key = cache_service.build_user_profile_cache_key(user.id)
+    assert cache_key in fake_cache.store
+
+    def fail_load_logs(db, user_id):
+        raise AssertionError(f"unexpected cache miss for user {user_id}")
+
+    monkeypatch.setattr(
+        "backend.app.services.recommendations.load_user_behavior_logs",
+        fail_load_logs,
+    )
+
+    with api_session_factory() as session:
+        cached_profile = build_user_interest_profile(session, user_id=user.id)
+        assert cached_profile.behavior_count == 1

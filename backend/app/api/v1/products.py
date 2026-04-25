@@ -17,7 +17,9 @@ from backend.app.services.behavior import (
 from backend.app.services.cache import (
     PRODUCT_DETAIL_CACHE_TTL,
     RECOMMENDATIONS_CACHE_TTL,
+    RELATED_PRODUCTS_CACHE_TTL,
     build_cache_key,
+    build_recommendation_cache_key,
     get_cached_json,
     invalidate_recommendation_cache_for_user,
     set_cached_json,
@@ -230,7 +232,12 @@ def get_product_recommendations(
     debug: bool = Query(default=False),
 ):
     pipeline = build_runtime_marker()
-    cache_key = build_cache_key("products", "recommendations", current_user.id, limit)
+    cache_key = build_recommendation_cache_key(
+        user_id=current_user.id,
+        slot=slot,
+        limit=limit,
+        backend=str(pipeline["active_recommendation_backend"]),
+    )
     cached_items = get_cached_json(cache_key)
     if not debug and isinstance(cached_items, list):
         log_recommendation_request(
@@ -446,6 +453,27 @@ def get_related_products(
     db: Session = Depends(get_db),
     limit: int = Query(default=4, ge=1, le=12),
 ):
+    runtime = build_runtime_marker()
+    cache_key = build_cache_key(
+        "products",
+        "related",
+        product_id,
+        runtime["active_search_backend"],
+        limit,
+    )
+    cached_items = get_cached_json(cache_key)
+    if isinstance(cached_items, list):
+        return build_response(
+            request=request,
+            code=0,
+            message="ok",
+            data={
+                "items": cached_items,
+                "pipeline": runtime,
+            },
+            status_code=200,
+        )
+
     product = db.scalar(select(Product).where(Product.id == product_id))
     if product is None:
         return build_response(
@@ -461,16 +489,19 @@ def get_related_products(
         product_id=product_id,
         limit=limit,
     )
+    items = [serialize_related_product_item(result) for result in results]
+    set_cached_json(
+        cache_key,
+        items,
+        ttl_seconds=RELATED_PRODUCTS_CACHE_TTL,
+    )
     return build_response(
         request=request,
         code=0,
         message="ok",
         data={
-            "items": [
-                serialize_related_product_item(result)
-                for result in results
-            ],
-            "pipeline": build_runtime_marker(),
+            "items": items,
+            "pipeline": runtime,
         },
         status_code=200,
     )

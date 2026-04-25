@@ -1297,3 +1297,31 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   当前 `training_sample_count + recommendation_ltr_min_training_samples` 的组合，使“低样本伪模型误上线”这个风险第一次被正式约束住；这比简单的“文件加载成功就切换”更接近真实系统治理。
 * 有些业务规则不适合留在加权公式里当软信号。
   无库存与未上架状态本轮被前移成 ranker 的硬过滤，说明排序层并不是所有约束都要被连续分值吸收；一旦某个规则本身代表“结果根本不该展示”，它就应该被提升为明确边界，而不是继续和其他分数混算。
+
+### 9.50 Phase 15 现在已经形成“命名空间缓存层 + 画像快照层 + Qdrant 相关推荐快路径”的性能形态
+
+第 74 次同日推进把第 15 节里最现实的性能项真正落到了运行链路上：
+
+* `backend/app/services/cache.py`：统一缓存策略与命名空间层。
+  当前不再只是几个 TTL 常量和简单 key 拼接，而是新增了 `SEMANTIC_SEARCH_CACHE_TTL`、`RELATED_PRODUCTS_CACHE_TTL`、`USER_PROFILE_CACHE_TTL`、slot-aware 推荐 key，以及基于 `DATABASE_URL` 的 cache namespace。Phase 15 之后，缓存终于开始具备环境隔离语义，而不是所有测试库和运行环境都挤在同一套 Redis key 上。
+* `backend/app/services/recommendations.py`：用户画像快照层。
+  当前 `build_user_interest_profile()` 在真正扫行为日志和商品文本前，会优先尝试读取缓存的 `UserInterestProfile` 快照；构建完成后再把画像序列化回缓存。这意味着“中间用户画像”已经从纯数据库表升级成了真正的可失效缓存对象。
+* `backend/app/api/v1/products.py`：推荐与相关推荐缓存编排层。
+  当前首页推荐缓存 key 已按 `user_id + slot + backend + limit` 拆开，修复了旧实现里不同展示位共用同一缓存的问题；相关推荐接口也新增了独立缓存，并在命中时直接返回稳定的公开协议，不需要再重复做相似度计算。
+* `backend/app/api/v1/search.py`：语义搜索缓存编排层。
+  当前最终搜索接口和语义搜索接口都具备了 query/filter/backend 维度的结果缓存；缓存命中时仍然保留行为日志和搜索日志写入，因此性能优化没有破坏后续评估和埋点链路。
+* `backend/app/services/vector_search.py`：相关推荐双路径执行层。
+  当前 `find_related_products()` 已升级成“Qdrant 优先、baseline 回退”的结构：当向量库 ready 时走 `find_related_products_with_qdrant()`，先从 Qdrant 取有限候选，再补 co-view/co-buy 和文化匹配分；只有在向量库不可用或异常时，才回退到旧的全量 embedding 相似度扫描。
+* `backend/tests/integration/test_cache_behavior.py`：性能缓存回归层。
+  当前不仅继续验证商品详情、搜索建议和推荐缓存，还新增了语义搜索缓存、推荐 slot 隔离、相关推荐缓存和用户画像缓存命中的回归测试，确保本轮加上的缓存不会因为 key 设计错误而变成功能 bug。
+* `backend/tests/test_hybrid_search.py`：Qdrant 相关推荐路径验收层。
+  当前新增的回归已经固定了 `find_related_products()` 在向量库 ready 时会返回 `pipeline_version=qdrant_related`，不再只是默认走 baseline；这让相关推荐的优化终于有了明确测试锚点。
+
+这里有三个新的关键架构洞察：
+
+* 在共享 Redis 的项目里，“cache key 命名空间”本身就是基础设施设计，而不是测试细节。
+  本轮新增的用户画像缓存一上线就暴露出跨测试库串缓存的问题，说明只要缓存从商品级扩展到用户级，`user_id` 这种局部主键就不再足够；现在基于 `DATABASE_URL` 的命名空间已经成为所有缓存 key 的共同前缀约束。
+* 最有效的性能优化往往不是把整条链路一起缓存，而是把“重建代价高、失效边界清晰”的中间状态单独缓存。
+  `UserInterestProfile` 正是这种对象：它构建时要扫行为日志和商品文本，但失效又天然跟随用户行为发生。因此把画像做成可失效快照，比只扩大最终推荐 TTL 更稳，也更接近第 15 节“缓存中间用户画像”的目标。
+* 相关推荐的性能优化不能牺牲解释结构。
+  本轮 `find_related_products_with_qdrant()` 虽然把候选获取改成了向量库 fast path，但外层仍然保留 `source_breakdown`、`co_view_co_buy`、`cultural_match` 和 `diversity_result`。这说明“优化内部执行路径、保持外部协议不变”是这类系统里最稳的演进方式。
