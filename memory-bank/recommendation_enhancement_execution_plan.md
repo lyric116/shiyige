@@ -344,24 +344,53 @@ git commit -m "admin: add recommendation ab dashboard"
 
 在已有 `10000` 商品压测脚本基础上，补齐更大规模数据生成与分层采样策略，为 `100000` 商品量级提供可执行的压测入口和结果记录方式。
 
+**具体任务**
+
+1. 扩展压测脚本参数：
+   * 支持更大的商品量级
+   * 支持按 endpoint 单独指定请求量
+   * 支持分层采样或轻量模式，避免本地一次性压满
+2. 扩展压测产物：
+   * 记录数据集生成耗时
+   * 记录索引准备耗时
+   * 记录不同模式下的脚本运行说明
+3. 在文档和后台材料目录中补充：
+   * 大规模压测入口说明
+   * 10000 与 100000 量级的执行建议
+4. 补充测试：
+   * 脚本参数解析
+   * 轻量模式 / 降级模式输出结构
+
+**验证**
+
+```bash
+./.venv/bin/python backend/scripts/benchmark_recommendations.py --products 20000 --users 400 --requests 20
+./.venv/bin/python -m pytest backend/tests -q
+```
+
+**建议提交信息**
+
+```bash
+git commit -m "bench: extend large-scale recommendation benchmark"
+```
+
 ---
 
 ## 六、下一步起点
 
 当前阶段已完成：
 
-* **Phase E6：Redis 预计算推荐**
+* **Phase E7：A/B 实验看板**
 
 当前完成情况：
 
-* 已新增 Redis 预计算快照层，并支持按 `user_id + slot + backend + limit` 预热首页与购物车推荐。
-* 推荐接口现已形成“预计算 -> 在线缓存 -> 实时推荐”的三层返回路径，并通过 `cache_source` 暴露命中来源。
-* 后台实验配置页已能展示预热状态并触发一键预热。
+* 已在实验配置页补齐 A/B 实验效果看板，可展示流量最高实验版本、baseline 对比卡片和版本 x 槽位的效果表格。
+* 后台实验接口现已返回 `experiment_dashboard`，并把 CTR、CVR、fallback 和平均延迟直接聚合成结构化看板数据。
 * 已完成验证：
-  * `./.venv/bin/python -m pytest backend/tests/integration/test_cache_behavior.py -q`
-  * `./.venv/bin/python -m pytest backend/tests/api/test_recommendations.py backend/tests/api/test_admin_recommendation_debug.py -q`
+  * `./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q`
+  * `./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q`
   * `./.venv/bin/python -m pytest backend/tests -q`
 
 当前正在执行：
 
-* **Phase E7：A/B 实验看板**
+* **Phase E8：10 万商品压测扩展**

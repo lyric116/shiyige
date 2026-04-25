@@ -303,6 +303,236 @@ def build_search_metrics(db: Session) -> dict[str, object]:
     }
 
 
+def build_experiment_dashboard(db: Session) -> dict[str, object]:
+    requests = db.scalars(
+        select(RecommendationRequestLog)
+        .order_by(RecommendationRequestLog.created_at.asc(), RecommendationRequestLog.id.asc())
+    ).all()
+    total_requests = len(requests)
+    if total_requests == 0:
+        return {
+            "summary": {
+                "request_count": 0,
+                "variant_count": 0,
+                "slot_variant_count": 0,
+                "latest_request_at": None,
+            },
+            "top_variants": [],
+            "items": [],
+            "comparison_cards": [],
+        }
+
+    def build_count_map(model, *, action_type: str | None = None) -> dict[str, int]:
+        query = (
+            select(
+                model.request_id,
+                func.count().label("total"),
+            )
+            .group_by(model.request_id)
+            .order_by(model.request_id.asc())
+        )
+        if action_type is not None:
+            query = query.where(model.action_type == action_type)
+        return {
+            str(request_id): int(total)
+            for request_id, total in db.execute(query).all()
+        }
+
+    impression_counts = build_count_map(RecommendationImpressionLog)
+    click_counts = build_count_map(RecommendationClickLog, action_type="click")
+    add_to_cart_counts = build_count_map(RecommendationConversionLog, action_type="add_to_cart")
+    pay_counts = build_count_map(RecommendationConversionLog, action_type="pay_order")
+
+    slot_variant_metrics: dict[tuple[str, str, str], dict[str, object]] = {}
+    variant_metrics: dict[tuple[str, str], dict[str, object]] = {}
+
+    for request_row in requests:
+        slot_key = (
+            str(request_row.pipeline_version),
+            str(request_row.model_version),
+            str(request_row.slot),
+        )
+        variant_key = (
+            str(request_row.pipeline_version),
+            str(request_row.model_version),
+        )
+        request_id = str(request_row.request_id)
+
+        slot_bucket = slot_variant_metrics.setdefault(
+            slot_key,
+            {
+                "pipeline_version": slot_key[0],
+                "model_version": slot_key[1],
+                "slot": slot_key[2],
+                "request_count": 0,
+                "impression_count": 0,
+                "click_count": 0,
+                "add_to_cart_count": 0,
+                "pay_order_count": 0,
+                "fallback_request_count": 0,
+                "latency_total": 0.0,
+                "last_request_at": None,
+            },
+        )
+        variant_bucket = variant_metrics.setdefault(
+            variant_key,
+            {
+                "pipeline_version": variant_key[0],
+                "model_version": variant_key[1],
+                "request_count": 0,
+                "impression_count": 0,
+                "click_count": 0,
+                "add_to_cart_count": 0,
+                "pay_order_count": 0,
+                "fallback_request_count": 0,
+                "latency_total": 0.0,
+                "slot_count": set(),
+                "last_request_at": None,
+            },
+        )
+
+        for bucket in (slot_bucket, variant_bucket):
+            bucket["request_count"] = int(bucket["request_count"]) + 1
+            bucket["impression_count"] = int(bucket["impression_count"]) + impression_counts.get(
+                request_id,
+                0,
+            )
+            bucket["click_count"] = int(bucket["click_count"]) + click_counts.get(request_id, 0)
+            bucket["add_to_cart_count"] = int(bucket["add_to_cart_count"]) + add_to_cart_counts.get(
+                request_id,
+                0,
+            )
+            bucket["pay_order_count"] = int(bucket["pay_order_count"]) + pay_counts.get(
+                request_id,
+                0,
+            )
+            bucket["fallback_request_count"] = int(bucket["fallback_request_count"]) + int(
+                bool(request_row.fallback_used)
+            )
+            bucket["latency_total"] = float(bucket["latency_total"]) + float(
+                request_row.latency_ms or 0.0
+            )
+            bucket["last_request_at"] = max(
+                filter(
+                    None,
+                    [bucket.get("last_request_at"), request_row.created_at],
+                ),
+                default=request_row.created_at,
+            )
+        variant_bucket["slot_count"].add(request_row.slot)
+
+    def finalize_bucket(bucket: dict[str, object], *, request_base: int) -> dict[str, object]:
+        request_count = int(bucket["request_count"])
+        impression_count = int(bucket["impression_count"])
+        click_count = int(bucket["click_count"])
+        add_to_cart_count = int(bucket["add_to_cart_count"])
+        pay_order_count = int(bucket["pay_order_count"])
+        fallback_request_count = int(bucket["fallback_request_count"])
+        average_latency_ms = round(float(bucket["latency_total"]) / max(request_count, 1), 3)
+        return {
+            "pipeline_version": str(bucket["pipeline_version"]),
+            "model_version": str(bucket["model_version"]),
+            "slot": bucket.get("slot"),
+            "request_count": request_count,
+            "traffic_share": round(request_count / max(request_base, 1), 4),
+            "impression_count": impression_count,
+            "click_count": click_count,
+            "add_to_cart_count": add_to_cart_count,
+            "pay_order_count": pay_order_count,
+            "ctr": round(click_count / max(impression_count, 1), 4),
+            "add_to_cart_rate": round(add_to_cart_count / max(impression_count, 1), 4),
+            "conversion_rate": round(pay_order_count / max(impression_count, 1), 4),
+            "fallback_request_count": fallback_request_count,
+            "fallback_rate": round(fallback_request_count / max(request_count, 1), 4),
+            "average_latency_ms": average_latency_ms,
+            "last_request_at": isoformat_or_none(bucket.get("last_request_at")),
+        }
+
+    items = sorted(
+        [
+            finalize_bucket(bucket, request_base=total_requests)
+            for bucket in slot_variant_metrics.values()
+        ],
+        key=lambda item: (
+            item["request_count"],
+            item["ctr"],
+            -item["average_latency_ms"],
+            item["pipeline_version"],
+        ),
+        reverse=True,
+    )
+
+    top_variants = sorted(
+        [
+            {
+                **finalize_bucket(bucket, request_base=total_requests),
+                "slot_count": len(bucket["slot_count"]),
+            }
+            for bucket in variant_metrics.values()
+        ],
+        key=lambda item: (
+            item["request_count"],
+            item["ctr"],
+            -item["average_latency_ms"],
+            item["pipeline_version"],
+        ),
+        reverse=True,
+    )[:3]
+
+    baseline_variant = next(
+        (
+            item
+            for item in top_variants
+            if item["pipeline_version"] == "baseline" or item["model_version"] == "baseline"
+        ),
+        None,
+    )
+    leading_variant = next(
+        (
+            item
+            for item in top_variants
+            if item["pipeline_version"] != "baseline" and item["model_version"] != "baseline"
+        ),
+        None,
+    )
+    comparison_cards: list[dict[str, object]] = []
+    if baseline_variant and leading_variant:
+        comparison_cards.append(
+            {
+                "title": "Baseline 与当前主实验对比",
+                "baseline": baseline_variant,
+                "challenger": leading_variant,
+                "ctr_delta": round(
+                    float(leading_variant["ctr"]) - float(baseline_variant["ctr"]),
+                    4,
+                ),
+                "conversion_rate_delta": round(
+                    float(leading_variant["conversion_rate"])
+                    - float(baseline_variant["conversion_rate"]),
+                    4,
+                ),
+                "latency_delta_ms": round(
+                    float(leading_variant["average_latency_ms"])
+                    - float(baseline_variant["average_latency_ms"]),
+                    3,
+                ),
+            }
+        )
+
+    latest_request_at = max(request.created_at for request in requests)
+    return {
+        "summary": {
+            "request_count": total_requests,
+            "variant_count": len(variant_metrics),
+            "slot_variant_count": len(slot_variant_metrics),
+            "latest_request_at": isoformat_or_none(latest_request_at),
+        },
+        "top_variants": top_variants,
+        "items": items,
+        "comparison_cards": comparison_cards,
+    }
+
+
 def build_experiment_payload(
     db: Session,
     *,
@@ -313,6 +543,7 @@ def build_experiment_payload(
     capability_catalog = build_experiment_capability_catalog()
     artifact_catalog = build_recommendation_artifact_catalog()
     precompute_summary = get_recommendation_precompute_summary()
+    experiment_dashboard = build_experiment_dashboard(db)
     active_rows = db.scalars(
         select(RecommendationExperiment)
         .where(RecommendationExperiment.is_active.is_(True))
@@ -455,6 +686,7 @@ def build_experiment_payload(
         "artifact_summary": build_recommendation_artifact_summary(artifact_catalog),
         "artifact_catalog": artifact_catalog,
         "precompute_summary": precompute_summary,
+        "experiment_dashboard": experiment_dashboard,
         "items": items,
     }
 

@@ -68,6 +68,34 @@
         </section>
 
         <section class="admin-panel">
+          <h2>A/B 实验看板</h2>
+          <p id="recommendation-experiment-summary" class="page-copy">
+            正在加载实验流量与效果对比...
+          </p>
+          <div id="recommendation-experiment-cards" class="debug-card-grid"></div>
+          <div id="recommendation-experiment-comparison" class="debug-card-grid mt-3"></div>
+          <div class="table-responsive mt-3">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Pipeline</th>
+                  <th>Model</th>
+                  <th>Slot</th>
+                  <th>请求数</th>
+                  <th>流量占比</th>
+                  <th>CTR</th>
+                  <th>加购率</th>
+                  <th>CVR</th>
+                  <th>Fallback 比例</th>
+                  <th>平均延迟</th>
+                </tr>
+              </thead>
+              <tbody id="recommendation-experiment-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-panel">
           <h2>答辩解释提示</h2>
           <div id="recommendation-config-notes" class="debug-card-grid"></div>
         </section>

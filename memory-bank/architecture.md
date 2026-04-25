@@ -1492,3 +1492,27 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   本轮把预计算快照失效直接挂到现有 `invalidate_recommendation_cache_for_user()` 上，说明用户行为驱动的失效边界已经成为推荐系统设计的一部分，而不是 Redis 层面的实现细节。
 * 当性能优化已经能通过后台触发时，后台页面本身就成为系统调优的一环。
   现在 `recommendation-config.html` 已经可以展示预热状态并触发预热，这意味着后台不再只是演示页面，而开始承担运行期调优入口；后续的 A/B 看板和更大规模压测，也应该沿着这条“后台可操作”路线继续扩展。
+
+### 9.57 Phase E7 现在已经形成“实验效果聚合层 + 实验看板展示层 + baseline 对比层”的运营形态
+
+第 81 次同日推进把实验页从“解释有哪些方案”推进到“解释这些方案当前跑出了什么结果”：
+
+* `backend/app/services/recommendation_admin.py`：实验效果聚合层。
+  当前新增 `build_experiment_dashboard()`，会把 `RecommendationRequestLog / RecommendationImpressionLog / RecommendationClickLog / RecommendationConversionLog` 按 `pipeline_version + model_version + slot` 聚合成实验效果看板数据。这样后台终于能直接看到实验流量占比、CTR、加购率、支付转化率、fallback 比例和平均延迟，而不需要手动去日志表拼数据。
+* `backend/app/services/recommendation_admin.py`：实验版本汇总层。
+  当前除了 slot 级明细 `items` 外，还会继续聚合 `top_variants` 和 `comparison_cards`。前者负责按实验版本汇总流量最高的几个方案，后者则在存在 baseline 与主实验流量时自动生成差值摘要，把 CTR、CVR 和延迟差直接做成后台可以展示的对比卡片。
+* `admin/recommendation-config.html` 与 `admin/js/app.js`：实验看板展示层。
+  当前实验配置页已经不只是能力矩阵、预计算状态和材料目录页，还增加了 A/B 实验摘要、流量最高方案卡片、baseline 对比卡片，以及按“实验版本 x slot”展开的完整效果表格。实验配置页因此开始同时承担“能力解释页”和“实验效果看板页”两种职责。
+* `backend/tests/services/test_recommendation_admin_metrics.py`：实验聚合口径守护层。
+  当前新增测试已经锁定了实验版本流量聚合、fallback 比例和 baseline / v1 对比逻辑，避免后续继续改推荐日志或后台聚合时把 A/B 看板算歪。
+* `backend/tests/api/test_admin_recommendation_debug.py`：实验接口契约守护层。
+  当前实验配置接口测试已继续覆盖 `experiment_dashboard` 字段，保证前端实验看板渲染所需的数据结构不会被后续改动悄悄删掉。
+
+这里有三个新的关键架构洞察：
+
+* 只做“实验配置页”是不够的，实验系统必须同时回答“现在流量到底跑到了哪里”。
+  当前 `build_experiment_dashboard()` 把推荐请求日志和效果日志真正接到实验页上，这意味着实验系统终于从“静态方案目录”变成了“带效果反馈的运行中系统”。
+* 实验看板至少需要两层视角：版本视角和版本 x 槽位视角。
+  本轮 `top_variants` 与 `items` 的分层，正是为了避免把“总体哪个实验流量最大”和“某个 slot 下哪个实验表现更好”混成同一种统计口径。
+* baseline 对比不该停留在文档里，而应变成后台自动计算的结构化结果。
+  现在 `comparison_cards` 已能在后台直接展示 baseline 与主实验的 CTR / CVR / 延迟差，这让答辩和交接时都不需要临时再翻评估文档手工做心算对比。

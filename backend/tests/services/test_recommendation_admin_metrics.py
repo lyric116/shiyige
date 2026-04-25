@@ -5,12 +5,15 @@ from backend.app.core.security import hash_password
 from backend.app.models.base import Base
 from backend.app.models.product import Product
 from backend.app.models.recommendation_analytics import (
+    RecommendationClickLog,
+    RecommendationConversionLog,
     RecommendationImpressionLog,
     RecommendationRequestLog,
     SearchRequestLog,
 )
 from backend.app.models.user import User, UserProfile
 from backend.app.services.recommendation_admin import (
+    build_experiment_dashboard,
     build_recommendation_metrics,
     build_search_metrics,
 )
@@ -247,3 +250,167 @@ def test_build_search_metrics_includes_pipeline_breakdown(
             "share": 0.3333,
         },
     ]
+
+
+def test_build_experiment_dashboard_aggregates_variant_traffic_and_effectiveness(
+    db_engine,
+) -> None:
+    session_factory = create_session_factory(db_engine)
+    tracked_user = create_user(
+        session_factory,
+        email="metrics-ab@example.com",
+        username="metrics-ab",
+    )
+
+    with session_factory() as session:
+        seed_base_data(session)
+        product_ids = session.scalars(select(Product.id).order_by(Product.id.asc()).limit(3)).all()
+        assert len(product_ids) == 3
+
+        session.add_all(
+            [
+                RecommendationRequestLog(
+                    request_id="ab-req-1",
+                    user_id=tracked_user.id,
+                    slot="home",
+                    pipeline_version="baseline",
+                    model_version="baseline",
+                    candidate_count=6,
+                    final_product_ids=product_ids[:2],
+                    latency_ms=80.0,
+                    fallback_used=True,
+                ),
+                RecommendationRequestLog(
+                    request_id="ab-req-2",
+                    user_id=tracked_user.id,
+                    slot="home",
+                    pipeline_version="v1",
+                    model_version="weighted-ranker-v1",
+                    candidate_count=6,
+                    final_product_ids=product_ids[:2],
+                    latency_ms=35.0,
+                    fallback_used=False,
+                ),
+                RecommendationRequestLog(
+                    request_id="ab-req-3",
+                    user_id=tracked_user.id,
+                    slot="cart",
+                    pipeline_version="v1",
+                    model_version="weighted-ranker-v1",
+                    candidate_count=6,
+                    final_product_ids=product_ids[1:],
+                    latency_ms=30.0,
+                    fallback_used=False,
+                ),
+            ]
+        )
+        session.add_all(
+            [
+                RecommendationImpressionLog(
+                    request_id="ab-req-1",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[0],
+                    rank_position=1,
+                    recall_channels=["cold_start"],
+                    final_score=0.6,
+                    reason="baseline result",
+                ),
+                RecommendationImpressionLog(
+                    request_id="ab-req-1",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[1],
+                    rank_position=2,
+                    recall_channels=["trending"],
+                    final_score=0.55,
+                    reason="baseline result",
+                ),
+                RecommendationImpressionLog(
+                    request_id="ab-req-2",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[0],
+                    rank_position=1,
+                    recall_channels=["content_profile"],
+                    final_score=0.92,
+                    reason="pipeline result",
+                ),
+                RecommendationImpressionLog(
+                    request_id="ab-req-2",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[1],
+                    rank_position=2,
+                    recall_channels=["item_cooccurrence"],
+                    final_score=0.88,
+                    reason="pipeline result",
+                ),
+                RecommendationImpressionLog(
+                    request_id="ab-req-3",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[1],
+                    rank_position=1,
+                    recall_channels=["item_cooccurrence"],
+                    final_score=0.9,
+                    reason="pipeline result",
+                ),
+                RecommendationImpressionLog(
+                    request_id="ab-req-3",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[2],
+                    rank_position=2,
+                    recall_channels=["content_profile"],
+                    final_score=0.85,
+                    reason="pipeline result",
+                ),
+            ]
+        )
+        session.add_all(
+            [
+                RecommendationClickLog(
+                    request_id="ab-req-1",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[0],
+                    action_type="click",
+                ),
+                RecommendationClickLog(
+                    request_id="ab-req-2",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[0],
+                    action_type="click",
+                ),
+                RecommendationClickLog(
+                    request_id="ab-req-3",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[1],
+                    action_type="click",
+                ),
+                RecommendationConversionLog(
+                    request_id="ab-req-2",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[0],
+                    action_type="add_to_cart",
+                ),
+                RecommendationConversionLog(
+                    request_id="ab-req-3",
+                    user_id=tracked_user.id,
+                    product_id=product_ids[1],
+                    action_type="pay_order",
+                ),
+            ]
+        )
+        session.commit()
+
+        dashboard = build_experiment_dashboard(session)
+
+    assert dashboard["summary"]["request_count"] == 3
+    assert dashboard["summary"]["variant_count"] == 2
+    assert dashboard["summary"]["slot_variant_count"] == 3
+    assert dashboard["top_variants"][0]["pipeline_version"] == "v1"
+    assert dashboard["top_variants"][0]["request_count"] == 2
+    assert dashboard["top_variants"][0]["slot_count"] == 2
+    assert dashboard["items"][0]["traffic_share"] == 0.3333
+    assert any(
+        item["pipeline_version"] == "baseline"
+        and item["fallback_rate"] == 1.0
+        for item in dashboard["items"]
+    )
+    assert dashboard["comparison_cards"][0]["baseline"]["pipeline_version"] == "baseline"
+    assert dashboard["comparison_cards"][0]["challenger"]["pipeline_version"] == "v1"

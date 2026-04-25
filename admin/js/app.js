@@ -341,6 +341,100 @@
       .join("");
   }
 
+  function renderExperimentPerformanceCards(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return '<div class="result-card">当前还没有可展示的实验流量数据。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        return `
+          <article class="debug-card">
+            <div class="debug-card-header">
+              <div>
+                <p class="admin-eyebrow">${escapeHtml(item.pipeline_version || "-")}</p>
+                <h3>${escapeHtml(item.model_version || "-")}</h3>
+                <p class="page-copy">覆盖槽位数：${item.slot_count ?? 0}</p>
+              </div>
+              <span class="admin-status">${formatPercent(item.traffic_share)}</span>
+            </div>
+            <div class="admin-kv-grid">
+              <div class="admin-kv-item">
+                <strong>请求数</strong>
+                <span>${item.request_count ?? 0}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>CTR</strong>
+                <span>${formatPercent(item.ctr)}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>CVR</strong>
+                <span>${formatPercent(item.conversion_rate)}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>平均延迟</strong>
+                <span>${formatScore(item.average_latency_ms, 1)} ms</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>Fallback 比例</strong>
+                <span>${formatPercent(item.fallback_rate)}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>最近请求</strong>
+                <span>${escapeHtml(formatDateTime(item.last_request_at))}</span>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  function renderExperimentComparisonCards(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return '<div class="result-card">当前还没有足够的 baseline / 主实验对比流量。</div>';
+    }
+
+    return items
+      .map(function (item) {
+        const baseline = item.baseline || {};
+        const challenger = item.challenger || {};
+        return `
+          <article class="debug-card">
+            <div class="debug-card-header">
+              <div>
+                <p class="admin-eyebrow">Experiment Comparison</p>
+                <h3>${escapeHtml(item.title || "Baseline vs Variant")}</h3>
+                <p class="page-copy">
+                  baseline=${escapeHtml(
+                    `${baseline.pipeline_version || "-"} / ${baseline.model_version || "-"}`
+                  )}；
+                  challenger=${escapeHtml(
+                    `${challenger.pipeline_version || "-"} / ${challenger.model_version || "-"}`
+                  )}
+                </p>
+              </div>
+            </div>
+            <div class="admin-kv-grid">
+              <div class="admin-kv-item">
+                <strong>CTR 差值</strong>
+                <span>${formatPercent(item.ctr_delta)}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>CVR 差值</strong>
+                <span>${formatPercent(item.conversion_rate_delta)}</span>
+              </div>
+              <div class="admin-kv-item">
+                <strong>平均延迟差值</strong>
+                <span>${formatScore(item.latency_delta_ms, 1)} ms</span>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
   function renderPrecomputeSummary(summary) {
     const hitCount = Number(summary.hit_count || 0);
     const missCount = Number(summary.miss_count || 0);
@@ -1136,6 +1230,10 @@
     const matrixHeadRow = document.getElementById("recommendation-config-matrix-head-row");
     const matrixBody = document.getElementById("recommendation-config-matrix-body");
     const list = document.getElementById("recommendation-config-list");
+    const experimentSummary = document.getElementById("recommendation-experiment-summary");
+    const experimentCards = document.getElementById("recommendation-experiment-cards");
+    const experimentComparison = document.getElementById("recommendation-experiment-comparison");
+    const experimentTable = document.getElementById("recommendation-experiment-table-body");
     const notes = document.getElementById("recommendation-config-notes");
     const precomputeSummary = document.getElementById("recommendation-precompute-summary");
     const precomputeGrid = document.getElementById("recommendation-precompute-grid");
@@ -1248,6 +1346,60 @@
     }
     if (list) {
       list.innerHTML = renderExperimentCards(items);
+    }
+    if (experimentSummary) {
+      const summary = payload.data.experiment_dashboard?.summary || {};
+      experimentSummary.textContent = `当前已记录 ${summary.request_count || 0} 次推荐请求，形成 ${
+        summary.variant_count || 0
+      } 个实验版本和 ${summary.slot_variant_count || 0} 个实验-槽位组合。最近一次实验流量时间：${
+        formatDateTime(summary.latest_request_at) || "-"
+      }。`;
+    }
+    if (experimentCards) {
+      experimentCards.innerHTML = renderExperimentPerformanceCards(
+        payload.data.experiment_dashboard?.top_variants || []
+      );
+    }
+    if (experimentComparison) {
+      experimentComparison.innerHTML = renderExperimentComparisonCards(
+        payload.data.experiment_dashboard?.comparison_cards || []
+      );
+    }
+    if (experimentTable) {
+      experimentTable.innerHTML = renderBreakdownTableRows(
+        payload.data.experiment_dashboard?.items || [],
+        [
+          {
+            key: "pipeline_version",
+            render: function (item) {
+              return escapeHtml(item.pipeline_version || "-");
+            },
+          },
+          {
+            key: "model_version",
+            render: function (item) {
+              return escapeHtml(item.model_version || "-");
+            },
+          },
+          {
+            key: "slot",
+            render: function (item) {
+              return escapeHtml(item.slot || "-");
+            },
+          },
+          { key: "request_count", render: (item) => String(item.request_count ?? 0) },
+          { key: "traffic_share", render: (item) => formatPercent(item.traffic_share) },
+          { key: "ctr", render: (item) => formatPercent(item.ctr) },
+          { key: "add_to_cart_rate", render: (item) => formatPercent(item.add_to_cart_rate) },
+          { key: "conversion_rate", render: (item) => formatPercent(item.conversion_rate) },
+          { key: "fallback_rate", render: (item) => formatPercent(item.fallback_rate) },
+          {
+            key: "average_latency_ms",
+            render: (item) => `${formatScore(item.average_latency_ms, 1)} ms`,
+          },
+        ],
+        "当前还没有 A/B 实验流量数据。"
+      );
     }
     if (notes) {
       notes.innerHTML = renderComparisonNotes(payload.data.comparison_notes || []);

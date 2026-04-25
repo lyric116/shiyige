@@ -248,6 +248,7 @@ async def test_admin_recommendation_experiments_endpoint_returns_static_configs(
         item["path"] == "docs/recommendation_pipeline.md"
         for item in body["data"]["artifact_catalog"]
     )
+    assert body["data"]["experiment_dashboard"]["summary"]["request_count"] == 0
     assert {item["key"] for item in body["data"]["items"]} >= {
         "baseline",
         "hybrid",

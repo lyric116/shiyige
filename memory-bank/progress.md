@@ -2967,3 +2967,64 @@ Step 14:
 * 预计算推荐没有直接覆盖原有在线缓存，而是额外加了一层 `precomputed` 快照。这样可以把“预热生成”和“请求时临时缓存”区分开来，后续做命中率统计和 A/B 看板时才有可解释空间。
 * 预热服务当前优先覆盖 `home` 与 `cart` 两个槽位；如果后续要扩到 `order_complete` 或其他推荐展示位，应先确认该展示位的失效边界，再决定是否加入预热列表，而不是直接复制同样配置。
 * 本轮已经把 `recommend_home` 的高延迟问题转成了可运营的预热能力；下一步更合适的方向是继续做 A/B 实验看板，把 `precomputed / realtime / fallback` 的流量与效果差异展示出来，而不是再次只做底层埋点。
+
+### 同日继续推进记录（五十五）
+
+已继续完成：
+
+* Recommendation Enhancement Phase E7：A/B 实验看板
+
+新增与修改：
+
+* `backend/app/services/recommendation_admin.py`
+* `backend/tests/services/test_recommendation_admin_metrics.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-config.html`
+* `admin/js/app.js`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+
+验证命令：
+
+* `./.venv/bin/python -m ruff check backend/app/services/recommendation_admin.py backend/tests/services/test_recommendation_admin_metrics.py backend/tests/api/test_admin_recommendation_debug.py`
+* `node --check admin/js/app.js`
+* `./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_admin_recommendation_debug.py -q`
+* `docker compose exec -T nginx sh -lc 'wget -S -O /dev/null http://127.0.0.1/admin/recommendation-config.html'`
+* `./.venv/bin/python -m pytest backend/tests -q`
+
+结果：
+
+* 已在 `backend/app/services/recommendation_admin.py` 新增实验看板聚合 `build_experiment_dashboard()`，把推荐请求、曝光、点击、加购、支付、fallback 和平均延迟按：
+  * `pipeline_version`
+  * `model_version`
+  * `slot`
+  三个维度聚合成后台可消费的实验指标。
+* 聚合结果现在会同时返回：
+  * `summary`
+  * `top_variants`
+  * `items`
+  * `comparison_cards`
+  其中 `comparison_cards` 会在存在 baseline 与主实验流量时自动给出 CTR、CVR 和平均延迟差值。
+* `admin/recommendation-config.html` 与 `admin/js/app.js` 现已把实验配置页扩成真正的 A/B 实验看板：
+  * 顶部摘要会展示累计推荐请求数、实验版本数和最近一次实验流量时间
+  * 中间卡片会展示流量最高的实验版本
+  * 表格会展示实验版本 x 展示位的完整流量和效果拆解
+  * 对比卡片会显式说明 baseline 与当前主实验的差值
+* 这一步没有再新开孤立页面，而是把 A/B 看板直接叠加在现有实验配置页里。这样实验能力、预计算状态和实验效果处于同一个后台语境，答辩时解释链路更连贯。
+* 新增自动化测试已覆盖：
+  * 实验维度聚合口径
+  * 实验配置接口返回 `experiment_dashboard`
+  * 预计算接口和实验配置接口并存时的兼容行为
+* 本轮专项验证结果为：
+  * `backend/tests/services/test_recommendation_admin_metrics.py`：`3 passed`
+  * `backend/tests/api/test_admin_recommendation_debug.py`：`6 passed`
+  * 后端全量回归：`153 passed`
+* 本轮仍只有既有 `datetime.utcnow()` 弃用警告，没有新增失败。
+
+交接提醒：
+
+* 实验看板当前基于推荐日志聚合，不额外引入新表。这意味着后续如果想继续扩展实验指标，优先复用 `RecommendationRequestLog / Impression / Click / Conversion` 这条链路，而不是再平行造一套实验埋点。
+* 看板里的 `top_variants` 是按实验版本聚合，表格里的 `items` 是按“实验版本 x slot”聚合。后续如果要做更细粒度的流量分析，应保持这两层语义分离，不要把卡片和表格混成一种口径。
+* 现在后台已经能同时回答三个问题：当前启用了哪些能力、当前预热状态如何、当前实验效果如何。下一步更自然的方向是扩展大规模压测入口，而不是再补纯展示性卡片。
