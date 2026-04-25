@@ -7,6 +7,7 @@
     { page: "dashboard", href: "index.html", label: "仪表盘" },
     { page: "products", href: "products.html", label: "商品管理" },
     { page: "orders", href: "orders.html", label: "订单管理" },
+    { page: "recommendation-metrics", href: "recommendation-metrics.html", label: "推荐指标" },
     { page: "recommendation-debug", href: "recommendation-debug.html", label: "推荐调试" },
     { page: "reindex", href: "reindex.html", label: "索引状态" },
     { page: "recommendation-config", href: "recommendation-config.html", label: "实验配置" },
@@ -81,6 +82,33 @@
         ${values.map((value) => `<span class="admin-tag">${escapeHtml(value)}</span>`).join("")}
       </div>
     `;
+  }
+
+  function renderEmptyTableRow(colspan, message) {
+    return `<tr><td colspan="${colspan}" class="empty-state">${escapeHtml(message)}</td></tr>`;
+  }
+
+  function renderBreakdownTableRows(items, columns, emptyMessage) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return renderEmptyTableRow(columns.length, emptyMessage);
+    }
+
+    return items
+      .map(function (item) {
+        return `
+          <tr>
+            ${columns
+              .map(function (column) {
+                const rawValue = typeof column.render === "function"
+                  ? column.render(item)
+                  : item[column.key];
+                return `<td>${rawValue}</td>`;
+              })
+              .join("")}
+          </tr>
+        `;
+      })
+      .join("");
   }
 
   function showFlash(message, type = "info") {
@@ -871,6 +899,204 @@
     }
   }
 
+  async function loadRecommendationMetricsPage() {
+    const payload = await request("/api/v1/admin/recommendations/metrics");
+    const runtime = payload.data.runtime || {};
+    const metrics = payload.data.metrics || {};
+    const searchMetrics = payload.data.search_metrics || {};
+
+    const runtimeCopy = document.getElementById("recommendation-metrics-runtime");
+    if (runtimeCopy) {
+      runtimeCopy.textContent = `当前推荐后端：${
+        runtime.active_recommendation_backend || "-"
+      }；当前搜索后端：${
+        runtime.active_search_backend || "-"
+      }；当前排序器：${runtime.configured_recommendation_ranker || "-"}`;
+    }
+
+    const kpiGrid = document.getElementById("recommendation-kpi-grid");
+    if (kpiGrid) {
+      kpiGrid.innerHTML = `
+        <article class="metric-card">
+          <span class="metric-label">推荐请求数</span>
+          <div class="metric-value">${metrics.request_count ?? 0}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">曝光数</span>
+          <div class="metric-value">${metrics.impression_count ?? 0}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">涉及用户数</span>
+          <div class="metric-value">${metrics.unique_user_count ?? 0}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Fallback 比例</span>
+          <div class="metric-value">${formatPercent(metrics.fallback_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">平均延迟</span>
+          <div class="metric-value">${formatScore(metrics.average_latency_ms, 1)} ms</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">平均曝光/请求</span>
+          <div class="metric-value">${formatScore(
+            metrics.average_impressions_per_request,
+            2
+          )}</div>
+        </article>
+      `;
+    }
+
+    const conversionGrid = document.getElementById("recommendation-conversion-kpi-grid");
+    if (conversionGrid) {
+      conversionGrid.innerHTML = `
+        <article class="metric-card">
+          <span class="metric-label">CTR</span>
+          <div class="metric-value">${formatPercent(metrics.ctr)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">加购率</span>
+          <div class="metric-value">${formatPercent(metrics.add_to_cart_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">支付转化率</span>
+          <div class="metric-value">${formatPercent(metrics.conversion_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">覆盖率</span>
+          <div class="metric-value">${formatPercent(metrics.coverage_rate)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">平均候选数</span>
+          <div class="metric-value">${formatScore(metrics.average_candidate_count, 2)}</div>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Fallback 请求数</span>
+          <div class="metric-value">${metrics.fallback_request_count ?? 0}</div>
+        </article>
+      `;
+    }
+
+    const runtimeGrid = document.getElementById("recommendation-runtime-grid");
+    if (runtimeGrid) {
+      runtimeGrid.innerHTML = `
+        <article class="admin-metadata-card">
+          <h3>推荐运行时</h3>
+          <div class="admin-kv-grid">
+            <div class="admin-kv-item">
+              <strong>推荐后端</strong>
+              <span>${escapeHtml(runtime.active_recommendation_backend || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>搜索后端</strong>
+              <span>${escapeHtml(runtime.active_search_backend || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>排序器</strong>
+              <span>${escapeHtml(runtime.configured_recommendation_ranker || "-")}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>Pipeline 版本</strong>
+              <span>${escapeHtml(runtime.recommendation_pipeline_version || "-")}</span>
+            </div>
+          </div>
+        </article>
+        <article class="admin-metadata-card">
+          <h3>搜索概览</h3>
+          <div class="admin-kv-grid">
+            <div class="admin-kv-item">
+              <strong>搜索请求数</strong>
+              <span>${searchMetrics.request_count ?? 0}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>语义搜索数</strong>
+              <span>${searchMetrics.semantic_count ?? 0}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>关键词搜索数</strong>
+              <span>${searchMetrics.keyword_count ?? 0}</span>
+            </div>
+            <div class="admin-kv-item">
+              <strong>平均结果数</strong>
+              <span>${formatScore(searchMetrics.average_result_count, 2)}</span>
+            </div>
+          </div>
+          <div class="debug-card-section">
+            <strong>最近推荐请求</strong>
+            <span>${escapeHtml(formatDateTime(metrics.last_request_at))}</span>
+          </div>
+          <div class="debug-card-section">
+            <strong>最近搜索请求</strong>
+            <span>${escapeHtml(formatDateTime(searchMetrics.last_request_at))}</span>
+          </div>
+        </article>
+      `;
+    }
+
+    const slotTable = document.getElementById("recommendation-slot-table-body");
+    if (slotTable) {
+      slotTable.innerHTML = renderBreakdownTableRows(
+        metrics.slot_breakdown || [],
+        [
+          { key: "slot", render: (item) => escapeHtml(item.slot || "-") },
+          { key: "total", render: (item) => String(item.total ?? 0) },
+          { key: "share", render: (item) => formatPercent(item.share) },
+        ],
+        "当前没有槽位分布数据。"
+      );
+    }
+
+    const channelTable = document.getElementById("recommendation-channel-table-body");
+    if (channelTable) {
+      channelTable.innerHTML = renderBreakdownTableRows(
+        metrics.channel_breakdown || [],
+        [
+          { key: "channel", render: (item) => escapeHtml(item.channel || "-") },
+          { key: "impression_count", render: (item) => String(item.impression_count ?? 0) },
+          {
+            key: "appearance_share",
+            render: (item) => formatPercent(item.appearance_share),
+          },
+        ],
+        "当前没有召回通道数据。"
+      );
+    }
+
+    const pipelineTable = document.getElementById("recommendation-pipeline-table-body");
+    if (pipelineTable) {
+      pipelineTable.innerHTML = renderBreakdownTableRows(
+        metrics.pipeline_breakdown || [],
+        [
+          {
+            key: "pipeline_version",
+            render: (item) => escapeHtml(item.pipeline_version || "-"),
+          },
+          { key: "model_version", render: (item) => escapeHtml(item.model_version || "-") },
+          { key: "total", render: (item) => String(item.total ?? 0) },
+          { key: "share", render: (item) => formatPercent(item.share) },
+        ],
+        "当前没有推荐 Pipeline 分布数据。"
+      );
+    }
+
+    const searchPipelineTable = document.getElementById("search-pipeline-table-body");
+    if (searchPipelineTable) {
+      searchPipelineTable.innerHTML = renderBreakdownTableRows(
+        searchMetrics.pipeline_breakdown || [],
+        [
+          { key: "mode", render: (item) => escapeHtml(item.mode || "-") },
+          {
+            key: "pipeline_version",
+            render: (item) => escapeHtml(item.pipeline_version || "-"),
+          },
+          { key: "total", render: (item) => String(item.total ?? 0) },
+          { key: "share", render: (item) => formatPercent(item.share) },
+        ],
+        "当前没有搜索 Pipeline 分布数据。"
+      );
+    }
+  }
+
   async function handleLoginPage() {
     if (getToken()) {
       try {
@@ -941,6 +1167,8 @@
         await loadProducts();
       } else if (page === "orders") {
         await loadOrders();
+      } else if (page === "recommendation-metrics") {
+        await loadRecommendationMetricsPage();
       } else if (page === "recommendation-debug") {
         bindRecommendationDebugPage();
       } else if (page === "reindex") {

@@ -6,6 +6,7 @@
 * `memory-bank/implementation_plan.md`：当前执行顺序的主合同，后续开发按这里的 Step 编号推进。
 * `memory-bank/progress.md`：执行日志，记录已经完成的步骤、验证结果和交接信息。
 * `memory-bank/architecture.md`：当前仓库结构、文件职责、耦合关系和新的架构洞察。
+* `memory-bank/recommendation_enhancement_execution_plan.md`：推荐增强执行合同；在主升级计划之外，专门承接当前仓库仍值得继续落地的推荐可观测、可展示、可运营增强项。
 
 ## 2. 当前仓库的真实结构
 
@@ -64,6 +65,16 @@
 * `front/orders.html`：订单页；负责订单统计、订单列表、订单详情、支付记录以及支付/取消动作，当前已通过真实订单接口驱动。
 * `front/membership.html`：会员中心；负责等级、权益、充值和积分记录展示，当前通过全局会员脚本读取本地会员数据。
 
+## 4.1 `admin/` 页面文件作用
+
+* `admin/index.html`：后台仪表盘；展示业务总览、推荐 KPI、搜索 KPI、向量索引概况和实验摘要。
+* `admin/products.html`：后台商品管理页。
+* `admin/orders.html`：后台订单管理页。
+* `admin/reindex.html`：向量索引状态与重建页。
+* `admin/recommendation-debug.html`：推荐调试台；按用户查看画像、候选拆解和最终打分证据。
+* `admin/recommendation-config.html`：推荐实验配置页；展示 baseline、hybrid、hybrid_rerank、full_pipeline 等方案能力。
+* `admin/recommendation-metrics.html`：推荐指标页；聚合推荐请求、曝光、点击、加购、支付转化、槽位分布、召回通道分布和搜索/推荐 pipeline 分布，是推荐系统可观测层的后台展示入口。
+
 ## 5. `front/js/` 脚本文件作用
 
 * `front/js/main.js`：全站通用脚本；负责时钟、导航高亮、工具提示、日期、返回顶部、图片失败兜底和滚动动画。
@@ -82,6 +93,10 @@
 * `front/js/auth-pages.js`：登录页/注册页脚本；负责真实注册、真实登录、游客页守卫和第三方按钮的占位提示。
 * `front/js/profile-page.js`：个人中心页脚本；负责加载当前用户、提交资料修改、提交密码修改和展示默认地址摘要。
 * `front/js/orders-page.js`：订单页控制器；负责加载真实订单列表与详情、渲染订单统计，并在待支付订单上触发真实支付和取消接口。
+
+## 5.1 `admin/js/` 脚本文件作用
+
+* `admin/js/app.js`：后台统一前端编排层；负责管理员登录态、导航、仪表盘、商品页、订单页、推荐调试页、推荐指标页、实验配置页和索引状态页的数据请求与渲染。
 
 ## 6. `front/css/` 样式文件作用
 
@@ -142,6 +157,7 @@
 * `backend/app/services/__init__.py`：服务层包入口占位。
 * `backend/app/services/embedding.py`：向量 provider 服务；负责统一 embedding provider 抽象、离线 fallback、本地模型包装以及模型元信息描述。
 * `backend/app/services/embedding_text.py`：向量文本构建服务；负责生成稳定的商品 `embedding_text` 与对应 `content_hash`。
+* `backend/app/services/recommendation_admin.py`：后台聚合服务；负责把推荐日志、搜索日志、实验配置、向量索引状态和运行时信息整理成后台仪表盘/推荐后台页面可直接消费的数据结构。当前还承担推荐 KPI、fallback 比例、召回通道分布和搜索/推荐 pipeline 分布的聚合职责。
 * `backend/app/services/vector_search.py`：向量检索服务；负责商品 embedding 保障、向量相似度计算、语义排序和推荐理由生成。
 * `backend/app/services/recommendations.py`：推荐服务；负责从行为日志构建用户兴趣画像，并基于画像向量和兴趣词返回猜你喜欢结果。
 
@@ -219,6 +235,7 @@
 * `backend/tests/api/test_behavior_logging.py`：行为日志 API 测试；校验浏览、搜索、加购、下单、支付动作会写入正确的行为事件。
 * `backend/tests/unit/test_embedding_provider.py`：embedding provider 单元测试；校验 deterministic provider、模型包装器和配置映射行为。
 * `backend/tests/services/test_embedding_text_builder.py`：embedding 文本构建测试；校验商品向量文本的固定字段顺序和内容哈希稳定性。
+* `backend/tests/services/test_recommendation_admin_metrics.py`：推荐后台指标聚合测试；校验 fallback 统计、召回通道分布和搜索 pipeline 分布的聚合结果。
 * `backend/tests/api/test_search_semantic.py`：语义搜索接口测试；校验自然语言搜索、排序和推荐理由输出。
 * `backend/tests/tasks/test_embedding_tasks.py`：向量任务测试；校验全量建索引、增量跳过与内容变更后的单商品重建。
 * `backend/tests/api/test_related_products.py`：相似商品接口测试；校验排除自身、排除下架商品和推荐理由输出。
@@ -1351,3 +1368,23 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
   因为它承接的是“如何解释系统边界、如何解释算法收益、如何解释冷启动与完整性”这些跨模块问题，所以 `docs/defense_script.md` 实际上已经成为推荐系统对外语义层的一部分，而不是普通说明文档。
 * 最终回归不是开发流程的附属动作，而是后续增强版本的起始锚点。
   本轮在补 FAQ 后重新跑了全量后端测试和完整 demo e2e，这使当前提交点具备了“可继续往第 17 节增强版本迭代”的稳定基线；后续任何新增实验、排序器或多模态能力，都应该建立在这个回归通过的锚点之上。
+
+### 9.52 推荐系统现在开始具备“后台可观测层”，而不只是“有日志表”
+
+第 76 次同日推进把推荐系统从“日志已经落库”进一步推进到“日志已经能被后台消费”：
+
+* `backend/app/services/recommendation_admin.py`：指标聚合层。
+  当前不再只返回 CTR、转化率和覆盖率，而是继续聚合 `unique_user_count`、`fallback_request_count`、`fallback_rate`、`average_impressions_per_request`、`channel_breakdown`，以及搜索侧 `pipeline_breakdown`。这让后台终于能回答“当前是不是还在回退 baseline”“哪些召回通道真的有曝光”“hybrid search 实际占比是多少”。
+* `admin/recommendation-metrics.html`：指标展示层。
+  当前后台新增独立“推荐指标”页面，专门承接推荐请求、曝光、点击、加购、支付转化、槽位分布、召回通道分布和搜索/推荐 pipeline 分布的展示，不再把所有推荐数据都挤在仪表盘里。
+* `admin/js/app.js`：推荐后台编排层。
+  当前统一后台脚本已经扩展出“推荐指标页”分支，说明后台推荐能力不再只停留在单页调试或实验说明，而是开始形成“仪表盘 -> 指标页 -> 调试页 -> 实验页”的分工结构。
+* `backend/tests/services/test_recommendation_admin_metrics.py`：可观测层回归测试。
+  当前新增测试已经把“fallback 比例”“召回通道分布”“搜索 pipeline 分布”固定成自动化回归项，避免未来继续改推荐日志或后台聚合时把这些关键指标悄悄改坏。
+
+这里有两个新的关键架构洞察：
+
+* 推荐系统是否“完整”，不仅取决于召回和排序链路，也取决于后台能不能把这些链路变成可读证据。
+  现在 `recommendation_admin.py -> admin/js/app.js -> recommendation-metrics.html` 已经构成一条专门的可观测链路，这使项目从“实现了推荐”走向“能证明自己实现了推荐”。
+* 当后台开始展示召回通道与 fallback 分布后，日志字段就不再只是埋点细节，而是后台协议的一部分。
+  这意味着后续继续做实验对比、冷启动展示和评估页面时，应该优先复用现有指标聚合层，而不是各个页面各算一套统计口径。

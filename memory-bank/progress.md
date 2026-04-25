@@ -59,6 +59,59 @@
 * `http://127.0.0.1/api/v1/health` 返回 `200`。
 * `http://127.0.0.1/admin/` 返回 `302 -> /admin/index.html -> 200`。
 
+### 推荐增强计划与 Phase E1
+
+* 新增了 `memory-bank/recommendation_enhancement_execution_plan.md`，把推荐升级计划里更适合当前仓库继续落地的增强项收敛成 5 个执行阶段。
+* 已完成 Phase E1：推荐指标可观测页。
+* 后端推荐指标聚合新增：
+  * `unique_user_count`
+  * `fallback_request_count`
+  * `fallback_rate`
+  * `average_impressions_per_request`
+  * `channel_breakdown`
+  * 搜索侧 `pipeline_breakdown`
+* 新增后台页面 `admin/recommendation-metrics.html`，并在后台导航中加入“推荐指标”入口。
+* `admin/js/app.js` 已接入新的推荐指标页渲染逻辑，可展示推荐 KPI、转化 KPI、运行时状态、槽位分布、召回通道分布、推荐 pipeline 分布和搜索 pipeline 分布。
+* 新增自动化测试 `backend/tests/services/test_recommendation_admin_metrics.py`，覆盖推荐通道分布、fallback 统计和搜索 pipeline 分布。
+
+### 本阶段修改文件
+
+* `memory-bank/recommendation_enhancement_execution_plan.md`
+* `backend/app/services/recommendation_admin.py`
+* `backend/tests/services/test_recommendation_admin_metrics.py`
+* `backend/tests/api/test_admin_recommendation_debug.py`
+* `admin/recommendation-metrics.html`
+* `admin/js/app.js`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### 本阶段验证
+
+* `./.venv/bin/python -m pytest backend/tests/services/test_recommendation_admin_metrics.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_admin_dashboard.py backend/tests/api/test_admin_recommendation_debug.py -q`
+* `./.venv/bin/python -m ruff check backend/app/services/recommendation_admin.py backend/tests/services/test_recommendation_admin_metrics.py backend/tests/api/test_admin_recommendation_debug.py`
+* `node --check admin/js/app.js`
+* `curl -I http://127.0.0.1/admin/recommendation-metrics.html`
+* `curl -s http://127.0.0.1/api/v1/health`
+
+结果：
+
+* 新增服务测试 `2 passed`。
+* 管理后台相关 API 测试 `5 passed`。
+* `ruff check` 通过。
+* 后台脚本语法检查通过。
+* `http://127.0.0.1/admin/recommendation-metrics.html` 返回 `200`。
+* API 健康检查返回 `200`。
+
+### 当前结论
+
+* 当前项目已经不只是“有推荐日志”，而是开始把日志变成后台可直接展示的指标资产。
+* 这一步对答辩非常关键，因为它把“多路召回、fallback、实验版本、搜索后端是否真实生效”转成了可截图、可解释、可对比的后台证据。
+
+### 下一步起点
+
+* 下一步进入 `recommendation_enhancement_execution_plan.md` 的 **Phase E2：实验对比台增强**。
+
 ## 2026-04-13
 
 ### 完成事项

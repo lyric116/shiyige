@@ -220,15 +220,20 @@ async def test_admin_recommendation_metrics_endpoint_returns_runtime_and_metrics
                 "add_to_cart_count": 2,
                 "pay_order_count": 1,
                 "covered_product_count": 10,
+                "unique_user_count": 5,
+                "fallback_request_count": 3,
                 "ctr": 0.125,
                 "add_to_cart_rate": 0.0417,
                 "conversion_rate": 0.0208,
                 "coverage_rate": 0.5,
+                "fallback_rate": 0.25,
                 "average_latency_ms": 88.0,
                 "average_candidate_count": 6.0,
+                "average_impressions_per_request": 4.0,
                 "last_request_at": None,
                 "slot_breakdown": [],
                 "pipeline_breakdown": [],
+                "channel_breakdown": [],
             },
             "search_metrics": {
                 "request_count": 7,
@@ -237,6 +242,7 @@ async def test_admin_recommendation_metrics_endpoint_returns_runtime_and_metrics
                 "average_latency_ms": 66.0,
                 "average_result_count": 5.0,
                 "last_request_at": None,
+                "pipeline_breakdown": [],
             },
         },
     )
@@ -250,6 +256,7 @@ async def test_admin_recommendation_metrics_endpoint_returns_runtime_and_metrics
     assert response.status_code == 200
     assert body["data"]["runtime"]["active_recommendation_backend"] == "multi_recall"
     assert body["data"]["metrics"]["request_count"] == 12
+    assert body["data"]["metrics"]["fallback_rate"] == 0.25
     assert body["data"]["search_metrics"]["semantic_count"] == 4
 
     with api_session_factory() as session:

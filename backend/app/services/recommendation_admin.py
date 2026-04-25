@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -76,12 +77,29 @@ def build_recommendation_metrics(
     covered_product_count = int(
         db.scalar(select(func.count(func.distinct(RecommendationImpressionLog.product_id)))) or 0
     )
+    unique_user_count = int(
+        db.scalar(
+            select(func.count(func.distinct(RecommendationRequestLog.user_id))).where(
+                RecommendationRequestLog.user_id.is_not(None)
+            )
+        )
+        or 0
+    )
+    fallback_request_count = int(
+        db.scalar(
+            select(func.count())
+            .select_from(RecommendationRequestLog)
+            .where(RecommendationRequestLog.fallback_used.is_(True))
+        )
+        or 0
+    )
     avg_latency_ms = float(
         db.scalar(select(func.avg(RecommendationRequestLog.latency_ms))) or 0.0
     )
     avg_candidate_count = float(
         db.scalar(select(func.avg(RecommendationRequestLog.candidate_count))) or 0.0
     )
+    avg_impressions_per_request = impression_count / request_count if request_count else 0.0
     last_request_at = db.scalar(select(func.max(RecommendationRequestLog.created_at)))
     slot_breakdown = db.execute(
         select(
@@ -104,6 +122,11 @@ def build_recommendation_metrics(
         )
         .order_by(func.count().desc())
     ).all()
+    channel_counter: Counter[str] = Counter()
+    channel_rows = db.execute(select(RecommendationImpressionLog.recall_channels)).all()
+    for row in channel_rows:
+        for channel in row[0] or []:
+            channel_counter[str(channel)] += 1
 
     ctr = click_count / impression_count if impression_count else 0.0
     add_to_cart_rate = add_to_cart_count / impression_count if impression_count else 0.0
@@ -111,6 +134,7 @@ def build_recommendation_metrics(
     coverage_rate = (
         covered_product_count / active_product_count if active_product_count else 0.0
     )
+    fallback_rate = fallback_request_count / request_count if request_count else 0.0
 
     return {
         "request_count": request_count,
@@ -119,15 +143,23 @@ def build_recommendation_metrics(
         "add_to_cart_count": add_to_cart_count,
         "pay_order_count": pay_order_count,
         "covered_product_count": covered_product_count,
+        "unique_user_count": unique_user_count,
+        "fallback_request_count": fallback_request_count,
         "ctr": round(ctr, 4),
         "add_to_cart_rate": round(add_to_cart_rate, 4),
         "conversion_rate": round(conversion_rate, 4),
         "coverage_rate": round(coverage_rate, 4),
+        "fallback_rate": round(fallback_rate, 4),
         "average_latency_ms": round(avg_latency_ms, 3),
         "average_candidate_count": round(avg_candidate_count, 3),
+        "average_impressions_per_request": round(avg_impressions_per_request, 3),
         "last_request_at": isoformat_or_none(last_request_at),
         "slot_breakdown": [
-            {"slot": str(slot), "total": int(total)}
+            {
+                "slot": str(slot),
+                "total": int(total),
+                "share": round((int(total) / request_count), 4) if request_count else 0.0,
+            }
             for slot, total in slot_breakdown
         ],
         "pipeline_breakdown": [
@@ -135,8 +167,22 @@ def build_recommendation_metrics(
                 "pipeline_version": str(pipeline_version),
                 "model_version": str(model_version),
                 "total": int(total),
+                "share": round((int(total) / request_count), 4) if request_count else 0.0,
             }
             for pipeline_version, model_version, total in pipeline_breakdown
+        ],
+        "channel_breakdown": [
+            {
+                "channel": channel,
+                "impression_count": count,
+                "appearance_share": (
+                    round((count / impression_count), 4) if impression_count else 0.0
+                ),
+            }
+            for channel, count in sorted(
+                channel_counter.items(),
+                key=lambda item: (-item[1], item[0]),
+            )
         ],
     }
 
@@ -162,6 +208,22 @@ def build_search_metrics(db: Session) -> dict[str, object]:
     avg_latency_ms = float(db.scalar(select(func.avg(SearchRequestLog.latency_ms))) or 0.0)
     avg_result_count = float(db.scalar(select(func.avg(SearchRequestLog.total_results))) or 0.0)
     last_request_at = db.scalar(select(func.max(SearchRequestLog.created_at)))
+    pipeline_breakdown = db.execute(
+        select(
+            SearchRequestLog.mode,
+            SearchRequestLog.pipeline_version,
+            func.count().label("total"),
+        )
+        .group_by(
+            SearchRequestLog.mode,
+            SearchRequestLog.pipeline_version,
+        )
+        .order_by(
+            func.count().desc(),
+            SearchRequestLog.mode.asc(),
+            SearchRequestLog.pipeline_version.asc(),
+        )
+    ).all()
 
     return {
         "request_count": request_count,
@@ -170,6 +232,15 @@ def build_search_metrics(db: Session) -> dict[str, object]:
         "average_latency_ms": round(avg_latency_ms, 3),
         "average_result_count": round(avg_result_count, 3),
         "last_request_at": isoformat_or_none(last_request_at),
+        "pipeline_breakdown": [
+            {
+                "mode": str(mode),
+                "pipeline_version": str(pipeline_version),
+                "total": int(total),
+                "share": round((int(total) / request_count), 4) if request_count else 0.0,
+            }
+            for mode, pipeline_version, total in pipeline_breakdown
+        ],
     }
 
 
