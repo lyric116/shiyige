@@ -2,6 +2,34 @@
 
 ## 2026-04-26
 
+### README 修订
+
+* 已重写根目录 `README.md`，补齐项目简介、运行环境、顶层目录与关键文件说明、Compose 启动方案、本地直跑后端方案、演示账号和常用命令。
+* 这次 README 不再只写“前台/后台/后端”几个笼统目录，而是明确标注了 `docker-compose.yml`、`.env.example`、`pytest.ini`、`ruff.toml`、`nginx/default.conf`、`backend/scripts/start_api.sh` 等关键文件的作用。
+* README 中的启动说明现已区分两条链路：
+  * `docker compose up -d --build` 的整站运行方案
+  * `docker compose up -d postgres redis minio qdrant` + 本机 `uvicorn` 的后端开发方案
+* README 中原先缺失的环境信息现已补齐，包括 `Python 3.11`、`FastAPI`、`PostgreSQL`、`Redis`、`MinIO`、`Qdrant`、`Nginx`、`pytest`、`playwright`、`ruff`、`.venv`、`.uv-cache`。
+* README 中原本容易误导的测试收集命令已修正；当前仓库如果直接执行 `UV_CACHE_DIR=.uv-cache uv run --with pytest pytest --collect-only`，会因为 `backend` 包路径缺失而失败，所以最终写成了 `PYTHONPATH=. UV_CACHE_DIR=.uv-cache uv run --with pytest pytest --collect-only -q`。
+
+### README 本次修改文件
+
+* `README.md`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### README 已执行验证
+
+* `docker compose config --quiet`
+* `PYTHONPATH=. UV_CACHE_DIR=.uv-cache uv run --with pytest pytest --collect-only -q`
+* `./.venv/bin/ruff check .`
+
+结果：
+
+* Compose 配置检查通过。
+* pytest 测试收集成功，当前共收集 `173` 个测试。
+* `ruff check .` 通过，README 修订没有引入额外代码问题。
+
 ### 完成事项
 
 * 修复了前台多个页脚残留的 `categories.html` 旧链接，统一改回当前真实页面 `category.html`，避免首页、登录、注册、商品、购物车、结算页继续保留死链。

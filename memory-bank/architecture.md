@@ -2,6 +2,10 @@
 
 ## 2026-04-26 补充洞察
 
+* 根目录 `README.md` 现在应该被视为“运行入口文档”，而不只是一个极简项目名片。
+  它需要同时覆盖目录职责、关键文件、环境基线、Compose 启动、宿主机直跑后端、演示账号和常用验证命令；否则后续开发者很容易只看到仓库名，却不知道该从 `docker-compose.yml` 还是 `uvicorn` 入口启动项目。
+* 当前仓库的测试收集命令有一个容易踩坑的细节：使用 `uv run` 时要显式带上 `PYTHONPATH=.`。
+  原因不是 pytest 本身有问题，而是仓库根目录下的 `backend/` 是源码包目录；如果不把根目录放进 Python 模块搜索路径，`backend/tests/conftest.py` 在导入 `backend.app...` 时就会失败。
 * SQLAlchemy 模型层现在更明确地采用了 `from __future__ import annotations` + `TYPE_CHECKING` + 字符串前向引用的组合。
   这让 `backend/app/models/cart.py`、`membership.py`、`order.py`、`product.py`、`review.py`、`user.py` 之间的双向关系既能保持模块拆分，又不会再因为导入环或未解析名称卡住 `ruff`。
 * 前台多个页面页脚过去仍残留 `categories.html` 这一旧页面名，而真实分类页已经固定为 `category.html`。
