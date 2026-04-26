@@ -267,9 +267,4 @@ PYTHONPATH=. UV_CACHE_DIR=.uv-cache uv run --with pytest pytest --collect-only -
 
 * 当前仓库的首选交付入口是 `docker-compose.yml`，不是单独的后端进程。
 * `.env.example` 更适合作为“宿主机直跑 API”时的参考模板；Compose 模式主要读取 `docker-compose.yml` 中定义的环境变量。
-* 如果你要继续开发，优先阅读：
-  * `AGENTS.md`
-  * `memory-bank/design.md`
-  * `memory-bank/implementation_plan.md`
-  * `memory-bank/progress.md`
-  * `memory-bank/architecture.md`
+
