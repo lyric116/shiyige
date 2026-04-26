@@ -38,24 +38,8 @@ def register_and_login_api(live_server, email: str, password: str) -> str:
     return login_response.json()["data"]["access_token"]
 
 
-def seed_checkout_prerequisites(live_server, access_token: str) -> None:
+def seed_checkout_cart(live_server, access_token: str) -> None:
     headers = {"Authorization": f"Bearer {access_token}"}
-
-    address_response = httpx.post(
-        f"{live_server}/api/v1/users/addresses",
-        headers=headers,
-        json={
-            "recipient_name": "结算测试用户",
-            "phone": "13800138000",
-            "region": "北京市 东城区",
-            "detail_address": "景山前街 4 号",
-            "postal_code": "100009",
-            "is_default": True,
-        },
-        timeout=5.0,
-        trust_env=False,
-    )
-    assert address_response.status_code == 201
 
     product_list_response = httpx.get(
         f"{live_server}/api/v1/products",
@@ -94,12 +78,34 @@ def test_checkout_page_uses_real_cart_address_and_order_flow(browser, live_serve
     password = "secret-pass-123"
     access_token = register_and_login_api(live_server, email, password)
     headers = {"Authorization": f"Bearer {access_token}"}
-    seed_checkout_prerequisites(live_server, access_token)
+    seed_checkout_cart(live_server, access_token)
 
     context = browser.new_context(base_url=live_server)
     page = context.new_page()
 
     login_through_page(page, live_server, email, password)
+    page.goto(f"{live_server}/profile.html", wait_until="domcontentloaded")
+    page.locator("#address-form").wait_for(timeout=5000)
+    page.locator("#address-recipient-name").fill("结算测试用户")
+    page.locator("#address-phone").fill("13800138000")
+    page.locator("#address-region").fill("北京市 东城区")
+    page.locator("#address-detail-address").fill("景山前街 4 号")
+    page.locator("#address-postal-code").fill("100009")
+    page.locator("#save-address-btn").click()
+    page.locator("body").get_by_text("收货地址已保存").wait_for(timeout=5000)
+
+    address_response = httpx.get(
+        f"{live_server}/api/v1/users/addresses",
+        headers=headers,
+        timeout=5.0,
+        trust_env=False,
+    )
+    assert address_response.status_code == 200
+    addresses = address_response.json()["data"]["items"]
+    assert len(addresses) == 1
+    assert addresses[0]["recipient_name"] == "结算测试用户"
+    assert addresses[0]["is_default"] is True
+
     page.goto(f"{live_server}/cart.html", wait_until="domcontentloaded")
     page.get_by_text("点翠发簪").wait_for(timeout=5000)
     page.locator("#checkout-btn").click()

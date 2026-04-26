@@ -2,6 +2,16 @@
 
 ## 2026-04-26 补充洞察
 
+* 个人中心此前并不真正具备“地址管理”能力。
+  `front/profile.html` 上虽然有“收货地址”字段，但旧版 `front/js/profile-page.js` 会把它设成只读，并只做默认地址摘要回显；这意味着 `/users/addresses` 没有数据时，用户在个人中心无法自行补齐地址。
+* 本次支付阻塞的根因不在结算页或支付接口，而在个人中心没有把地址 CRUD 接到后端。
+  `front/js/checkout.js` 一直都是通过 `/users/addresses` 读取真实地址并决定是否允许下单；一旦地址为空，结算按钮就会被正确禁用，所以真正缺的是个人中心的地址写入入口，而不是 checkout 的兜底逻辑。
+* `front/profile.html` 现在已经从“资料表单 + 密码表单”的双卡片页面，升级成“资料表单 + 收货地址管理 + 密码表单”的三段式页面。
+  地址区现在既是首个地址创建入口，也是已有地址的编辑/删除入口，后续如果还要扩展地址簿能力，应继续沿用这块而不是再回退成单个摘要字段。
+* `front/js/profile-page.js` 现在不能再被理解成一个纯资料页脚本。
+  它已经同时承担当前用户加载、资料更新、密码更新，以及 `/users/addresses` 的新增、编辑、删除、默认地址回显和地址列表渲染，是个人中心的聚合控制器。
+* `tests/e2e/test_checkout_flow.py` 现在不再通过 API 直接预灌收货地址。
+  用例已经改成先在 `profile.html` 填写地址，再去 `cart.html` / `checkout.html` 下单支付，这样个人中心地址表单一旦回归失效，支付主链路测试会直接暴露问题。
 * 当前运行站点里看到的大量商品并不一定都来自 `seed_base_data.py` 这 20 个基础模板。
   仓库还存在 `backend/scripts/generate_synthetic_catalog.py` 这一压测目录生成器；当运行环境做过 `10000` 商品压测时，前台实际浏览到的大量 `Synthetic ...` 商品都来自这里，而不是基础种子本身。
 * synthetic 商品的图片复用问题，根因不是“基础模板没换图”，而是旧生成器把模板的 `cover_url` 与 `media_items` 原样复制给每一个克隆商品。
@@ -92,7 +102,7 @@
 * `front/checkout.html`：结算页；负责真实地址选择、真实购物车汇总、订单备注、支付方式选择和提交流程，当前已通过真实订单接口驱动。
 * `front/login.html`：登录页；负责登录表单、错误提示和成功后跳转，当前已通过真实认证接口工作。
 * `front/register.html`：注册页；负责注册表单、字段校验和注册成功后跳转，当前已通过真实认证接口工作。
-* `front/profile.html`：个人中心；负责用户资料展示、资料修改和密码修改交互，当前已通过 `/api/v1/users/me` 等接口驱动。
+* `front/profile.html`：个人中心；负责用户资料展示、资料修改、收货地址管理和密码修改交互，当前已通过 `/api/v1/users/me`、`/api/v1/users/addresses` 等接口驱动。
 * `front/orders.html`：订单页；负责订单统计、订单列表、订单详情、支付记录以及支付/取消动作，当前已通过真实订单接口驱动。
 * `front/membership.html`：会员中心；负责等级、权益、充值和积分记录展示，当前通过全局会员脚本读取本地会员数据。
 
@@ -122,7 +132,7 @@
 * `front/js/api.js`：前端统一 API 入口；负责统一补齐 `/api/v1` 前缀、自动附带 access token、`401` 后触发刷新重试。
 * `front/js/session.js`：前端统一会话入口；负责把 access token 存在 `sessionStorage`，并通过 refresh cookie 获取新 token。
 * `front/js/auth-pages.js`：登录页/注册页脚本；负责真实注册、真实登录、游客页守卫和第三方按钮的占位提示。
-* `front/js/profile-page.js`：个人中心页脚本；负责加载当前用户、提交资料修改、提交密码修改和展示默认地址摘要。
+* `front/js/profile-page.js`：个人中心页脚本；负责加载当前用户、提交资料修改、提交密码修改，以及通过 `/users/addresses` 完成地址的新增、编辑、删除和列表渲染。
 * `front/js/orders-page.js`：订单页控制器；负责加载真实订单列表与详情、渲染订单统计，并在待支付订单上触发真实支付和取消接口。
 
 ## 5.1 `admin/js/` 脚本文件作用

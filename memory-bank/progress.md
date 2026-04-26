@@ -2,6 +2,59 @@
 
 ## 2026-04-26
 
+### 个人中心收货地址与支付链路修复
+
+* 已修复个人中心原本“只能展示默认地址摘要、不能真正填写地址”的问题。
+  旧版 `front/js/profile-page.js` 会把收货地址输入框直接设为只读，只从 `/users/addresses` 拉默认地址回显，因此新用户在 `profile.html` 页面无法创建地址，结算页就会一直因为“无可用地址”而禁用支付按钮。
+* `front/profile.html` 现在把单一的只读地址输入框替换成真实的“收货地址管理”区域，包含：
+  * 收件人姓名
+  * 联系电话
+  * 所在地区
+  * 详细地址
+  * 邮政编码
+  * 默认地址开关
+  * 已保存地址列表
+* `front/js/profile-page.js` 已重写为地址 CRUD 控制器：
+  * 页面加载时拉取 `/users/me` 与 `/users/addresses`
+  * 支持新增地址、编辑地址、删除地址
+  * 自动高亮当前编辑地址
+  * 无地址时会用当前用户名/手机号预填草稿，降低首次填写成本
+* 结算页和支付链路本身不需要再改业务逻辑。
+  问题根因是结算页 `front/js/checkout.js` 已经正确依赖 `/users/addresses`，但个人中心之前没有给用户提供写入该接口的入口。
+* 已把浏览器级结算用例改成真实从 `profile.html` 填地址，再进入购物车和结算页完成支付。
+  这样后续如果个人中心地址表单再次失效，`tests/e2e/test_checkout_flow.py` 会直接把问题拦下来。
+
+### 个人中心收货地址与支付链路本次修改文件
+
+* `front/profile.html`
+* `front/js/profile-page.js`
+* `tests/e2e/test_checkout_flow.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### 个人中心收货地址与支付链路已执行验证
+
+* `node --check front/js/profile-page.js`
+* `./.venv/bin/python -m pytest tests/e2e/test_profile_page.py tests/e2e/test_checkout_flow.py -q`
+* `./.venv/bin/python -m pytest backend/tests/api/test_user_addresses.py backend/tests/api/test_order_create.py backend/tests/api/test_order_pay.py -q`
+
+结果：
+
+* `profile-page.js` 语法检查通过。
+* 浏览器级 e2e 共 `3 passed`：
+  * 个人中心资料修改
+  * 个人中心退出登录
+  * 从个人中心填写收货地址后进入结算并完成模拟支付
+* 后端地址与订单支付回归共 `6 passed`：
+  * 地址 CRUD
+  * 创建订单写快照并清空购物车
+  * 支付成功写支付记录并扣库存
+  * 支付前库存复检
+* 这次验证已经直接确认：
+  * 用户可以在个人中心创建默认收货地址
+  * 结算页可以读取该地址
+  * 下单后支付接口可正常完成，订单状态变为 `PAID`
+
 ### Synthetic 商品图片轮换
 
 * 已继续补充第二批在线下载素材，不再只停留在基础种子那 9 个“去掉旧复用图”的层面，而是给当前只有单图的 9 个模板商品补上了第二张轮换素材：
