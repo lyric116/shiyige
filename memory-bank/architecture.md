@@ -2,6 +2,12 @@
 
 ## 2026-04-26 补充洞察
 
+* `backend/scripts/seed_base_data.py` 现在不能再被理解为“只适合空库第一次灌数”的一次性脚本。
+  它已经承担了种子同步职责：会按 `slug` 对齐类目、按商品名回写商品字段，并重建对应的媒体列表与标签，所以后续如果再调整商品封面或媒体路径，重复执行 seed 也会把现有数据库同步到最新种子状态。
+* 商品静态图片目录不必和业务 `category_slug` 一一对应。
+  这次为了解除重复图，新增了 `front/images/饰品/` 和 `front/images/礼盒/` 两个资源目录；业务类目仍然分别是 `accessory` 与 `gift-box`，前端真正依赖的是商品记录里的 `cover_url` / `media_urls`，而不是硬编码的目录映射。
+* 当前商品图去重不只是“往仓库里多放几张图”，关键在于种子脚本已经从“新增”升级成“同步”。
+  否则仓库文件虽然换了，但已存在的 `backend/dev.db` 或其他已 seed 过的数据库仍会继续引用旧的重复图片路径。
 * `front/js/main.js` 里的 `renderEvidence()` 现在不能再被理解为“所有上下文一律展示完整证据”。
   首页 `猜你喜欢` 已经单独收窄成极简模式，只保留来源标签；而商品详情、购物车、下单成功和搜索结果仍然走完整解释链。这说明推荐解释 UI 现在已经按页面语境分层，而不是一套信息密度硬塞到所有入口。
 * 首页推荐卡片的信息密度问题，本质上不是接口数据过多，而是展示层没有区分“首页导购卡片”和“调试/解释型场景”。
@@ -128,6 +134,8 @@
 ## 7. 资源目录作用
 
 * `front/images/汉服/`：汉服类商品静态图片。
+* `front/images/饰品/`：饰品类商品静态图片；当前承接点翠发簪、玉兔耳坠、云肩披帛扣、宫灯流苏书签等去重后的独立素材。
+* `front/images/礼盒/`：礼盒类商品静态图片；当前承接节气香礼盒、上元灯会礼盒、国风美妆礼盒、端午祈福礼盒等去重后的独立素材。
 * `front/images/文创产品/`：文创商品静态图片。
 * `front/images/非遗手工艺/`：非遗商品静态图片。
 * `front/images/背景/`：花瓣与背景装饰图片。
@@ -207,7 +215,7 @@
 * `backend/alembic/versions/20260414_04_cart_domain.py`：购物车域迁移；创建 `cart`、`cart_item` 表和唯一约束。
 * `backend/alembic/versions/20260414_05_order_domain.py`：订单域迁移；创建 `orders`、`order_item`、`payment_record` 表和订单/支付唯一键。
 * `backend/alembic/versions/20260414_06_embedding_domain.py`：推荐域迁移；创建 `product_embedding`、`user_interest_profile` 两张向量/画像表及索引。
-* `backend/scripts/seed_base_data.py`：目录基础数据种子脚本；负责初始化 5 个类目和 20 个商品，是本地测试与 e2e 的统一种子入口。
+* `backend/scripts/seed_base_data.py`：目录基础数据种子脚本；负责同步 5 个类目和 25 个商品的基础资料、默认 SKU、库存、媒体与标签，是本地测试与 e2e 的统一种子入口。当前重复执行会更新现有商品的 `cover_url` 与 `product_media`，而不再只是空库初始化。
 * `backend/scripts/seed_demo_data.py`：演示数据种子脚本；负责在基础商品数据之上继续创建演示普通用户、默认地址、样例订单、积分与推荐行为画像。
 * `backend/scripts/start_api.sh`：Compose 下 API 容器启动脚本；负责等待迁移成功、执行基础种子并启动 Uvicorn。
 * `backend/scripts/reindex_embeddings.py`：商品向量全量/增量重建命令入口；负责调用向量任务并输出重建结果摘要。

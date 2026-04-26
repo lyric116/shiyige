@@ -130,7 +130,7 @@ PRODUCT_SEEDS = [
         "category_slug": "hanfu",
         "name": "宋风褙子套装",
         "subtitle": "雅致豆绿配色",
-        "cover_url": "images/汉服/明制襦裙1.jpg",
+        "cover_url": "images/汉服/宋风褙子套装.jpg",
         "description": "轻盈褙子与百迭裙组合，适合春夏穿着。",
         "culture_summary": "宋风服饰强调含蓄雅致，与文人审美密切相关。",
         "dynasty_style": "宋制",
@@ -138,7 +138,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "春夏",
         "scene_tag": "茶会",
         "tags": ["宋制", "褙子", "雅致"],
-        "media_urls": ["images/汉服/明制襦裙1.jpg"],
+        "media_urls": ["images/汉服/宋风褙子套装.jpg"],
         "price": Decimal("699.00"),
         "member_price": Decimal("629.00"),
         "stock": 16,
@@ -286,7 +286,7 @@ PRODUCT_SEEDS = [
         "category_slug": "accessory",
         "name": "点翠发簪",
         "subtitle": "古风造型点缀",
-        "cover_url": "images/文创产品/故宫星空折扇1.jpg",
+        "cover_url": "images/饰品/点翠发簪.jpg",
         "description": "仿点翠工艺发簪，适合古风穿搭。",
         "culture_summary": "发簪是传统发饰体系的重要组成部分，兼具固定与装饰作用。",
         "dynasty_style": "宫廷风",
@@ -294,7 +294,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "拍照",
         "scene_tag": "穿搭",
         "tags": ["发簪", "饰品", "古风"],
-        "media_urls": ["images/文创产品/故宫星空折扇1.jpg"],
+        "media_urls": ["images/饰品/点翠发簪.jpg"],
         "price": Decimal("129.00"),
         "member_price": Decimal("109.00"),
         "stock": 35,
@@ -303,7 +303,7 @@ PRODUCT_SEEDS = [
         "category_slug": "accessory",
         "name": "玉兔耳坠",
         "subtitle": "中秋限定饰品",
-        "cover_url": "images/文创产品/故宫宫廷香囊1.jpg",
+        "cover_url": "images/饰品/玉兔耳坠.jpg",
         "description": "玉兔主题耳坠，轻巧灵动。",
         "culture_summary": "玉兔意象常见于中秋神话叙事，也常被用于吉祥饰物设计。",
         "dynasty_style": "节令风",
@@ -311,7 +311,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "中秋",
         "scene_tag": "穿搭",
         "tags": ["耳坠", "玉兔", "中秋"],
-        "media_urls": ["images/文创产品/故宫宫廷香囊1.jpg"],
+        "media_urls": ["images/饰品/玉兔耳坠.jpg"],
         "price": Decimal("89.00"),
         "member_price": Decimal("79.00"),
         "stock": 40,
@@ -320,7 +320,7 @@ PRODUCT_SEEDS = [
         "category_slug": "accessory",
         "name": "云肩披帛扣",
         "subtitle": "汉服搭配小配件",
-        "cover_url": "images/汉服/汉元素对襟1.jpg",
+        "cover_url": "images/饰品/云肩披帛扣.jpg",
         "description": "适合搭配披帛与云肩的小型金属扣件。",
         "culture_summary": "服饰配件虽小，却承担了整体造型定风格的关键作用。",
         "dynasty_style": "明制",
@@ -328,7 +328,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "日常",
         "scene_tag": "穿搭",
         "tags": ["配饰", "云肩", "汉服"],
-        "media_urls": ["images/汉服/汉元素对襟1.jpg"],
+        "media_urls": ["images/饰品/云肩披帛扣.jpg"],
         "price": Decimal("59.00"),
         "member_price": Decimal("49.00"),
         "stock": 60,
@@ -337,7 +337,7 @@ PRODUCT_SEEDS = [
         "category_slug": "accessory",
         "name": "宫灯流苏书签",
         "subtitle": "古风阅读配饰",
-        "cover_url": "images/文创产品/故宫花神口红1.jpg",
+        "cover_url": "images/饰品/宫灯流苏书签.jpg",
         "description": "带流苏装饰的宫灯造型书签。",
         "culture_summary": "把宫灯意象转化为书签，是传统器物符号的小型化再设计。",
         "dynasty_style": "宫廷风",
@@ -345,7 +345,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "赠礼",
         "scene_tag": "阅读",
         "tags": ["书签", "宫灯", "文房"],
-        "media_urls": ["images/文创产品/故宫花神口红1.jpg"],
+        "media_urls": ["images/饰品/宫灯流苏书签.jpg"],
         "price": Decimal("45.00"),
         "member_price": Decimal("39.00"),
         "stock": 80,
@@ -354,7 +354,7 @@ PRODUCT_SEEDS = [
         "category_slug": "gift-box",
         "name": "节气香礼盒",
         "subtitle": "四时闻香套装",
-        "cover_url": "images/文创产品/故宫宫廷香囊1.jpg",
+        "cover_url": "images/礼盒/节气香礼盒.jpg",
         "description": "围绕二十四节气设计的闻香礼盒。",
         "culture_summary": "节气礼盒把时间感与仪式感结合，适合做文化礼赠。",
         "dynasty_style": "节令风",
@@ -362,7 +362,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "送礼",
         "scene_tag": "礼赠",
         "tags": ["礼盒", "节气", "闻香"],
-        "media_urls": ["images/文创产品/故宫宫廷香囊1.jpg"],
+        "media_urls": ["images/礼盒/节气香礼盒.jpg"],
         "price": Decimal("259.00"),
         "member_price": Decimal("229.00"),
         "stock": 20,
@@ -371,7 +371,7 @@ PRODUCT_SEEDS = [
         "category_slug": "gift-box",
         "name": "上元灯会礼盒",
         "subtitle": "节庆氛围套装",
-        "cover_url": "images/文创产品/故宫星空折扇1.jpg",
+        "cover_url": "images/礼盒/上元灯会礼盒.jpg",
         "description": "集合折扇、流苏与节庆小物的礼盒。",
         "culture_summary": "上元节意象丰富，适合转化为节庆型文创礼盒。",
         "dynasty_style": "节令风",
@@ -379,7 +379,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "元宵",
         "scene_tag": "送礼",
         "tags": ["礼盒", "元宵", "节庆"],
-        "media_urls": ["images/文创产品/故宫星空折扇1.jpg"],
+        "media_urls": ["images/礼盒/上元灯会礼盒.jpg"],
         "price": Decimal("319.00"),
         "member_price": Decimal("289.00"),
         "stock": 15,
@@ -388,7 +388,7 @@ PRODUCT_SEEDS = [
         "category_slug": "gift-box",
         "name": "国风美妆礼盒",
         "subtitle": "花神主题组合",
-        "cover_url": "images/文创产品/故宫花神口红1.jpg",
+        "cover_url": "images/礼盒/国风美妆礼盒.jpg",
         "description": "集合口红、镜盒与香包的组合礼盒。",
         "culture_summary": "国风美妆礼盒把传统审美主题转化成现代消费品组合。",
         "dynasty_style": "宫廷风",
@@ -396,7 +396,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "送礼",
         "scene_tag": "妆容",
         "tags": ["礼盒", "美妆", "花神"],
-        "media_urls": ["images/文创产品/故宫花神口红1.jpg"],
+        "media_urls": ["images/礼盒/国风美妆礼盒.jpg"],
         "price": Decimal("399.00"),
         "member_price": Decimal("359.00"),
         "stock": 12,
@@ -405,7 +405,7 @@ PRODUCT_SEEDS = [
         "category_slug": "gift-box",
         "name": "端午祈福礼盒",
         "subtitle": "香囊与竹编主题",
-        "cover_url": "images/非遗手工艺/竹编龙舟1.jpg",
+        "cover_url": "images/礼盒/端午祈福礼盒.jpg",
         "description": "端午主题礼盒，适合节日送礼与家居陈设。",
         "culture_summary": "端午器物常承载祈福、辟邪与团聚等传统寓意。",
         "dynasty_style": "节令风",
@@ -413,7 +413,7 @@ PRODUCT_SEEDS = [
         "festival_tag": "端午",
         "scene_tag": "礼赠",
         "tags": ["礼盒", "端午", "祈福"],
-        "media_urls": ["images/非遗手工艺/竹编龙舟1.jpg"],
+        "media_urls": ["images/礼盒/端午祈福礼盒.jpg"],
         "price": Decimal("289.00"),
         "member_price": Decimal("259.00"),
         "stock": 17,
@@ -466,80 +466,118 @@ def seed_default_admin_user(session: Session) -> int:
     return session.query(AdminUser).count()
 
 
-def seed_base_data(session: Session) -> dict[str, int]:
-    admin_user_count = seed_default_admin_user(session)
-    member_level_count = seed_member_levels(session)
-    existing_product = session.scalar(select(Product.id).limit(1))
-    if existing_product is not None:
-        session.commit()
-        return {
-            "admin_users": admin_user_count,
-            "member_levels": member_level_count,
-            "categories": session.query(Category).count(),
-            "products": session.query(Product).count(),
-        }
-
+def seed_categories(session: Session) -> dict[str, Category]:
+    existing_categories = {
+        category.slug: category
+        for category in session.scalars(select(Category)).all()
+    }
     categories_by_slug: dict[str, Category] = {}
+
     for index, category_data in enumerate(CATEGORY_SEEDS, start=1):
-        category = Category(
-            name=category_data["name"],
-            slug=category_data["slug"],
-            description=category_data["description"],
-            sort_order=index,
-            is_active=True,
-        )
-        session.add(category)
+        category = existing_categories.get(category_data["slug"])
+        if category is None:
+            category = Category(slug=category_data["slug"])
+            session.add(category)
+
+        category.name = category_data["name"]
+        category.description = category_data["description"]
+        category.sort_order = index
+        category.is_active = True
         categories_by_slug[category.slug] = category
 
     session.flush()
+    return categories_by_slug
 
-    for index, product_data in enumerate(PRODUCT_SEEDS, start=1):
-        product = Product(
-            category=categories_by_slug[product_data["category_slug"]],
-            name=product_data["name"],
-            subtitle=product_data["subtitle"],
-            cover_url=product_data["cover_url"],
-            description=product_data["description"],
-            culture_summary=product_data["culture_summary"],
-            dynasty_style=product_data["dynasty_style"],
-            craft_type=product_data["craft_type"],
-            festival_tag=product_data["festival_tag"],
-            scene_tag=product_data["scene_tag"],
-            status=1,
-        )
 
-        sku = ProductSku(
-            sku_code=f"SKU-{index:03d}",
-            name=f"{product_data['name']} 默认款",
-            specs_json={"default": True},
-            price=product_data["price"],
-            member_price=product_data["member_price"],
-            is_default=True,
-            is_active=True,
-        )
-        sku.inventory = Inventory(quantity=product_data["stock"])
+def sync_product_media(product: Product, media_urls: list[str]) -> None:
+    product.media_items = [
+        ProductMedia(media_type="image", url=media_url, sort_order=media_index)
+        for media_index, media_url in enumerate(media_urls, start=1)
+    ]
+
+
+def sync_product_tags(product: Product, tags: list[str]) -> None:
+    product.tags = [ProductTag(tag=tag) for tag in tags]
+
+
+def sync_default_sku(
+    product: Product,
+    *,
+    index: int,
+    product_name: str,
+    price: Decimal,
+    member_price: Decimal,
+    stock: int,
+) -> None:
+    sku_code = f"SKU-{index:03d}"
+    sku = next((item for item in product.skus if item.sku_code == sku_code), None)
+    if sku is None:
+        sku = product.default_sku
+    if sku is None:
+        sku = ProductSku(sku_code=sku_code)
         product.skus.append(sku)
 
-        for media_index, media_url in enumerate(product_data["media_urls"], start=1):
-            product.media_items.append(
-                ProductMedia(
-                    media_type="image",
-                    url=media_url,
-                    sort_order=media_index,
-                )
-            )
+    sku.sku_code = sku_code
+    sku.name = f"{product_name} 默认款"
+    sku.specs_json = {"default": True}
+    sku.price = price
+    sku.member_price = member_price
+    sku.is_default = True
+    sku.is_active = True
 
-        for tag in product_data["tags"]:
-            product.tags.append(ProductTag(tag=tag))
+    if sku.inventory is None:
+        sku.inventory = Inventory(quantity=stock)
+    else:
+        sku.inventory.quantity = stock
 
-        session.add(product)
+    for existing_sku in product.skus:
+        if existing_sku is not sku:
+            existing_sku.is_default = False
+
+
+def seed_base_data(session: Session) -> dict[str, int]:
+    admin_user_count = seed_default_admin_user(session)
+    member_level_count = seed_member_levels(session)
+    categories_by_slug = seed_categories(session)
+    products_by_name = {
+        product.name: product for product in session.scalars(select(Product)).all()
+    }
+
+    for index, product_data in enumerate(PRODUCT_SEEDS, start=1):
+        product = products_by_name.get(product_data["name"])
+        if product is None:
+            product = Product(name=product_data["name"])
+            session.add(product)
+            products_by_name[product.name] = product
+
+        product.category = categories_by_slug[product_data["category_slug"]]
+        product.subtitle = product_data["subtitle"]
+        product.cover_url = product_data["cover_url"]
+        product.description = product_data["description"]
+        product.culture_summary = product_data["culture_summary"]
+        product.dynasty_style = product_data["dynasty_style"]
+        product.craft_type = product_data["craft_type"]
+        product.festival_tag = product_data["festival_tag"]
+        product.scene_tag = product_data["scene_tag"]
+        product.status = 1
+
+        sync_default_sku(
+            product,
+            index=index,
+            product_name=product_data["name"],
+            price=product_data["price"],
+            member_price=product_data["member_price"],
+            stock=product_data["stock"],
+        )
+        sync_product_media(product, product_data["media_urls"])
+        sync_product_tags(product, product_data["tags"])
 
     session.commit()
     return {
         "admin_users": admin_user_count,
         "member_levels": member_level_count,
-        "categories": len(CATEGORY_SEEDS),
-        "products": len(PRODUCT_SEEDS),
+        "categories": session.query(Category).count(),
+        "products": session.query(Product).count(),
     }
 
 

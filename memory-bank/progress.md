@@ -2,6 +2,63 @@
 
 ## 2026-04-26
 
+### 商品图片去重
+
+* 已为 9 个原先复用同一张图片的商品补入独立素材，并把商品种子里的 `cover_url` 与 `media_urls` 改到新的本地图路径：
+  * `宋风褙子套装`
+  * `点翠发簪`
+  * `玉兔耳坠`
+  * `云肩披帛扣`
+  * `宫灯流苏书签`
+  * `节气香礼盒`
+  * `上元灯会礼盒`
+  * `国风美妆礼盒`
+  * `端午祈福礼盒`
+* 新素材已落库到仓库静态资源目录：
+  * `front/images/汉服/宋风褙子套装.jpg`
+  * `front/images/饰品/*.jpg`
+  * `front/images/礼盒/*.jpg`
+* 本轮下载来源使用了 Pexels 免费素材，避免继续让多个商品共用 `明制襦裙1.jpg`、`故宫星空折扇1.jpg`、`故宫宫廷香囊1.jpg`、`故宫花神口红1.jpg`、`竹编龙舟1.jpg` 等旧图。
+* `backend/scripts/seed_base_data.py` 不再是“只要库里已有商品就整体跳过”的一次性初始化脚本。
+  现在会按 `slug` 同步类目，按商品名同步商品基础字段，并重建对应的媒体列表与标签、更新默认 SKU 与库存。
+* 这次改动让两个场景都能拿到新图：
+  * 全新库初始化时直接写入新路径
+  * 已经 seed 过的本地库再次执行 `python -m backend.scripts.seed_base_data` 时，也会把旧的重复图路径修正成新图
+* 已新增集成测试，锁定“重复执行种子脚本时会把已有商品图片路径同步回最新种子值”的行为。
+
+### 商品图片去重本次修改文件
+
+* `backend/scripts/seed_base_data.py`
+* `backend/tests/integration/test_seed_base_data.py`
+* `front/images/汉服/宋风褙子套装.jpg`
+* `front/images/饰品/点翠发簪.jpg`
+* `front/images/饰品/玉兔耳坠.jpg`
+* `front/images/饰品/云肩披帛扣.jpg`
+* `front/images/饰品/宫灯流苏书签.jpg`
+* `front/images/礼盒/节气香礼盒.jpg`
+* `front/images/礼盒/上元灯会礼盒.jpg`
+* `front/images/礼盒/国风美妆礼盒.jpg`
+* `front/images/礼盒/端午祈福礼盒.jpg`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### 商品图片去重已执行验证
+
+* `./.venv/bin/ruff check backend/scripts/seed_base_data.py backend/tests/integration/test_seed_base_data.py`
+* `./.venv/bin/python -m pytest backend/tests/integration/test_seed_base_data.py -q`
+* `./.venv/bin/python -m backend.scripts.seed_base_data`
+* `rg -o '"cover_url": "[^"]+"' backend/scripts/seed_base_data.py -r '$0' | sed 's/"cover_url": "//; s/"$//' | sort | uniq -cd`
+* `sqlite3 backend/dev.db "select name, cover_url from product where name in (...)"`
+* `sqlite3 backend/dev.db "select p.name, group_concat(pm.url, ' | ') from product p join product_media pm on pm.product_id = p.id where p.name in (...) group by p.id order by p.name;"`
+
+结果：
+
+* `ruff check` 通过。
+* 种子集成测试 `2 passed`。
+* 本地 `backend/dev.db` 已同步到新的图片路径。
+* 种子文件中的重复 `cover_url` 已清零。
+* 当前通过数据库查询确认，上述 9 个商品的 `cover_url` 和 `product_media.url` 都已改到新的本地图片资源。
+
 ### 首页推荐文案收敛
 
 * 已收窄首页 `猜你喜欢` 卡片下方的推荐证据展示，只保留首个来源标签，例如 `热门`、`新品探索`、`节令主题`、`个性化`。
