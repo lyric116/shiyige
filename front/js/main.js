@@ -428,6 +428,8 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
 
   function renderEvidence(item, options = {}) {
     const sourceMeta = buildSourceMeta(item, options);
+    const compactHomeEvidence =
+      options.context === "home" || options.context === "home_guest";
     const explanationLabels = buildSearchExplanations(item, options);
     const highlightLabels = buildRecommendationHighlights(item, options);
     const chips = [];
@@ -439,6 +441,17 @@ function initInfiniteScroll(loadFunction, targetSelector, threshold = 200) {
         )}">${escapeHtml(sourceMeta.label)}</span>`
       );
     }
+
+    if (compactHomeEvidence) {
+      return chips.length
+        ? `
+      <div class="recommendation-evidence">
+        <div class="recommendation-chip-row">${chips.join("")}</div>
+      </div>
+    `
+        : "";
+    }
+
     if (explanationLabels.length > 0) {
       chips.push(renderChips(explanationLabels, { tone: "explanation" }));
     }

@@ -2,6 +2,39 @@
 
 ## 2026-04-26
 
+### 首页推荐文案收敛
+
+* 已收窄首页 `猜你喜欢` 卡片下方的推荐证据展示，只保留首个来源标签，例如 `热门`、`新品探索`、`节令主题`、`个性化`。
+* 首页推荐卡片不再继续展示：
+  * `用户兴趣匹配`、`新品探索位`、`文化标签匹配` 等额外 chip
+  * `命中：...` 这类 matched terms
+  * 底部整行 `reason` 文本
+* 这次调整只影响首页推荐上下文：
+  * `context: "home"`
+  * `context: "home_guest"`
+* 商品详情页相关推荐、购物车推荐、下单成功推荐、分类页语义搜索结果等其他上下文仍保留原有推荐解释能力。
+
+### 首页推荐本次修改文件
+
+* `front/js/main.js`
+* `tests/e2e/test_recommendation_ui.py`
+* `tests/e2e/test_full_demo_flow.py`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### 首页推荐已执行验证
+
+* `node --check front/js/main.js`
+* `./.venv/bin/python -m pytest --collect-only -q tests/e2e/test_recommendation_ui.py tests/e2e/test_full_demo_flow.py`
+* `./.venv/bin/ruff check .`
+
+结果：
+
+* 首页推荐通用脚本语法检查通过。
+* 两个相关 e2e 文件测试收集通过。
+* `ruff check .` 通过。
+* 由于当前沙箱仍无法正常启动 Playwright Chromium，浏览器级断言回归依旧不能在这里完成；但本轮修改仅收窄首页 `renderEvidence()` 的展示分支，没有改动推荐接口数据结构。
+
 ### README 修订
 
 * 已重写根目录 `README.md`，补齐项目简介、运行环境、顶层目录与关键文件说明、Compose 启动方案、本地直跑后端方案、演示账号和常用命令。

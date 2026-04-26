@@ -163,12 +163,12 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     first_page = first_context.new_page()
     login_through_page(first_page, live_server, first_email, password)
     first_page.wait_for_function(
-        "([expectedName, expectedReason]) => {"
+        "([expectedName, expectedSourceLabel]) => {"
         "  const container = document.querySelector('#home-featured-products');"
         "  return Boolean(container?.textContent?.includes(expectedName))"
-        "    && Boolean(container?.textContent?.includes(expectedReason));"
+        "    && Boolean(container?.textContent?.includes(expectedSourceLabel));"
         "}",
-        arg=[first_recommendation["name"], first_recommendation["reason"]],
+        arg=[first_recommendation["name"], first_recommendation["source_label"]],
         timeout=5000,
     )
     assert "猜你喜欢" in first_page.locator("#home-recommendation-title").text_content()
@@ -176,13 +176,10 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
         first_recommendation["name"] in first_page.locator("#home-featured-products").text_content()
     )
     assert (
-        first_recommendation["reason"]
-        in first_page.locator("#home-featured-products").text_content()
-    )
-    assert (
         first_recommendation["source_label"]
         in first_page.locator("#home-featured-products").text_content()
     )
+    assert first_page.locator("#home-featured-products .recommendation-reason").count() == 0
     assert (
         first_unique_recommendation["name"]
         in first_page.locator("#home-featured-products").text_content()
@@ -193,12 +190,12 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
     second_page = second_context.new_page()
     login_through_page(second_page, live_server, second_email, password)
     second_page.wait_for_function(
-        "([expectedName, expectedReason]) => {"
+        "([expectedName, expectedSourceLabel]) => {"
         "  const container = document.querySelector('#home-featured-products');"
         "  return Boolean(container?.textContent?.includes(expectedName))"
-        "    && Boolean(container?.textContent?.includes(expectedReason));"
+        "    && Boolean(container?.textContent?.includes(expectedSourceLabel));"
         "}",
-        arg=[second_recommendation["name"], second_recommendation["reason"]],
+        arg=[second_recommendation["name"], second_recommendation["source_label"]],
         timeout=5000,
     )
     assert (
@@ -206,13 +203,10 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
         in second_page.locator("#home-featured-products").text_content()
     )
     assert (
-        second_recommendation["reason"]
-        in second_page.locator("#home-featured-products").text_content()
-    )
-    assert (
         second_recommendation["source_label"]
         in second_page.locator("#home-featured-products").text_content()
     )
+    assert second_page.locator("#home-featured-products .recommendation-reason").count() == 0
     assert (
         second_unique_recommendation["name"]
         in second_page.locator("#home-featured-products").text_content()

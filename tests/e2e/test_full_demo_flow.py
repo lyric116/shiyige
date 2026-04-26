@@ -277,19 +277,20 @@ def test_full_demo_flow(browser, live_server) -> None:
 
     page.goto(f"{live_server}/index.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "([expectedName, expectedReason]) => {"
+        "([expectedName, expectedSourceLabel]) => {"
         "  const container = document.querySelector('#home-featured-products')?.textContent || '';"
         "  const copy = document.querySelector('#home-recommendation-copy')?.textContent || '';"
         "  return container.includes(expectedName)"
-        "    && container.includes(expectedReason)"
+        "    && container.includes(expectedSourceLabel)"
         "    && copy.includes('个性化推荐');"
         "}",
-        arg=[updated_recommendations[0]["name"], updated_recommendations[0]["reason"]],
+        arg=[updated_recommendations[0]["name"], updated_recommendations[0]["source_label"]],
         timeout=5000,
     )
     assert (
         updated_recommendations[0]["source_label"]
         in page.locator("#home-featured-products").text_content()
     )
+    assert page.locator("#home-featured-products .recommendation-reason").count() == 0
 
     context.close()
