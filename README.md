@@ -88,11 +88,6 @@
 * `docs/deployment.md`：部署与运行补充说明。
 * `docs/api_guide.md`：接口分组和演示账号说明。
 * `docs/testing.md`：测试命令和验证入口说明。
-* `memory-bank/`：项目长期上下文。
-* `memory-bank/design.md`：项目设计目标与比赛定位。
-* `memory-bank/implementation_plan.md`：实施计划。
-* `memory-bank/progress.md`：开发进度与验证记录。
-* `memory-bank/architecture.md`：当前架构洞察与文件职责说明。
 * `nginx/default.conf`：Nginx 站点配置，负责托管 `front/`、`admin/` 并反向代理 `/api`、`/docs` 等路径。
 
 ## 启动方式
