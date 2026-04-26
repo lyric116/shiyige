@@ -2,6 +2,82 @@
 
 ## 2026-04-26
 
+### Synthetic 商品图片轮换
+
+* 已继续补充第二批在线下载素材，不再只停留在基础种子那 9 个“去掉旧复用图”的层面，而是给当前只有单图的 9 个模板商品补上了第二张轮换素材：
+  * `宋风褙子套装-2`
+  * `点翠发簪-2`
+  * `玉兔耳坠-2`
+  * `云肩披帛扣-2`
+  * `宫灯流苏书签-2`
+  * `节气香礼盒-2`
+  * `上元灯会礼盒-2`
+  * `国风美妆礼盒-2`
+  * `端午祈福礼盒-2`
+* `backend/scripts/seed_base_data.py` 里这 9 个商品的 `media_urls` 现在都扩成了两张图，基础商品详情页不再只有单图。
+* 真正导致“点翠发簪和上元灯会礼盒还在复用折扇图”的根因不是基础种子，而是运行环境里存在一批 `Synthetic ...` 压测商品。
+  当前站点运行库里共有 `10000` 个商品，其中大量是由 `backend/scripts/generate_synthetic_catalog.py` 复制基础模板生成的 synthetic 商品。
+* 原 synthetic 生成器只会把模板商品的 `cover_url` 和 `media_items` 原样复制给所有克隆商品，所以：
+  * `Synthetic ... 点翠发簪` 会整批继承旧折扇图
+  * `Synthetic ... 上元灯会礼盒` 会整批继承旧折扇图
+  * 其他模板商品也会整批复用同一张封面
+* 现在 `backend/scripts/generate_synthetic_catalog.py` 已改成两段式：
+  * 新建 synthetic 商品时，不再硬复制模板首图，而是按“同模板第几次出现”的轮换序号，从模板图片池里选封面和详情图
+  * 再次执行 `ensure_synthetic_catalog()` 时，即使 `target_products` 已达到，也会回扫并重同步已有 synthetic 商品的图片资源
+* 轮换逻辑不再使用全局 synthetic 编号取模，而是按同模板出现次数轮换。
+  这是因为模板总数会把某些商品固定在同一张图上；用模板内出现次数才能真正让 `Synthetic ... 明制襦裙`、`Synthetic ... 点翠发簪`、`Synthetic ... 上元灯会礼盒` 等克隆商品交替用不同图片。
+* 已重建 `api` 容器并在运行库里执行：
+  * `python -m backend.scripts.generate_synthetic_catalog --products 10000`
+* 本次运行结果：
+  * `existing_products=10000`
+  * `created_products=0`
+  * `updated_products=7230`
+* 已清空 Redis 缓存，避免前台继续展示旧的商品列表/详情/推荐缓存。
+* 运行库抽查确认：
+  * `点翠发簪` 本体现在是 `images/饰品/点翠发簪.jpg`
+  * `Synthetic 000253 点翠发簪` 现在是 `images/饰品/点翠发簪-2.jpg`
+  * `上元灯会礼盒` 本体现在是 `images/礼盒/上元灯会礼盒.jpg`
+  * `Synthetic 009138 上元灯会礼盒` 现在是 `images/礼盒/上元灯会礼盒-2.jpg`
+* 抽查 synthetic 分布后，这两个示例商品的 synthetic 克隆现在分别在两张图之间分流，而不再全部压到同一张旧图上：
+  * `点翠发簪.jpg` / `点翠发簪-2.jpg`
+  * `上元灯会礼盒.jpg` / `上元灯会礼盒-2.jpg`
+
+### Synthetic 商品图片轮换本次修改文件
+
+* `backend/scripts/seed_base_data.py`
+* `backend/scripts/generate_synthetic_catalog.py`
+* `backend/tests/scripts/test_generate_synthetic_catalog.py`
+* `front/images/汉服/宋风褙子套装-2.jpg`
+* `front/images/饰品/点翠发簪-2.jpg`
+* `front/images/饰品/玉兔耳坠-2.jpg`
+* `front/images/饰品/云肩披帛扣-2.jpg`
+* `front/images/饰品/宫灯流苏书签-2.jpg`
+* `front/images/礼盒/节气香礼盒-2.jpg`
+* `front/images/礼盒/上元灯会礼盒-2.jpg`
+* `front/images/礼盒/国风美妆礼盒-2.jpg`
+* `front/images/礼盒/端午祈福礼盒-2.jpg`
+* `memory-bank/progress.md`
+* `memory-bank/architecture.md`
+
+### Synthetic 商品图片轮换已执行验证
+
+* `./.venv/bin/ruff check backend/scripts/generate_synthetic_catalog.py backend/scripts/seed_base_data.py backend/tests/scripts/test_generate_synthetic_catalog.py`
+* `./.venv/bin/python -m pytest backend/tests/scripts/test_generate_synthetic_catalog.py backend/tests/integration/test_seed_base_data.py -q`
+* `docker compose up -d --build api`
+* `docker compose exec -T api python -m backend.scripts.generate_synthetic_catalog --products 10000`
+* `docker compose exec -T redis redis-cli FLUSHDB`
+* `docker compose exec -T postgres psql -U shiyige -d shiyige -c "select name, cover_url ..."`
+* `docker compose exec -T postgres psql -U shiyige -d shiyige -c "select cover_url, count(*) ..."`
+
+结果：
+
+* `ruff check` 通过。
+* 新增 synthetic 图池测试与基础种子测试共 `4 passed`。
+* API 容器已重建到当前代码。
+* synthetic 目录同步执行后，共更新 `7230` 条现有商品。
+* Redis 缓存已清空。
+* 示例商品 `点翠发簪`、`上元灯会礼盒` 及其 synthetic 克隆已确认切换到新的本地图片路径。
+
 ### 商品图片去重
 
 * 已为 9 个原先复用同一张图片的商品补入独立素材，并把商品种子里的 `cover_url` 与 `media_urls` 改到新的本地图路径：

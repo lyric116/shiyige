@@ -2,6 +2,14 @@
 
 ## 2026-04-26 补充洞察
 
+* 当前运行站点里看到的大量商品并不一定都来自 `seed_base_data.py` 这 20 个基础模板。
+  仓库还存在 `backend/scripts/generate_synthetic_catalog.py` 这一压测目录生成器；当运行环境做过 `10000` 商品压测时，前台实际浏览到的大量 `Synthetic ...` 商品都来自这里，而不是基础种子本身。
+* synthetic 商品的图片复用问题，根因不是“基础模板没换图”，而是旧生成器把模板的 `cover_url` 与 `media_items` 原样复制给每一个克隆商品。
+  只修基础商品而不修 synthetic 生成器，会导致 `点翠发簪`、`上元灯会礼盒` 这类模板本体已经换图，但 `Synthetic ... 点翠发簪`、`Synthetic ... 上元灯会礼盒` 仍继续显示旧折扇图。
+* `backend/scripts/generate_synthetic_catalog.py` 现在不再只是“补够目标商品数”的扩容脚本。
+  它已经同时承担了 synthetic 资产同步职责：即使当前商品总数已经达到 `target_products`，重复执行脚本也会回扫已有 `Synthetic ...` 商品，并按当前模板图池重建它们的 `cover_url` 与 `product_media`。
+* synthetic 图片轮换现在按“同模板第几次出现”分配，而不是按全局 synthetic 编号分配。
+  这是因为模板总数和图池长度之间会形成固定余数模式；如果直接用全局编号取模，某些模板会永远落在同一张图上，看起来就像轮换逻辑失效。
 * `backend/scripts/seed_base_data.py` 现在不能再被理解为“只适合空库第一次灌数”的一次性脚本。
   它已经承担了种子同步职责：会按 `slug` 对齐类目、按商品名回写商品字段，并重建对应的媒体列表与标签，所以后续如果再调整商品封面或媒体路径，重复执行 seed 也会把现有数据库同步到最新种子状态。
 * 商品静态图片目录不必和业务 `category_slug` 一一对应。
@@ -133,9 +141,9 @@
 
 ## 7. 资源目录作用
 
-* `front/images/汉服/`：汉服类商品静态图片。
-* `front/images/饰品/`：饰品类商品静态图片；当前承接点翠发簪、玉兔耳坠、云肩披帛扣、宫灯流苏书签等去重后的独立素材。
-* `front/images/礼盒/`：礼盒类商品静态图片；当前承接节气香礼盒、上元灯会礼盒、国风美妆礼盒、端午祈福礼盒等去重后的独立素材。
+* `front/images/汉服/`：汉服类商品静态图片；当前除了基础模板图，也包含 `宋风褙子套装-2.jpg` 这类给 synthetic 轮换补充的第二张素材。
+* `front/images/饰品/`：饰品类商品静态图片；当前既承接点翠发簪、玉兔耳坠、云肩披帛扣、宫灯流苏书签等基础去重素材，也承接对应的 `*-2.jpg` 轮换素材，供 synthetic 克隆商品分流使用。
+* `front/images/礼盒/`：礼盒类商品静态图片；当前既承接节气香礼盒、上元灯会礼盒、国风美妆礼盒、端午祈福礼盒的基础图，也承接对应的 `*-2.jpg` 轮换素材。
 * `front/images/文创产品/`：文创商品静态图片。
 * `front/images/非遗手工艺/`：非遗商品静态图片。
 * `front/images/背景/`：花瓣与背景装饰图片。
@@ -1189,7 +1197,7 @@ Phase 4 的前端展示层现在已经补齐三个明确入口：
 * `backend/app/api/v1/cart.py` 与 `backend/app/api/v1/orders.py`：转化归因入口。
   当前加购、下单和支付接口都会尝试沿着最近曝光记录回填 `add_to_cart`、`create_order` 和 `pay_order`，这意味着推荐链路终于具备了完整的曝光到支付归因闭环。
 * `backend/scripts/generate_synthetic_catalog.py`：合成商品集生成层。
-  当前支持把商品量扩到指定规模，并明确只从非 synthetic 模板复制，避免压测多次后 synthetic 商品再去复制 synthetic 商品导致数据质量失控。
+  当前支持把商品量扩到指定规模，并明确只从非 synthetic 模板复制，避免压测多次后 synthetic 商品再去复制 synthetic 商品导致数据质量失控。现在还会根据模板图池为 synthetic 商品轮换封面/详情图，并在重复执行时回扫修正已有 synthetic 商品的图片资源。
 * `backend/scripts/evaluate_recommendations.py`：离线评测执行层。
   当前会准备 Qdrant 商品索引和协同过滤索引，构造三组用户场景，并输出 `baseline`、`dense_only`、`dense_sparse`、`dense_sparse_colbert`、`multi_recall_weighted`、`multi_recall_ltr` 和 `multi_recall_ltr_diversity` 七组对比指标到 `docs/recommendation_evaluation.md`。
 * `backend/scripts/benchmark_recommendations.py`：性能压测执行层。
