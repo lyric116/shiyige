@@ -137,7 +137,11 @@ async def test_cart_api_rejects_invalid_product_sku_quantity_and_inventory(
     unavailable_product_response = await api_client.post(
         "/api/v1/cart/items",
         headers=auth_headers_factory(user),
-        json={"product_id": unavailable_product.id, "sku_id": unavailable_product.default_sku.id, "quantity": 1},
+        json={
+            "product_id": unavailable_product.id,
+            "sku_id": unavailable_product.default_sku.id,
+            "quantity": 1,
+        },
     )
     assert unavailable_product_response.status_code == 409
     assert unavailable_product_response.json()["message"] == "product unavailable"

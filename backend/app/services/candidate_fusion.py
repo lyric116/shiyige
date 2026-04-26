@@ -95,13 +95,10 @@ def fuse_recall_results(
 
 def build_fused_reason(candidate: FusedRecommendationCandidate) -> str:
     reason_labels = [
-        CHANNEL_LABELS.get(channel, channel)
-        for channel in candidate.recall_channels[:3]
+        CHANNEL_LABELS.get(channel, channel) for channel in candidate.recall_channels[:3]
     ]
     if candidate.matched_terms:
-        return (
-            f"来自{'、'.join(reason_labels)}，匹配“{'/'.join(candidate.matched_terms[:3])}”"
-        )
+        return f"来自{'、'.join(reason_labels)}，匹配“{'/'.join(candidate.matched_terms[:3])}”"
     if reason_labels:
         return f"来自{'、'.join(reason_labels)}"
     return "基于你的近期兴趣推荐"

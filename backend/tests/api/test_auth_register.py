@@ -41,7 +41,9 @@ async def test_register_creates_user_with_profile_and_hashed_password(
 
 
 @pytest.mark.asyncio
-async def test_register_rejects_duplicate_email(api_client, api_session_factory, create_user) -> None:
+async def test_register_rejects_duplicate_email(
+    api_client, api_session_factory, create_user
+) -> None:
     create_user(email="existing@example.com", username="existing-user")
 
     response = await api_client.post(

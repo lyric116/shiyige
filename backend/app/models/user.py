@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from backend.app.models.cart import Cart
+    from backend.app.models.membership import PointAccount
+    from backend.app.models.order import Order
+    from backend.app.models.recommendation import UserInterestProfile
+    from backend.app.models.review import Review
 
 
 class User(TimestampMixin, Base):
@@ -20,39 +27,39 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    profile: Mapped[UserProfile | None] = relationship(
+    profile: Mapped["UserProfile | None"] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
     )
-    addresses: Mapped[list[UserAddress]] = relationship(
+    addresses: Mapped[list["UserAddress"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    behavior_logs: Mapped[list[UserBehaviorLog]] = relationship(
+    behavior_logs: Mapped[list["UserBehaviorLog"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    interest_profile: Mapped[UserInterestProfile | None] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-        uselist=False,
-    )
-    cart: Mapped[Cart | None] = relationship(
+    interest_profile: Mapped["UserInterestProfile | None"] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
     )
-    point_account: Mapped[PointAccount | None] = relationship(
+    cart: Mapped["Cart | None"] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
     )
-    reviews: Mapped[list[Review]] = relationship(
+    point_account: Mapped["PointAccount | None"] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    reviews: Mapped[list["Review"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    orders: Mapped[list[Order]] = relationship(back_populates="user")
+    orders: Mapped[list["Order"]] = relationship(back_populates="user")
 
 
 class UserProfile(TimestampMixin, Base):
@@ -66,7 +73,7 @@ class UserProfile(TimestampMixin, Base):
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    user: Mapped[User] = relationship(back_populates="profile")
+    user: Mapped["User"] = relationship(back_populates="profile")
 
 
 class UserAddress(TimestampMixin, Base):
@@ -81,7 +88,7 @@ class UserAddress(TimestampMixin, Base):
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="addresses")
+    user: Mapped["User"] = relationship(back_populates="addresses")
 
 
 class UserBehaviorLog(Base):
@@ -95,4 +102,4 @@ class UserBehaviorLog(Base):
     ext_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="behavior_logs")
+    user: Mapped["User"] = relationship(back_populates="behavior_logs")

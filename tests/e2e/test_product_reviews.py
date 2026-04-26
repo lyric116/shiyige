@@ -186,7 +186,10 @@ def test_product_reviews_section_uses_real_review_api(browser, live_server) -> N
 
     assert page.locator("#reviews-average-rating").text_content() == "4.0"
     assert page.locator("#reviews-total-copy").text_content() == "基于 3 条评价"
-    assert "".join(page.locator("#reviews-rating-bars").text_content().split()) == "5星14星13星12星01星0"
+    assert (
+        "".join(page.locator("#reviews-rating-bars").text_content().split())
+        == "5星14星13星12星01星0"
+    )
 
     reviews_text = page.locator("#reviews-container").text_content()
     assert "第三条真实评价，用于分页。" in reviews_text

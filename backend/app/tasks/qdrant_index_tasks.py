@@ -238,7 +238,9 @@ def delete_product_points(
             )
 
         embeddings = db.scalars(
-            select(ProductEmbedding).where(ProductEmbedding.product_id.in_(sorted(set(product_ids))))
+            select(ProductEmbedding).where(
+                ProductEmbedding.product_id.in_(sorted(set(product_ids)))
+            )
         ).all()
         for embedding in embeddings:
             embedding.qdrant_point_id = str(get_product_point_id(embedding.product_id))
@@ -270,14 +272,17 @@ def get_product_index_status(
 ) -> dict[str, object]:
     app_settings = settings or get_app_settings()
     connection_status = get_qdrant_connection_status(app_settings)
-    active_product_count = db.scalar(
-        select(func.count()).select_from(Product).where(Product.status == 1)
-    ) or 0
-    indexed_product_count = db.scalar(
-        select(func.count()).select_from(ProductEmbedding).where(
-            ProductEmbedding.index_status == INDEX_STATUS_INDEXED
+    active_product_count = (
+        db.scalar(select(func.count()).select_from(Product).where(Product.status == 1)) or 0
+    )
+    indexed_product_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(ProductEmbedding)
+            .where(ProductEmbedding.index_status == INDEX_STATUS_INDEXED)
         )
-    ) or 0
+        or 0
+    )
     failed_embeddings = db.scalars(
         select(ProductEmbedding)
         .where(ProductEmbedding.index_status == INDEX_STATUS_FAILED)

@@ -21,16 +21,20 @@ from backend.scripts.seed_base_data import seed_base_data
 
 
 def load_seed_products(session: Session) -> list[Product]:
-    return session.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.tags),
-            selectinload(Product.media_items),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
+    return (
+        session.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.tags),
+                selectinload(Product.media_items),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+            )
+            .where(Product.name.not_like("Synthetic %"))
+            .order_by(Product.id.asc())
         )
-        .where(Product.name.not_like("Synthetic %"))
-        .order_by(Product.id.asc())
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
 
 def ensure_synthetic_catalog(

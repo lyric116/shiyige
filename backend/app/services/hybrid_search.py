@@ -300,13 +300,17 @@ def load_products_by_id(db: Session, *, product_ids: list[int]) -> dict[int, Pro
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+            )
+            .where(Product.id.in_(product_ids))
         )
-        .where(Product.id.in_(product_ids))
-    ).unique().all()
+        .unique()
+        .all()
+    )
     return {product.id: product for product in products}

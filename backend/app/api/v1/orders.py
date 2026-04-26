@@ -36,7 +36,9 @@ def build_order_query(order_id: int):
     return (
         select(Order)
         .options(
-            selectinload(Order.items).selectinload(OrderItem.sku).selectinload(ProductSku.inventory),
+            selectinload(Order.items)
+            .selectinload(OrderItem.sku)
+            .selectinload(ProductSku.inventory),
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.payment_records),
         )
@@ -123,7 +125,9 @@ def load_existing_order_by_idempotency(
     return db.scalar(
         select(Order)
         .options(
-            selectinload(Order.items).selectinload(OrderItem.sku).selectinload(ProductSku.inventory),
+            selectinload(Order.items)
+            .selectinload(OrderItem.sku)
+            .selectinload(ProductSku.inventory),
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.payment_records),
         )
@@ -395,7 +399,9 @@ def list_orders(
     orders = db.scalars(
         select(Order)
         .options(
-            selectinload(Order.items).selectinload(OrderItem.sku).selectinload(ProductSku.inventory),
+            selectinload(Order.items)
+            .selectinload(OrderItem.sku)
+            .selectinload(ProductSku.inventory),
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.payment_records),
         )

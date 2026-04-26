@@ -22,10 +22,7 @@ def get_dashboard_summary(
 ):
     users_total = db.scalar(select(func.count()).select_from(User)) or 0
     active_users = (
-        db.scalar(
-            select(func.count()).select_from(User).where(User.is_active.is_(True))
-        )
-        or 0
+        db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(True))) or 0
     )
     products_total = db.scalar(select(func.count()).select_from(Product)) or 0
     orders_total = db.scalar(select(func.count()).select_from(Order)) or 0
@@ -33,9 +30,7 @@ def get_dashboard_summary(
         db.scalar(select(func.count()).select_from(Order).where(Order.status == "PAID")) or 0
     )
     pending_orders = (
-        db.scalar(
-            select(func.count()).select_from(Order).where(Order.status == "PENDING_PAYMENT")
-        )
+        db.scalar(select(func.count()).select_from(Order).where(Order.status == "PENDING_PAYMENT"))
         or 0
     )
     recommendation_payload = build_recommendation_dashboard_payload(db)

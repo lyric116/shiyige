@@ -3,12 +3,18 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.core.security import hash_password
 from backend.app.core.database import get_session_factory
+from backend.app.core.security import hash_password
 from backend.app.models.admin import AdminUser
 from backend.app.models.membership import MemberLevel
-from backend.app.models.product import Category, Inventory, Product, ProductMedia, ProductSku, ProductTag
-
+from backend.app.models.product import (
+    Category,
+    Inventory,
+    Product,
+    ProductMedia,
+    ProductSku,
+    ProductTag,
+)
 
 CATEGORY_SEEDS = [
     {"name": "汉服", "slug": "hanfu", "description": "传统汉服服饰"},
@@ -251,7 +257,10 @@ PRODUCT_SEEDS = [
         "festival_tag": "节庆",
         "scene_tag": "亲子",
         "tags": ["皮影", "礼盒", "体验"],
-        "media_urls": ["images/非遗手工艺/天官赐福皮影戏礼盒1.jpg", "images/非遗手工艺/天官赐福皮影戏礼盒2.jpg"],
+        "media_urls": [
+            "images/非遗手工艺/天官赐福皮影戏礼盒1.jpg",
+            "images/非遗手工艺/天官赐福皮影戏礼盒2.jpg",
+        ],
         "price": Decimal("299.00"),
         "member_price": Decimal("269.00"),
         "stock": 11,
@@ -415,7 +424,9 @@ PRODUCT_SEEDS = [
 def seed_member_levels(session: Session) -> int:
     existing_levels = {
         level.code: level
-        for level in session.scalars(select(MemberLevel).order_by(MemberLevel.level_order.asc())).all()
+        for level in session.scalars(
+            select(MemberLevel).order_by(MemberLevel.level_order.asc())
+        ).all()
     }
 
     for level_seed in MEMBER_LEVEL_SEEDS:

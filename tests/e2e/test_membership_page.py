@@ -80,9 +80,9 @@ def seed_paid_member_order(live_server, access_token: str) -> None:
         f"{live_server}/api/v1/cart/items",
         headers=headers,
         json={
-          "product_id": product["id"],
-          "sku_id": default_sku["id"],
-          "quantity": 2,
+            "product_id": product["id"],
+            "sku_id": default_sku["id"],
+            "quantity": 2,
         },
         timeout=5.0,
         trust_env=False,
@@ -125,11 +125,15 @@ def test_membership_page_uses_real_points_levels_and_member_price(browser, live_
     login_through_page(page, live_server, email, password)
     page.goto(f"{live_server}/membership.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => {"
-        "  const card = document.querySelector('.membership-card')?.textContent || '';"
-        "  const history = document.querySelector('#points-history-body')?.textContent || '';"
-        "  return card.includes('白银会员') && card.includes('1808') && history.includes('支付获得积分');"
-        "}",
+        (
+            "() => {"
+            "  const card = document.querySelector('.membership-card')?.textContent || '';"
+            "  const history = document.querySelector('#points-history-body')?.textContent || '';"
+            "  return card.includes('白银会员')"
+            " && card.includes('1808')"
+            " && history.includes('支付获得积分');"
+            "}"
+        ),
         timeout=5000,
     )
 
@@ -140,7 +144,10 @@ def test_membership_page_uses_real_points_levels_and_member_price(browser, live_
 
     page.goto(f"{live_server}/product.html?id=1", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => document.querySelector('#member-price .text-danger')?.textContent?.trim() === '¥799.00'",
+        (
+            "() => document.querySelector('#member-price .text-danger')"
+            "?.textContent?.trim() === '¥799.00'"
+        ),
         timeout=5000,
     )
     assert page.locator("#member-price .text-danger").text_content() == "¥799.00"

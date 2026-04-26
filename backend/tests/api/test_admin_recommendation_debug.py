@@ -240,9 +240,7 @@ async def test_admin_recommendation_experiments_endpoint_returns_static_configs(
     assert response.status_code == 200
     assert body["data"]["active_key"] == "full_pipeline"
     assert body["data"]["runtime_summary"]["active_recommendation_backend"] == "multi_recall"
-    assert any(
-        item["key"] == "dense_recall" for item in body["data"]["capability_catalog"]
-    )
+    assert any(item["key"] == "dense_recall" for item in body["data"]["capability_catalog"])
     assert body["data"]["artifact_summary"]["artifact_count"] >= 4
     assert any(
         item["path"] == "docs/recommendation_pipeline.md"
@@ -255,9 +253,10 @@ async def test_admin_recommendation_experiments_endpoint_returns_static_configs(
         "hybrid_rerank",
         "full_pipeline",
     }
-    assert next(
-        item for item in body["data"]["items"] if item["key"] == "full_pipeline"
-    )["is_active"] is True
+    assert (
+        next(item for item in body["data"]["items"] if item["key"] == "full_pipeline")["is_active"]
+        is True
+    )
 
 
 @pytest.mark.asyncio

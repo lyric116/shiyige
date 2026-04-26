@@ -246,22 +246,22 @@ def load_related_products_by_id(
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.embedding),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.embedding),
+            )
+            .where(Product.id.in_(product_ids), Product.status == 1)
         )
-        .where(Product.id.in_(product_ids), Product.status == 1)
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
-    return {
-        product.id: product
-        for product in products
-        if product_has_available_stock(product)
-    }
+    return {product.id: product for product in products if product_has_available_stock(product)}
 
 
 def find_related_products_with_qdrant(
@@ -367,16 +367,20 @@ def baseline_semantic_search_products(
     db.expire_all()
     query_vector = embedding_provider.embed_query(normalized_query)
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.embedding),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.embedding),
+            )
+            .where(Product.status == 1)
         )
-        .where(Product.status == 1)
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
     results: list[VectorSearchResult] = []
     for product in products:
@@ -526,16 +530,20 @@ def find_related_products(
     ensure_product_embeddings(db, embedding_provider)
     db.expire_all()
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.embedding),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.embedding),
+            )
+            .where(Product.status == 1)
         )
-        .where(Product.status == 1)
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
     source_product = next((product for product in products if product.id == product_id), None)
     if (

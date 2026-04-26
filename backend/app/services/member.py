@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal, ROUND_DOWN
+from decimal import ROUND_DOWN, Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -66,13 +66,13 @@ def resolve_member_level(db: Session, points_balance: int) -> MemberLevel:
     return level
 
 
-def get_point_account(db: Session, user_id: int, *, include_logs: bool = False) -> PointAccount | None:
+def get_point_account(
+    db: Session, user_id: int, *, include_logs: bool = False
+) -> PointAccount | None:
     options = [selectinload(PointAccount.member_level)]
     if include_logs:
         options.append(selectinload(PointAccount.point_logs))
-    return db.scalar(
-        select(PointAccount).options(*options).where(PointAccount.user_id == user_id)
-    )
+    return db.scalar(select(PointAccount).options(*options).where(PointAccount.user_id == user_id))
 
 
 def ensure_point_account(db: Session, user_id: int) -> PointAccount:

@@ -1,8 +1,7 @@
-from functools import lru_cache
 import os
+from functools import lru_cache
 
 from minio import Minio
-
 
 DEFAULT_MINIO_ENDPOINT = "127.0.0.1:9000"
 DEFAULT_MINIO_ACCESS_KEY = "minioadmin"

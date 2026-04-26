@@ -7,7 +7,9 @@ class FakeMediaStorage:
     def __init__(self):
         self.uploads: list[dict[str, object]] = []
 
-    def upload_bytes(self, *, bucket: str, object_name: str, data: bytes, content_type: str) -> StoredObject:
+    def upload_bytes(
+        self, *, bucket: str, object_name: str, data: bytes, content_type: str
+    ) -> StoredObject:
         self.uploads.append(
             {
                 "bucket": bucket,

@@ -9,8 +9,6 @@ from backend.app.core.responses import build_response
 from backend.app.models.admin import AdminUser
 from backend.app.models.order import Order, OrderItem
 from backend.app.models.product import ProductSku
-from backend.app.models.user import User
-
 
 router = APIRouter(prefix="/admin/orders", tags=["admin-orders"])
 
@@ -20,7 +18,9 @@ def build_admin_order_query():
         select(Order)
         .options(
             selectinload(Order.user),
-            selectinload(Order.items).selectinload(OrderItem.sku).selectinload(ProductSku.inventory),
+            selectinload(Order.items)
+            .selectinload(OrderItem.sku)
+            .selectinload(ProductSku.inventory),
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.payment_records),
         )

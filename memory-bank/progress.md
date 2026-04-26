@@ -1,5 +1,58 @@
 # Progress Log
 
+## 2026-04-26
+
+### 完成事项
+
+* 修复了前台多个页脚残留的 `categories.html` 旧链接，统一改回当前真实页面 `category.html`，避免首页、登录、注册、商品、购物车、结算页继续保留死链。
+* 清理并统一了仓库当前的 `ruff` 基线；执行自动修复与格式化后，补齐了模型层前向类型引用写法，并手工收口了剩余超长断言。
+* `backend/app/models/cart.py`、`membership.py`、`order.py`、`product.py`、`review.py`、`user.py` 现在统一使用 `TYPE_CHECKING` + 字符串前向引用，消除了跨模型双向关系在静态检查下触发的 `F821`。
+* 多个 e2e 用例中的 `wait_for_function(...)` 长字符串断言已拆成可读的短片段，避免继续因 `E501` 卡住全仓 `ruff` 校验。
+
+### 本次修改文件
+
+* `front/index.html`
+* `front/login.html`
+* `front/register.html`
+* `front/product.html`
+* `front/cart.html`
+* `front/checkout.html`
+* `backend/app/models/cart.py`
+* `backend/app/models/membership.py`
+* `backend/app/models/order.py`
+* `backend/app/models/product.py`
+* `backend/app/models/review.py`
+* `backend/app/models/user.py`
+* `tests/e2e/test_admin_basic.py`
+* `tests/e2e/test_cart_flow.py`
+* `tests/e2e/test_checkout_flow.py`
+* `tests/e2e/test_full_demo_flow.py`
+* `tests/e2e/test_membership_page.py`
+* `tests/e2e/test_recommendation_ui.py`
+* 以及本轮被 `ruff check --fix` / `ruff format` 统一整理的其余 Python 文件
+
+### 已执行验证
+
+* `./.venv/bin/ruff check .`
+* `./.venv/bin/python -m pytest backend/tests/models/test_user_models.py backend/tests/models/test_cart_models.py backend/tests/models/test_order_models.py backend/tests/models/test_product_models.py backend/tests/models/test_review_models.py tests/e2e/test_cart_flow.py tests/e2e/test_checkout_flow.py tests/e2e/test_admin_basic.py tests/e2e/test_membership_page.py tests/e2e/test_recommendation_ui.py -q`
+* `rg -n "categories\\.html" front -S`
+
+结果：
+
+* `ruff check .` 已通过。
+* 5 个模型测试文件共 `10 passed`，说明模型层前向引用调整没有破坏建表与关系结构。
+* `front/` 中已无 `categories.html` 残留引用。
+* e2e 选择集没有出现断言失败，但在浏览器启动阶段被当前执行环境拦截；`tests/e2e/conftest.py` 的 `playwright.chromium.launch()` 在本沙箱中报 `sandbox_host_linux.cc:41 ... Operation not permitted`，因此本轮无法在这里完成浏览器级回归。
+
+### 关键发现
+
+* 当前仓库真正的“半成品”主要不是业务链路，而是迁移后遗留的细节问题：旧页面名残链、模型注解写法不统一，以及长期未收口的 `ruff` 基线。
+* 现有 e2e 夹具默认硬编码 `playwright.chromium.launch()`；当运行环境不允许当前 Chromium headless shell 正常退出时，测试会在夹具阶段直接失败，而不是在页面断言阶段失败。
+
+### 下一步起点
+
+* 如果后续要继续恢复 e2e 自测能力，优先排查 `tests/e2e/conftest.py` 的浏览器启动策略，评估是否需要给当前沙箱单独加稳定启动参数或备用浏览器通道。
+
 ## 2026-04-25
 
 ### 完成事项

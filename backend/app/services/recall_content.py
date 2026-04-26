@@ -190,9 +190,7 @@ def collect_shared_payload_terms(
 
     for key, values in seed_values.items():
         candidate_values = (
-            candidate_payload.get("tags") or []
-            if key == "tags"
-            else [candidate_payload.get(key)]
+            candidate_payload.get("tags") or [] if key == "tags" else [candidate_payload.get(key)]
         )
         for candidate_value in candidate_values:
             if (

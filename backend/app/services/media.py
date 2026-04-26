@@ -12,7 +12,6 @@ from fastapi import HTTPException, UploadFile, status
 
 from backend.app.core.minio import get_minio_client, get_minio_settings
 
-
 ALLOWED_IMAGE_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",

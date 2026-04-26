@@ -4,7 +4,14 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import Session
 
 from backend.app.models.base import Base
-from backend.app.models.product import Category, Inventory, Product, ProductMedia, ProductSku, ProductTag
+from backend.app.models.product import (
+    Category,
+    Inventory,
+    Product,
+    ProductMedia,
+    ProductSku,
+    ProductTag,
+)
 
 
 def test_product_domain_models_create_expected_tables() -> None:
@@ -12,9 +19,14 @@ def test_product_domain_models_create_expected_tables() -> None:
     Base.metadata.create_all(engine)
     inspector = inspect(engine)
 
-    assert {"category", "product", "product_sku", "product_media", "product_tag", "inventory"}.issubset(
-        set(inspector.get_table_names())
-    )
+    assert {
+        "category",
+        "product",
+        "product_sku",
+        "product_media",
+        "product_tag",
+        "inventory",
+    }.issubset(set(inspector.get_table_names()))
 
 
 def test_product_model_supports_default_sku_lowest_price_and_inventory() -> None:
@@ -57,7 +69,9 @@ def test_product_model_supports_default_sku_lowest_price_and_inventory() -> None
         )
         alt_sku.inventory = Inventory(quantity=5)
         product.skus.extend([default_sku, alt_sku])
-        product.media_items.append(ProductMedia(media_type="image", url="https://example.com/hanfu-1.jpg"))
+        product.media_items.append(
+            ProductMedia(media_type="image", url="https://example.com/hanfu-1.jpg")
+        )
         product.tags.append(ProductTag(tag="汉服"))
         product.tags.append(ProductTag(tag="明制"))
 

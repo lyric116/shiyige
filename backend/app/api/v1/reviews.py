@@ -10,9 +10,8 @@ from backend.app.core.responses import build_response
 from backend.app.models.order import Order, OrderItem
 from backend.app.models.product import Product
 from backend.app.models.review import Review, ReviewImage
-from backend.app.models.user import User, UserProfile
+from backend.app.models.user import User
 from backend.app.schemas.review import CreateReviewRequest
-
 
 router = APIRouter(prefix="/products", tags=["reviews"])
 
@@ -39,7 +38,11 @@ def build_review_query(product_id: int):
 def serialize_review(review: Review) -> dict[str, object]:
     user = review.user
     profile = user.profile if user else None
-    reviewer_name = "匿名用户" if review.is_anonymous else (profile.display_name if profile else None) or user.username
+    reviewer_name = (
+        "匿名用户"
+        if review.is_anonymous
+        else (profile.display_name if profile else None) or user.username
+    )
     return {
         "id": review.id,
         "user_id": review.user_id,
@@ -49,7 +52,10 @@ def serialize_review(review: Review) -> dict[str, object]:
         "content": review.content,
         "is_anonymous": review.is_anonymous,
         "reviewer_name": reviewer_name,
-        "image_urls": [image.image_url for image in sorted(review.images, key=lambda item: (item.sort_order, item.id))],
+        "image_urls": [
+            image.image_url
+            for image in sorted(review.images, key=lambda item: (item.sort_order, item.id))
+        ],
         "created_at": review.created_at.isoformat(),
     }
 

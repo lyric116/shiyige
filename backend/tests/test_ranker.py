@@ -81,16 +81,22 @@ def test_weighted_ranker_prefers_interest_match_and_keeps_exploration_candidate(
         user = create_user(session, email="ranker@example.com", username="ranker")
         add_user_trace(session, user_id=user.id, product_id=1)
 
-        products = session.scalars(
-            select(Product)
-            .options(
-                selectinload(Product.category),
-                selectinload(Product.tags),
-                selectinload(Product.skus).selectinload(ProductSku.inventory),
-                selectinload(Product.media_items),
+        products = (
+            session.scalars(
+                select(Product)
+                .options(
+                    selectinload(Product.category),
+                    selectinload(Product.tags),
+                    selectinload(Product.skus).selectinload(ProductSku.inventory),
+                    selectinload(Product.media_items),
+                )
+                .where(
+                    Product.name.in_(["宋风褙子套装", "故宫宫廷香囊", "故宫星空折扇", "景泰蓝花瓶"])
+                )
             )
-            .where(Product.name.in_(["宋风褙子套装", "故宫宫廷香囊", "故宫星空折扇", "景泰蓝花瓶"]))
-        ).unique().all()
+            .unique()
+            .all()
+        )
         products_by_name = {product.name: product for product in products}
         hanfu_candidate = products_by_name["宋风褙子套装"]
         weak_match_candidate = products_by_name["故宫宫廷香囊"]
@@ -220,9 +226,7 @@ def test_weighted_ranker_prefers_interest_match_and_keeps_exploration_candidate(
         assert all(candidate.product.id != no_stock_candidate.id for candidate in ranked)
         assert all("selection_stage" in candidate.selection_trace for candidate in ranked)
         retained_exploration = next(
-            candidate
-            for candidate in ranked
-            if candidate.product.id == exploration_candidate.id
+            candidate for candidate in ranked if candidate.product.id == exploration_candidate.id
         )
         assert retained_exploration.selection_trace["selection_stage"] in {
             "primary",

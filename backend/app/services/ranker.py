@@ -156,8 +156,7 @@ def score_weighted_candidate(
     )
     colbert_rerank_score = bound_score(normalized["colbert_rerank_score"])
     collaborative_group_score = bound_score(
-        normalized["collaborative_score"] * 0.65
-        + normalized["item_cooccurrence_score"] * 0.35
+        normalized["collaborative_score"] * 0.65 + normalized["item_cooccurrence_score"] * 0.35
     )
     user_interest_score = bound_score(
         normalized["category_match"] * 0.12
@@ -193,8 +192,7 @@ def score_weighted_candidate(
         + (1.0 - normalized["already_purchased"]) * 0.10
     )
     diversity_exploration_score = bound_score(
-        normalized["exploration_candidate"] * 0.65
-        + (1.0 - normalized["recently_exposed"]) * 0.35
+        normalized["exploration_candidate"] * 0.65 + (1.0 - normalized["recently_exposed"]) * 0.35
     )
 
     hybrid_retrieval_contribution = (
@@ -216,17 +214,13 @@ def score_weighted_candidate(
         trend_freshness_score * WEIGHTED_RANKER_GROUP_WEIGHTS["trend_freshness_score"]
     )
     business_constraints_contribution = (
-        business_constraints_score
-        * WEIGHTED_RANKER_GROUP_WEIGHTS["business_constraints_score"]
+        business_constraints_score * WEIGHTED_RANKER_GROUP_WEIGHTS["business_constraints_score"]
     )
     diversity_contribution = (
-        diversity_exploration_score
-        * WEIGHTED_RANKER_GROUP_WEIGHTS["diversity_exploration_score"]
+        diversity_exploration_score * WEIGHTED_RANKER_GROUP_WEIGHTS["diversity_exploration_score"]
     )
 
-    recall_score = (
-        hybrid_retrieval_contribution + colbert_contribution + collaborative_contribution
-    )
+    recall_score = hybrid_retrieval_contribution + colbert_contribution + collaborative_contribution
     interest_score = interest_contribution
     quality_score = quality_contribution + trend_contribution
 

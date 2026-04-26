@@ -22,9 +22,7 @@ def get_cart_query(user_id: int):
     return (
         select(Cart)
         .options(
-            selectinload(Cart.items)
-            .selectinload(CartItem.product)
-            .selectinload(Product.category),
+            selectinload(Cart.items).selectinload(CartItem.product).selectinload(Product.category),
             selectinload(Cart.items).selectinload(CartItem.sku),
         )
         .where(Cart.user_id == user_id)
@@ -94,9 +92,7 @@ def validate_quantity(quantity: int) -> None:
 
 def load_product_for_cart(db: Session, product_id: int) -> Product:
     product = db.scalar(
-        select(Product)
-        .options(selectinload(Product.category))
-        .where(Product.id == product_id)
+        select(Product).options(selectinload(Product.category)).where(Product.id == product_id)
     )
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product not found")

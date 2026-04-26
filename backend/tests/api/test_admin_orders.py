@@ -1,8 +1,7 @@
 import pytest
-from sqlalchemy import select
 
-from backend.tests.api.test_order_pay import create_pending_order, get_seed_product
 from backend.app.models.user import UserAddress
+from backend.tests.api.test_order_pay import create_pending_order, get_seed_product
 
 
 @pytest.mark.asyncio

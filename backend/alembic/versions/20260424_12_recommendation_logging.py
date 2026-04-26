@@ -56,7 +56,9 @@ def upgrade() -> None:
             sa.Column("created_at", sa.DateTime(), nullable=False),
             sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
             sa.PrimaryKeyConstraint("id", name=op.f("pk_recommendation_request_log")),
-            sa.UniqueConstraint("request_id", name=op.f("uq_recommendation_request_log_request_id")),
+            sa.UniqueConstraint(
+                "request_id", name=op.f("uq_recommendation_request_log_request_id")
+            ),
         )
     _create_index_if_missing(
         op.f("ix_recommendation_request_log_request_id"),

@@ -151,9 +151,7 @@ async def test_recommendation_click_and_conversion_logs_follow_user_actions(
     }
     assert all(log.product_id == top_product_id for log in conversion_logs)
     assert any(
-        log.order_id == order_id
-        for log in conversion_logs
-        if log.action_type == "pay_order"
+        log.order_id == order_id for log in conversion_logs if log.action_type == "pay_order"
     )
 
 

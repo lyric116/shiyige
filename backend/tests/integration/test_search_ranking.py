@@ -50,4 +50,7 @@ def test_semantic_search_ranking_prefers_matching_scene_and_respects_filters() -
     assert hanfu_results[0].product.name == "明制襦裙"
     assert "汉服" in hanfu_results[0].reason
     assert accessory_results[0].product.name == "点翠发簪"
-    assert all((result.product.lowest_price or Decimal("0")) <= Decimal("150") for result in accessory_results)
+    assert all(
+        (result.product.lowest_price or Decimal("0")) <= Decimal("150")
+        for result in accessory_results
+    )

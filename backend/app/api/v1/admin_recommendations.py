@@ -392,9 +392,7 @@ def warm_recommendation_precompute(
     normalized_slots = normalize_precompute_slots(slots)
     try:
         parsed_user_ids = [
-            int(raw_id.strip())
-            for raw_id in (user_ids or "").split(",")
-            if raw_id.strip()
+            int(raw_id.strip()) for raw_id in (user_ids or "").split(",") if raw_id.strip()
         ] or None
     except ValueError as exc:
         raise HTTPException(

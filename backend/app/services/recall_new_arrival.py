@@ -14,16 +14,20 @@ def recall_new_arrival_candidates(
     consumed_product_ids: set[int],
     limit: int = 18,
 ) -> list[RecallItem]:
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+            )
+            .where(Product.status == 1)
+            .order_by(Product.created_at.desc(), Product.id.desc())
+            .limit(limit * 3)
         )
-        .where(Product.status == 1)
-        .order_by(Product.created_at.desc(), Product.id.desc())
-        .limit(limit * 3)
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
     results: list[RecallItem] = []
     for rank, product in enumerate(products, start=1):
@@ -36,11 +40,9 @@ def recall_new_arrival_candidates(
                 recall_channel="new_arrival",
                 recall_score=float(max(limit * 3 - rank, 1)),
                 rank_in_channel=rank,
-                matched_terms=[
-                    term
-                    for term in [product.festival_tag, product.scene_tag]
-                    if term
-                ][:2],
+                matched_terms=[term for term in [product.festival_tag, product.scene_tag] if term][
+                    :2
+                ],
                 reason_parts=["新品探索召回", "补充低曝光新商品"],
             )
         )

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from backend.app.models.user import User
 
 
 class MemberLevel(TimestampMixin, Base):
@@ -23,7 +26,7 @@ class MemberLevel(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_default: Mapped[bool] = mapped_column(default=False, nullable=False)
 
-    point_accounts: Mapped[list[PointAccount]] = relationship(back_populates="member_level")
+    point_accounts: Mapped[list["PointAccount"]] = relationship(back_populates="member_level")
 
 
 class PointAccount(TimestampMixin, Base):
@@ -49,9 +52,9 @@ class PointAccount(TimestampMixin, Base):
         nullable=False,
     )
 
-    user: Mapped[User] = relationship(back_populates="point_account")
-    member_level: Mapped[MemberLevel] = relationship(back_populates="point_accounts")
-    point_logs: Mapped[list[PointLog]] = relationship(
+    user: Mapped["User"] = relationship(back_populates="point_account")
+    member_level: Mapped["MemberLevel"] = relationship(back_populates="point_accounts")
+    point_logs: Mapped[list["PointLog"]] = relationship(
         back_populates="point_account",
         cascade="all, delete-orphan",
     )
@@ -75,4 +78,4 @@ class PointLog(Base):
     ext_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    point_account: Mapped[PointAccount] = relationship(back_populates="point_logs")
+    point_account: Mapped["PointAccount"] = relationship(back_populates="point_logs")

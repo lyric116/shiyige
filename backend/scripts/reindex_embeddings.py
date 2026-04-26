@@ -26,9 +26,7 @@ def main() -> int:
     args = parser.parse_args()
 
     result = run_reindex_command(force=not args.incremental)
-    print(
-        f"indexed={result['indexed']} skipped={result['skipped']} model={result['model_name']}"
-    )
+    print(f"indexed={result['indexed']} skipped={result['skipped']} model={result['model_name']}")
     return 0
 
 

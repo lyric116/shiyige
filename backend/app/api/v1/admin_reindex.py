@@ -5,9 +5,11 @@ from backend.app.api.v1.admin_auth import create_operation_log, get_current_admi
 from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
 from backend.app.models.admin import AdminUser
-from backend.app.tasks.embedding_tasks import rebuild_all_product_embeddings, reindex_changed_product_embeddings
 from backend.app.schemas.admin import AdminReindexRequest
-
+from backend.app.tasks.embedding_tasks import (
+    rebuild_all_product_embeddings,
+    reindex_changed_product_embeddings,
+)
 
 router = APIRouter(prefix="/admin/reindex", tags=["admin-reindex"])
 

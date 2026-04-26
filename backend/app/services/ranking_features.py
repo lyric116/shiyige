@@ -181,31 +181,13 @@ def build_ranking_feature_context(
         preferred_price = sum(positive_price_samples) / float(len(positive_price_samples))
 
     recent_categories = {product.category_id for product in recent_products}
-    recent_tags = {
-        tag.tag
-        for product in recent_products
-        for tag in product.tags
-    }
+    recent_tags = {tag.tag for product in recent_products for tag in product.tags}
     recent_dynasties = {
-        product.dynasty_style
-        for product in recent_products
-        if product.dynasty_style
+        product.dynasty_style for product in recent_products if product.dynasty_style
     }
-    recent_crafts = {
-        product.craft_type
-        for product in recent_products
-        if product.craft_type
-    }
-    recent_scenes = {
-        product.scene_tag
-        for product in recent_products
-        if product.scene_tag
-    }
-    recent_festivals = {
-        product.festival_tag
-        for product in recent_products
-        if product.festival_tag
-    }
+    recent_crafts = {product.craft_type for product in recent_products if product.craft_type}
+    recent_scenes = {product.scene_tag for product in recent_products if product.scene_tag}
+    recent_festivals = {product.festival_tag for product in recent_products if product.festival_tag}
 
     recent_cutoff = reference_time - timedelta(days=14)
     user_recent_view_counts: dict[int, int] = {}
@@ -248,16 +230,20 @@ def load_context_products(db: Session, product_ids: list[int]) -> dict[int, Prod
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.media_items),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.media_items),
+            )
+            .where(Product.id.in_(product_ids))
         )
-        .where(Product.id.in_(product_ids))
-    ).unique().all()
+        .unique()
+        .all()
+    )
     return {product.id: product for product in products}
 
 
@@ -265,10 +251,7 @@ def load_product_metrics(
     db: Session,
     product_ids: list[int],
 ) -> dict[int, ProductRankingMetrics]:
-    metrics = {
-        product_id: ProductRankingMetrics()
-        for product_id in set(product_ids)
-    }
+    metrics = {product_id: ProductRankingMetrics() for product_id in set(product_ids)}
     if not metrics:
         return {}
 
@@ -364,23 +347,16 @@ def build_candidate_ranking_features(
     )
     craft_match = float(
         bool(product.craft_type)
-        and (
-            product.craft_type in top_term_set
-            or product.craft_type in context.recent_crafts
-        )
+        and (product.craft_type in top_term_set or product.craft_type in context.recent_crafts)
     )
     scene_match = float(
         bool(product.scene_tag)
-        and (
-            product.scene_tag in top_term_set
-            or product.scene_tag in context.recent_scenes
-        )
+        and (product.scene_tag in top_term_set or product.scene_tag in context.recent_scenes)
     )
     festival_match = float(
         bool(product.festival_tag)
         and (
-            product.festival_tag in top_term_set
-            or product.festival_tag in context.recent_festivals
+            product.festival_tag in top_term_set or product.festival_tag in context.recent_festivals
         )
     )
 
@@ -437,9 +413,7 @@ def build_candidate_ranking_features(
     has_stock = float(product_has_stock(product))
     freshness_score = compute_freshness_score(product, now=context.current_time)
     content_quality_score = compute_content_quality_score(product)
-    recently_exposed = float(
-        min(context.user_recent_view_counts.get(product.id, 0) / 3.0, 1.0)
-    )
+    recently_exposed = float(min(context.user_recent_view_counts.get(product.id, 0) / 3.0, 1.0))
     already_purchased = float(product.id in context.consumed_product_ids)
     exploration_candidate = float(
         "new_arrival" in candidate.recall_channels

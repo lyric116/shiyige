@@ -12,7 +12,6 @@ from backend.app.services.media import (
     read_and_validate_image,
 )
 
-
 router = APIRouter(prefix="/media", tags=["media"])
 
 

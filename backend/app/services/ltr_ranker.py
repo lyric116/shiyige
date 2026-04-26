@@ -43,10 +43,7 @@ def load_ltr_ranker(
         return None
 
     payload = json.loads(path.read_text(encoding="utf-8"))
-    weights = {
-        str(key): float(value)
-        for key, value in dict(payload.get("weights", {})).items()
-    }
+    weights = {str(key): float(value) for key, value in dict(payload.get("weights", {})).items()}
     if not weights:
         return None
 

@@ -64,7 +64,9 @@ async def test_behavior_events_preserve_full_user_journey_sequence(
     headers = {"Authorization": f"Bearer {create_access_token(subject=str(user_id), role='user')}"}
 
     view_response = await async_client.get(f"/api/v1/products/{product_id}", headers=headers)
-    search_response = await async_client.get("/api/v1/search", params={"q": "故宫"}, headers=headers)
+    search_response = await async_client.get(
+        "/api/v1/search", params={"q": "故宫"}, headers=headers
+    )
     add_cart_response = await async_client.post(
         "/api/v1/cart/items",
         headers=headers,

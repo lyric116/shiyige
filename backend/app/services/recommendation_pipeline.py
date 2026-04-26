@@ -186,10 +186,7 @@ def run_recommendation_pipeline(
         settings=app_settings,
     )
 
-    pipeline_candidates = [
-        build_pipeline_candidate(candidate)
-        for candidate in ranked_candidates
-    ]
+    pipeline_candidates = [build_pipeline_candidate(candidate) for candidate in ranked_candidates]
 
     return RecommendationPipelineRun(
         profile=profile,
@@ -255,23 +252,23 @@ def load_pipeline_products(
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.media_items),
-            selectinload(Product.embedding),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.media_items),
+                selectinload(Product.embedding),
+            )
+            .where(Product.id.in_(product_ids), Product.status == 1)
         )
-        .where(Product.id.in_(product_ids), Product.status == 1)
-    ).unique().all()
+        .unique()
+        .all()
+    )
 
-    return {
-        product.id: product
-        for product in products
-        if product_has_available_stock(product)
-    }
+    return {product.id: product for product in products if product_has_available_stock(product)}
 
 
 def build_pipeline_candidate(

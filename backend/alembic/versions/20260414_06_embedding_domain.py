@@ -7,9 +7,8 @@ Create Date: 2026-04-14 08:10:00
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "20260414_06"
 down_revision: str | None = "20260414_05"
@@ -55,7 +54,9 @@ def upgrade() -> None:
     )
     op.create_index("ix_user_interest_profile_user_id", "user_interest_profile", ["user_id"])
     op.create_index("ix_user_interest_profile_model_name", "user_interest_profile", ["model_name"])
-    op.create_index("ix_user_interest_profile_content_hash", "user_interest_profile", ["content_hash"])
+    op.create_index(
+        "ix_user_interest_profile_content_hash", "user_interest_profile", ["content_hash"]
+    )
 
 
 def downgrade() -> None:

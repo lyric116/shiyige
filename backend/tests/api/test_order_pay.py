@@ -16,7 +16,9 @@ def get_seed_product(session, name: str) -> Product:
     return product
 
 
-async def create_pending_order(api_client, headers, address_id, product_id, sku_id, quantity, idempotency_key):
+async def create_pending_order(
+    api_client, headers, address_id, product_id, sku_id, quantity, idempotency_key
+):
     add_cart_response = await api_client.post(
         "/api/v1/cart/items",
         headers=headers,

@@ -11,12 +11,10 @@ from backend.app.core.security import hash_password
 from backend.app.models.membership import PointAccount
 from backend.app.models.order import Order, OrderItem, PaymentRecord
 from backend.app.models.product import Product, ProductSku
-from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import User, UserAddress, UserBehaviorLog, UserProfile
 from backend.app.services.member import accrue_points_for_paid_order
 from backend.app.services.recommendations import build_user_interest_profile
 from backend.scripts.seed_base_data import seed_base_data
-
 
 DEMO_USER_EMAIL = "user@shiyige-demo.com"
 DEMO_USER_USERNAME = "demo-user"
@@ -48,7 +46,9 @@ def generate_payment_no() -> str:
     return f"PAY{timestamp[-14:]}"
 
 
-def load_product_with_default_sku(session: Session, product_name: str) -> tuple[Product, ProductSku]:
+def load_product_with_default_sku(
+    session: Session, product_name: str
+) -> tuple[Product, ProductSku]:
     product = session.scalar(
         select(Product)
         .options(selectinload(Product.skus).selectinload(ProductSku.inventory))

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from backend.app.models.product import Product, ProductSku
+    from backend.app.models.user import User
 
 
 class Order(TimestampMixin, Base):
@@ -17,7 +22,9 @@ class Order(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), default="PENDING_PAYMENT", nullable=False)
     goods_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    shipping_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"), nullable=False)
+    shipping_amount: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal("0.00"), nullable=False
+    )
     payable_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     recipient_name: Mapped[str] = mapped_column(String(100), nullable=False)
     recipient_phone: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -25,16 +32,18 @@ class Order(TimestampMixin, Base):
     recipient_detail_address: Mapped[str] = mapped_column(String(255), nullable=False)
     recipient_postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     buyer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    idempotency_key: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True, index=True
+    )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user: Mapped[User] = relationship(back_populates="orders")
-    items: Mapped[list[OrderItem]] = relationship(
+    user: Mapped["User"] = relationship(back_populates="orders")
+    items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
     )
-    payment_records: Mapped[list[PaymentRecord]] = relationship(
+    payment_records: Mapped[list["PaymentRecord"]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
     )
@@ -58,9 +67,9 @@ class OrderItem(TimestampMixin, Base):
     unit_member_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     subtotal_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    order: Mapped[Order] = relationship(back_populates="items")
-    product: Mapped[Product] = relationship(back_populates="order_items")
-    sku: Mapped[ProductSku] = relationship(back_populates="order_items")
+    order: Mapped["Order"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship(back_populates="order_items")
+    sku: Mapped["ProductSku"] = relationship(back_populates="order_items")
 
 
 class PaymentRecord(TimestampMixin, Base):
@@ -78,4 +87,4 @@ class PaymentRecord(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(32), default="PENDING", nullable=False)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    order: Mapped[Order] = relationship(back_populates="payment_records")
+    order: Mapped["Order"] = relationship(back_populates="payment_records")

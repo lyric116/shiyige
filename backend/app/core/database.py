@@ -1,11 +1,10 @@
+import os
 from collections.abc import Generator
 from functools import lru_cache
-import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
-
 
 DEFAULT_DATABASE_URL = "sqlite:///./backend/dev.db"
 

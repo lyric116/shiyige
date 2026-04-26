@@ -149,9 +149,7 @@ def build_gift_attribute_text(
     if scene_tag and any(keyword in scene_tag for keyword in ("送礼", "礼赠", "拜访", "节庆")):
         gift_terms.append(scene_tag)
     gift_tags = [
-        tag
-        for tag in tags
-        if any(keyword in tag for keyword in ("礼", "赠", "祝福", "香囊"))
+        tag for tag in tags if any(keyword in tag for keyword in ("礼", "赠", "祝福", "香囊"))
     ]
     gift_terms.extend(gift_tags)
     if not gift_terms:

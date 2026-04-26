@@ -1,7 +1,7 @@
 import pytest
 
-from backend.tests.api.test_reviews_create import create_paid_order, get_product
 from backend.app.models.user import UserAddress
+from backend.tests.api.test_reviews_create import create_paid_order, get_product
 
 
 @pytest.mark.asyncio

@@ -19,9 +19,7 @@ def build_feature_summary(
             "rrf_fusion_score": round(features.rrf_fusion_score, 6),
             "recall_channel_count": int(features.recall_channel_count),
             "best_channel_rank": (
-                int(features.best_channel_rank)
-                if features.best_channel_rank
-                else 0
+                int(features.best_channel_rank) if features.best_channel_rank else 0
             ),
         },
         "interest": {

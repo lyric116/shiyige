@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, Boolean, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from backend.app.models.cart import CartItem
+    from backend.app.models.order import OrderItem
+    from backend.app.models.recommendation import ProductEmbedding
+    from backend.app.models.review import Review
 
 
 class Category(TimestampMixin, Base):
@@ -19,7 +25,7 @@ class Category(TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    products: Mapped[list[Product]] = relationship(back_populates="category")
+    products: Mapped[list["Product"]] = relationship(back_populates="category")
 
 
 class Product(TimestampMixin, Base):
@@ -38,26 +44,26 @@ class Product(TimestampMixin, Base):
     scene_tag: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
-    category: Mapped[Category] = relationship(back_populates="products")
-    skus: Mapped[list[ProductSku]] = relationship(
+    category: Mapped["Category"] = relationship(back_populates="products")
+    skus: Mapped[list["ProductSku"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
     )
-    media_items: Mapped[list[ProductMedia]] = relationship(
+    media_items: Mapped[list["ProductMedia"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
     )
-    tags: Mapped[list[ProductTag]] = relationship(
+    tags: Mapped[list["ProductTag"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
     )
-    cart_items: Mapped[list[CartItem]] = relationship(back_populates="product")
-    order_items: Mapped[list[OrderItem]] = relationship(back_populates="product")
-    reviews: Mapped[list[Review]] = relationship(
+    cart_items: Mapped[list["CartItem"]] = relationship(back_populates="product")
+    order_items: Mapped[list["OrderItem"]] = relationship(back_populates="product")
+    reviews: Mapped[list["Review"]] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
     )
-    embedding: Mapped[ProductEmbedding | None] = relationship(
+    embedding: Mapped["ProductEmbedding | None"] = relationship(
         back_populates="product",
         cascade="all, delete-orphan",
         uselist=False,
@@ -79,7 +85,9 @@ class ProductSku(TimestampMixin, Base):
     __tablename__ = "product_sku"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("product.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("product.id", ondelete="CASCADE"), index=True
+    )
     sku_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     specs_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -88,36 +96,40 @@ class ProductSku(TimestampMixin, Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    product: Mapped[Product] = relationship(back_populates="skus")
-    inventory: Mapped[Inventory | None] = relationship(
+    product: Mapped["Product"] = relationship(back_populates="skus")
+    inventory: Mapped["Inventory | None"] = relationship(
         back_populates="sku",
         cascade="all, delete-orphan",
         uselist=False,
     )
-    cart_items: Mapped[list[CartItem]] = relationship(back_populates="sku")
-    order_items: Mapped[list[OrderItem]] = relationship(back_populates="sku")
+    cart_items: Mapped[list["CartItem"]] = relationship(back_populates="sku")
+    order_items: Mapped[list["OrderItem"]] = relationship(back_populates="sku")
 
 
 class ProductMedia(TimestampMixin, Base):
     __tablename__ = "product_media"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("product.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("product.id", ondelete="CASCADE"), index=True
+    )
     media_type: Mapped[str] = mapped_column(String(20), default="image", nullable=False)
     url: Mapped[str] = mapped_column(String(255), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    product: Mapped[Product] = relationship(back_populates="media_items")
+    product: Mapped["Product"] = relationship(back_populates="media_items")
 
 
 class ProductTag(TimestampMixin, Base):
     __tablename__ = "product_tag"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("product.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("product.id", ondelete="CASCADE"), index=True
+    )
     tag: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
-    product: Mapped[Product] = relationship(back_populates="tags")
+    product: Mapped["Product"] = relationship(back_populates="tags")
 
 
 class Inventory(TimestampMixin, Base):
@@ -132,4 +144,4 @@ class Inventory(TimestampMixin, Base):
     )
     quantity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    sku: Mapped[ProductSku] = relationship(back_populates="inventory")
+    sku: Mapped["ProductSku"] = relationship(back_populates="inventory")

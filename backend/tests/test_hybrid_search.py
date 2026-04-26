@@ -173,9 +173,7 @@ def test_semantic_search_uses_qdrant_hybrid_and_respects_stock_filters(
         )
         assert all(result.product.festival_tag == "端午" for result in filtered_results)
 
-        product = seeded_session.scalar(
-            select(Product).where(Product.name == "故宫宫廷香囊")
-        )
+        product = seeded_session.scalar(select(Product).where(Product.name == "故宫宫廷香囊"))
         assert product is not None
         assert product.default_sku is not None
         assert product.default_sku.inventory is not None
@@ -244,9 +242,7 @@ def test_related_products_use_qdrant_candidates_when_vector_store_is_ready(
             bundle=bundle,
         )
 
-        source_product = seeded_session.scalar(
-            select(Product).where(Product.name == "点翠发簪")
-        )
+        source_product = seeded_session.scalar(select(Product).where(Product.name == "点翠发簪"))
         assert source_product is not None
 
         results = find_related_products(

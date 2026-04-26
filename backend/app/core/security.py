@@ -1,13 +1,12 @@
-from datetime import UTC, datetime, timedelta
 import os
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
 from passlib.context import CryptContext
-
+from pydantic import BaseModel
 
 # Use a pure-passlib scheme to avoid bcrypt backend incompatibilities in the
 # local Python 3.13 environment while preserving the same security API.

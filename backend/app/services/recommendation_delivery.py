@@ -154,8 +154,7 @@ def resolve_recommendation_payload(
             force_baseline=True,
         )
         items = [
-            serialize_recommendation_item(result, debug=debug, slot=slot)
-            for result in results
+            serialize_recommendation_item(result, debug=debug, slot=slot) for result in results
         ]
         pipeline.update(
             {

@@ -172,12 +172,21 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
         timeout=5000,
     )
     assert "猜你喜欢" in first_page.locator("#home-recommendation-title").text_content()
-    assert first_recommendation["name"] in first_page.locator("#home-featured-products").text_content()
-    assert first_recommendation["reason"] in first_page.locator("#home-featured-products").text_content()
-    assert first_recommendation["source_label"] in first_page.locator("#home-featured-products").text_content()
-    assert first_unique_recommendation["name"] in first_page.locator(
-        "#home-featured-products"
-    ).text_content()
+    assert (
+        first_recommendation["name"] in first_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        first_recommendation["reason"]
+        in first_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        first_recommendation["source_label"]
+        in first_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        first_unique_recommendation["name"]
+        in first_page.locator("#home-featured-products").text_content()
+    )
     first_context.close()
 
     second_context = browser.new_context(base_url=live_server)
@@ -192,15 +201,26 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
         arg=[second_recommendation["name"], second_recommendation["reason"]],
         timeout=5000,
     )
-    assert second_recommendation["name"] in second_page.locator("#home-featured-products").text_content()
-    assert second_recommendation["reason"] in second_page.locator("#home-featured-products").text_content()
-    assert second_recommendation["source_label"] in second_page.locator("#home-featured-products").text_content()
-    assert second_unique_recommendation["name"] in second_page.locator(
-        "#home-featured-products"
-    ).text_content()
-    assert first_unique_recommendation["name"] not in second_page.locator(
-        "#home-featured-products"
-    ).text_content()
+    assert (
+        second_recommendation["name"]
+        in second_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        second_recommendation["reason"]
+        in second_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        second_recommendation["source_label"]
+        in second_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        second_unique_recommendation["name"]
+        in second_page.locator("#home-featured-products").text_content()
+    )
+    assert (
+        first_unique_recommendation["name"]
+        not in second_page.locator("#home-featured-products").text_content()
+    )
     second_context.close()
 
     product_context = browser.new_context(base_url=live_server)
@@ -236,7 +256,9 @@ def test_recommendation_and_semantic_search_ui(browser, live_server) -> None:
         ],
         timeout=5000,
     )
-    assert search_page.locator("#category-name").text_content() == "语义搜索：适合春日出游的素雅汉服"
+    assert (
+        search_page.locator("#category-name").text_content() == "语义搜索：适合春日出游的素雅汉服"
+    )
     assert semantic_item["name"] in search_page.locator("#products-container").text_content()
     assert semantic_item["reason"] in search_page.locator("#products-container").text_content()
     assert "语义相关" in search_page.locator("#products-container").text_content()

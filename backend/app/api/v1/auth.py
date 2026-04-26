@@ -19,7 +19,6 @@ from backend.app.core.security import (
 from backend.app.models.user import User, UserProfile
 from backend.app.schemas.auth import LoginRequest, RegisterRequest
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -64,7 +63,9 @@ def register(
 
     existing_username = get_user_by_username(db, username)
     if existing_username is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="username already registered"
+        )
 
     user = User(
         email=email,
@@ -131,11 +132,15 @@ def refresh_token(
 ):
     refresh_token_value = request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_token_value:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="missing refresh token"
+        )
 
     token_payload = decode_token(refresh_token_value)
     if token_payload.token_type != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token"
+        )
 
     user = get_user_by_subject(db, token_payload.sub)
     if user is None or not user.is_active:

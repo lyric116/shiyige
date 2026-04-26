@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
 
-from backend.app.models.membership import PointAccount
 from backend.app.models.base import Base
+from backend.app.models.membership import PointAccount
 from backend.app.models.order import Order
 from backend.app.models.recommendation import UserInterestProfile
 from backend.app.models.user import User, UserBehaviorLog
@@ -18,9 +18,7 @@ def test_seed_demo_data_creates_demo_user_orders_points_and_interest_profile() -
         second_result = seed_demo_data(session)
 
         demo_user = session.scalar(
-            select(User)
-            .options(selectinload(User.addresses))
-            .where(User.email == DEMO_USER_EMAIL)
+            select(User).options(selectinload(User.addresses)).where(User.email == DEMO_USER_EMAIL)
         )
         assert demo_user is not None
         assert demo_user.profile is not None

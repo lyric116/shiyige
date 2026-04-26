@@ -82,10 +82,14 @@ def record_recommendation_precompute_served(
     slot_summary["hit_count"] = int(slot_summary.get("hit_count") or 0) + int(hit)
     slot_summary["miss_count"] = int(slot_summary.get("miss_count") or 0) + int(not hit)
     slot_total = int(slot_summary["hit_count"]) + int(slot_summary["miss_count"])
-    slot_summary["hit_rate"] = round(
-        int(slot_summary["hit_count"]) / slot_total,
-        4,
-    ) if slot_total else 0.0
+    slot_summary["hit_rate"] = (
+        round(
+            int(slot_summary["hit_count"]) / slot_total,
+            4,
+        )
+        if slot_total
+        else 0.0
+    )
     slot_stats[slot] = slot_summary
     summary["slot_stats"] = slot_stats
     persist_recommendation_precompute_summary(summary)

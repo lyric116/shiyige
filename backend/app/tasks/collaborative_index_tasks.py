@@ -70,8 +70,7 @@ def build_collaborative_index(
         ensure_collaborative_collection(client=qdrant_client, settings=app_settings)
 
         logs = db.scalars(
-            select(UserBehaviorLog)
-            .order_by(
+            select(UserBehaviorLog).order_by(
                 UserBehaviorLog.user_id.asc(),
                 UserBehaviorLog.created_at.asc(),
                 UserBehaviorLog.id.asc(),

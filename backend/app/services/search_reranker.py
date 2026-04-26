@@ -21,8 +21,7 @@ def score_colbert_maxsim(
     total_score = 0.0
     for query_vector in query_vectors:
         max_score = max(
-            dot_product(query_vector, document_vector)
-            for document_vector in document_vectors
+            dot_product(query_vector, document_vector) for document_vector in document_vectors
         )
         total_score += max_score
 

@@ -75,10 +75,7 @@ class FastEmbedColbertEmbeddingProvider(ColbertEmbeddingProvider):
         return [self._prepare_matrix(matrix) for matrix in matrices]
 
     def _prepare_matrix(self, matrix: Sequence[Sequence[float]]) -> list[list[float]]:
-        token_vectors = [
-            [float(value) for value in row]
-            for row in matrix
-        ]
+        token_vectors = [[float(value) for value in row] for row in matrix]
         if self.descriptor.normalize:
             return [normalize_dense_vector(row) for row in token_vectors]
         return token_vectors

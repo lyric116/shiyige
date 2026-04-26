@@ -172,9 +172,7 @@ def ensure_benchmark_users(
     product_ids: list[int],
 ) -> list[BenchmarkUserContext]:
     existing_users = session.scalars(
-        select(User)
-        .where(User.email.like("benchmark-user-%@example.com"))
-        .order_by(User.id.asc())
+        select(User).where(User.email.like("benchmark-user-%@example.com")).order_by(User.id.asc())
     ).all()
     existing_count = len(existing_users)
     if existing_count < target_users:
@@ -231,17 +229,13 @@ def ensure_benchmark_users(
         session.commit()
 
     users = session.scalars(
-        select(User)
-        .where(User.email.like("benchmark-user-%@example.com"))
-        .order_by(User.id.asc())
+        select(User).where(User.email.like("benchmark-user-%@example.com")).order_by(User.id.asc())
     ).all()[:target_users]
     return [
         BenchmarkUserContext(
             user_id=user.id,
             headers={
-                "Authorization": (
-                    f"Bearer {create_access_token(str(user.id), role=user.role)}"
-                ),
+                "Authorization": (f"Bearer {create_access_token(str(user.id), role=user.role)}"),
             },
         )
         for user in users

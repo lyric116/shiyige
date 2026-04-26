@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from backend.app.core.security import decode_token
 from backend.app.models.user import User, UserBehaviorLog
 
-
 BEHAVIOR_VIEW_PRODUCT = "view_product"
 BEHAVIOR_SEARCH = "search"
 BEHAVIOR_ADD_TO_CART = "add_to_cart"

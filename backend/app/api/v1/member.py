@@ -15,7 +15,6 @@ from backend.app.services.member import (
     serialize_point_log,
 )
 
-
 router = APIRouter(prefix="/member", tags=["member"])
 
 

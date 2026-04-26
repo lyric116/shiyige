@@ -36,7 +36,9 @@ async def test_admin_reindex_endpoint_rebuilds_product_embeddings(
     assert len(body["data"]["result"]["product_ids"]) == 20
 
     with api_session_factory() as session:
-        embeddings = session.scalars(select(ProductEmbedding).order_by(ProductEmbedding.product_id)).all()
+        embeddings = session.scalars(
+            select(ProductEmbedding).order_by(ProductEmbedding.product_id)
+        ).all()
         operation_log = session.scalar(
             select(OperationLog)
             .where(OperationLog.admin_user_id == admin_user.id)

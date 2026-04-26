@@ -4,11 +4,15 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
-from backend.app.core.security import TokenPayload, get_current_token, hash_password, verify_password
+from backend.app.core.security import (
+    TokenPayload,
+    get_current_token,
+    hash_password,
+    verify_password,
+)
 from backend.app.models.user import User, UserAddress, UserProfile
 from backend.app.schemas.address import UserAddressRequest
 from backend.app.schemas.user import ChangePasswordRequest, UpdateUserProfileRequest
-
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -41,7 +45,9 @@ def get_user_from_token(
     try:
         user_id = int(token_payload.sub)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid access token"
+        ) from exc
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
@@ -83,7 +89,9 @@ def get_user_address(db: Session, user_id: int, address_id: int) -> UserAddress 
     )
 
 
-def clear_other_default_addresses(db: Session, user_id: int, keep_address_id: int | None = None) -> None:
+def clear_other_default_addresses(
+    db: Session, user_id: int, keep_address_id: int | None = None
+) -> None:
     addresses = db.scalars(select(UserAddress).where(UserAddress.user_id == user_id)).all()
     for address in addresses:
         if keep_address_id is not None and address.id == keep_address_id:
@@ -123,7 +131,9 @@ def update_me(
         select(User).where(User.username == username, User.id != current_user.id)
     )
     if existing_username is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="username already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="username already registered"
+        )
 
     current_user.email = email
     current_user.username = username
@@ -156,7 +166,9 @@ def change_password(
     db: Session = Depends(get_db),
 ):
     if not verify_password(payload.current_password, current_user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="current password is incorrect")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="current password is incorrect"
+        )
 
     current_user.password_hash = hash_password(payload.new_password)
     db.add(current_user)

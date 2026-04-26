@@ -1,5 +1,14 @@
 # 当前架构洞察
 
+## 2026-04-26 补充洞察
+
+* SQLAlchemy 模型层现在更明确地采用了 `from __future__ import annotations` + `TYPE_CHECKING` + 字符串前向引用的组合。
+  这让 `backend/app/models/cart.py`、`membership.py`、`order.py`、`product.py`、`review.py`、`user.py` 之间的双向关系既能保持模块拆分，又不会再因为导入环或未解析名称卡住 `ruff`。
+* 前台多个页面页脚过去仍残留 `categories.html` 这一旧页面名，而真实分类页已经固定为 `category.html`。
+  这类问题不会在后端测试里暴露，但会直接形成用户可见死链，所以后续凡是改页面名或路由名，都应该追加一次全仓文本扫描，而不是只依赖业务测试。
+* 当前 `tests/e2e/conftest.py` 的浏览器夹具直接调用 `playwright.chromium.launch()`。
+  这意味着 e2e 的稳定性不只依赖前后端逻辑，还依赖执行环境能否正常运行 Playwright 自带的 Chromium headless shell；在受限沙箱里，测试可能会在夹具启动阶段失败，而不是在页面行为阶段失败。
+
 ## 1. 记忆文档的作用
 
 * `memory-bank/design.md`：项目目标、比赛定位、系统能力边界和推荐思路的源文档。

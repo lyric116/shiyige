@@ -122,30 +122,38 @@ def load_products_for_interest_profile(db: Session, product_ids: set[int]) -> di
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.embedding),
-            selectinload(Product.skus),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.embedding),
+                selectinload(Product.skus),
+            )
+            .where(Product.id.in_(sorted(product_ids)))
         )
-        .where(Product.id.in_(sorted(product_ids)))
-    ).unique().all()
+        .unique()
+        .all()
+    )
     return {product.id: product for product in products}
 
 
 def load_active_products_for_recommendations(db: Session) -> list[Product]:
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
-            selectinload(Product.embedding),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+                selectinload(Product.embedding),
+            )
+            .where(Product.status == 1)
         )
-        .where(Product.status == 1)
-    ).unique().all()
+        .unique()
+        .all()
+    )
     return [product for product in products if product_has_available_stock(product)]
 
 
@@ -291,8 +299,7 @@ def extract_profile_terms(profile: UserInterestProfile) -> tuple[list[str], set[
 
     top_terms = list(profile.ext_json.get("top_terms", []))
     consumed_product_ids = {
-        int(product_id)
-        for product_id in profile.ext_json.get("consumed_product_ids", [])
+        int(product_id) for product_id in profile.ext_json.get("consumed_product_ids", [])
     }
     return top_terms, consumed_product_ids
 

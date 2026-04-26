@@ -132,8 +132,7 @@ def test_collaborative_index_builds_sparse_user_vectors_and_item_cooccurrence(
         )
         assert any(candidate.product_id == 4 for candidate in cooccurrence_candidates)
         assert any(
-            candidate.recall_channel == "item_cooccurrence"
-            for candidate in cooccurrence_candidates
+            candidate.recall_channel == "item_cooccurrence" for candidate in cooccurrence_candidates
         )
     finally:
         if client.collection_exists(settings.qdrant_collection_cf):

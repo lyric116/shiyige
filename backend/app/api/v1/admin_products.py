@@ -6,9 +6,15 @@ from backend.app.api.v1.admin_auth import create_operation_log, get_current_admi
 from backend.app.core.database import get_db
 from backend.app.core.responses import build_response
 from backend.app.models.admin import AdminUser
-from backend.app.models.product import Category, Inventory, Product, ProductMedia, ProductSku, ProductTag
+from backend.app.models.product import (
+    Category,
+    Inventory,
+    Product,
+    ProductMedia,
+    ProductSku,
+    ProductTag,
+)
 from backend.app.schemas.admin import AdminProductUpsertRequest
-
 
 router = APIRouter(prefix="/admin/products", tags=["admin-products"])
 
@@ -46,7 +52,10 @@ def serialize_admin_product(product: Product) -> dict[str, object]:
         "scene_tag": product.scene_tag,
         "status": product.status,
         "tags": [tag.tag for tag in sorted(product.tags, key=lambda item: item.id)],
-        "media_urls": [media.url for media in sorted(product.media_items, key=lambda item: (item.sort_order, item.id))],
+        "media_urls": [
+            media.url
+            for media in sorted(product.media_items, key=lambda item: (item.sort_order, item.id))
+        ],
         "default_sku": (
             {
                 "id": default_sku.id,
@@ -89,10 +98,14 @@ def ensure_unique_sku_code(db: Session, sku_code: str, current_sku_id: int | Non
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="sku code already exists")
 
 
-def apply_product_payload(db: Session, product: Product, payload: AdminProductUpsertRequest) -> None:
+def apply_product_payload(
+    db: Session, product: Product, payload: AdminProductUpsertRequest
+) -> None:
     category = get_category_or_404(db, payload.category_id)
     default_sku = product.default_sku
-    ensure_unique_sku_code(db, payload.default_sku.sku_code.strip(), default_sku.id if default_sku else None)
+    ensure_unique_sku_code(
+        db, payload.default_sku.sku_code.strip(), default_sku.id if default_sku else None
+    )
 
     product.category = category
     product.name = payload.name.strip()

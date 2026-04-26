@@ -152,8 +152,11 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
 
     page.goto(f"{live_server}/admin/orders.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => document.querySelector('#orders-table-body')?.textContent?.includes('admin-order-user')"
-        " && document.querySelector('#orders-table-body')?.textContent?.includes('PAID')",
+        (
+            "() => document.querySelector('#orders-table-body')"
+            "?.textContent?.includes('admin-order-user')"
+            " && document.querySelector('#orders-table-body')?.textContent?.includes('PAID')"
+        ),
         timeout=5000,
     )
     orders_text = page.locator("#orders-table-body").text_content()
@@ -163,7 +166,10 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
 
     page.goto(f"{live_server}/admin/reindex.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => document.querySelector('#vector-status-metrics')?.textContent?.includes('Collection')",
+        (
+            "() => document.querySelector('#vector-status-metrics')"
+            "?.textContent?.includes('Collection')"
+        ),
         timeout=5000,
     )
     page.locator("#reindex-products-btn").click()
@@ -187,7 +193,10 @@ def test_admin_basic_pages_use_real_admin_apis(browser, live_server) -> None:
 
     page.goto(f"{live_server}/admin/recommendation-config.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => document.querySelector('#recommendation-config-list')?.textContent?.includes('full_pipeline')",
+        (
+            "() => document.querySelector('#recommendation-config-list')"
+            "?.textContent?.includes('full_pipeline')"
+        ),
         timeout=5000,
     )
     assert "baseline" in page.locator("#recommendation-config-list").text_content()

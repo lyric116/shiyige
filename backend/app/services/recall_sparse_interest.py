@@ -47,11 +47,9 @@ def recall_sparse_interest_candidates(
             if product_id in consumed_product_ids:
                 continue
 
-            matched_terms = [
-                term
-                for term in top_terms
-                if term in build_payload_term_set(payload)
-            ][:4]
+            matched_terms = [term for term in top_terms if term in build_payload_term_set(payload)][
+                :4
+            ]
             rank += 1
             results.append(
                 RecallItem(

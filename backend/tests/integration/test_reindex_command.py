@@ -47,7 +47,9 @@ def test_reindex_command_rebuilds_full_product_embedding_index() -> None:
     assert result["model_name"] == "local-hash-command"
 
     with Session(engine) as session:
-        embeddings = session.scalars(select(ProductEmbedding).order_by(ProductEmbedding.product_id)).all()
+        embeddings = session.scalars(
+            select(ProductEmbedding).order_by(ProductEmbedding.product_id)
+        ).all()
 
     assert len(embeddings) == 20
     assert len(embeddings[0].embedding_vector or []) == 12

@@ -78,11 +78,9 @@ def recall_trending_candidates(
                 recall_channel="trending",
                 recall_score=float(product_scores[product_id]),
                 rank_in_channel=rank,
-                matched_terms=[
-                    term
-                    for term in [product.festival_tag, product.scene_tag]
-                    if term
-                ][:2],
+                matched_terms=[term for term in [product.festival_tag, product.scene_tag] if term][
+                    :2
+                ],
                 reason_parts=["热门趋势召回", "来自近 7 天站内热度"],
             )
         )
@@ -99,16 +97,16 @@ def load_active_products_by_id(
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+            )
+            .where(Product.id.in_(product_ids), Product.status == 1)
         )
-        .where(Product.id.in_(product_ids), Product.status == 1)
-    ).unique().all()
-    return {
-        product.id: product
-        for product in products
-        if product_has_available_stock(product)
-    }
+        .unique()
+        .all()
+    )
+    return {product.id: product for product in products if product_has_available_stock(product)}

@@ -32,9 +32,7 @@ def build_product_embedding_query(product_ids: Iterable[int] | None = None):
 
 
 def load_product_embedding(db: Session, *, product_id: int) -> ProductEmbedding | None:
-    return db.scalar(
-        select(ProductEmbedding).where(ProductEmbedding.product_id == product_id)
-    )
+    return db.scalar(select(ProductEmbedding).where(ProductEmbedding.product_id == product_id))
 
 
 def build_product_embedding_values(
@@ -71,9 +69,7 @@ def upsert_product_embedding_row(
     bind = db.get_bind()
     dialect_name = bind.dialect.name if bind is not None else ""
     update_values = {
-        key: value
-        for key, value in values.items()
-        if key not in {"product_id", "created_at"}
+        key: value for key, value in values.items() if key not in {"product_id", "created_at"}
     }
 
     if dialect_name == "sqlite":

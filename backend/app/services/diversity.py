@@ -45,9 +45,7 @@ def diversify_candidates(
 
         category_counts[product.category_id] = category_counts.get(product.category_id, 0) + 1
         if product.dynasty_style:
-            dynasty_counts[product.dynasty_style] = (
-                dynasty_counts.get(product.dynasty_style, 0) + 1
-            )
+            dynasty_counts[product.dynasty_style] = dynasty_counts.get(product.dynasty_style, 0) + 1
         if product.craft_type:
             craft_counts[product.craft_type] = craft_counts.get(product.craft_type, 0) + 1
 

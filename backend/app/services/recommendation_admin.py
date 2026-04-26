@@ -105,9 +105,7 @@ def build_recommendation_metrics(
         )
         or 0
     )
-    avg_latency_ms = float(
-        db.scalar(select(func.avg(RecommendationRequestLog.latency_ms))) or 0.0
-    )
+    avg_latency_ms = float(db.scalar(select(func.avg(RecommendationRequestLog.latency_ms))) or 0.0)
     avg_candidate_count = float(
         db.scalar(select(func.avg(RecommendationRequestLog.candidate_count))) or 0.0
     )
@@ -167,9 +165,7 @@ def build_recommendation_metrics(
     ctr = click_count / impression_count if impression_count else 0.0
     add_to_cart_rate = add_to_cart_count / impression_count if impression_count else 0.0
     conversion_rate = pay_order_count / impression_count if impression_count else 0.0
-    coverage_rate = (
-        covered_product_count / active_product_count if active_product_count else 0.0
-    )
+    coverage_rate = covered_product_count / active_product_count if active_product_count else 0.0
     fallback_rate = fallback_request_count / request_count if request_count else 0.0
     cold_start_request_count = sum(
         1 for channels in request_channels.values() if "cold_start" in channels
@@ -179,9 +175,7 @@ def build_recommendation_metrics(
     )
     cold_start_request_rate = cold_start_request_count / request_count if request_count else 0.0
     exploration_hit_rate = exploration_request_count / request_count if request_count else 0.0
-    new_arrival_share = (
-        new_arrival_impression_count / impression_count if impression_count else 0.0
-    )
+    new_arrival_share = new_arrival_impression_count / impression_count if impression_count else 0.0
     exploration_impression_share = (
         exploration_impression_count / impression_count if impression_count else 0.0
     )
@@ -305,8 +299,9 @@ def build_search_metrics(db: Session) -> dict[str, object]:
 
 def build_experiment_dashboard(db: Session) -> dict[str, object]:
     requests = db.scalars(
-        select(RecommendationRequestLog)
-        .order_by(RecommendationRequestLog.created_at.asc(), RecommendationRequestLog.id.asc())
+        select(RecommendationRequestLog).order_by(
+            RecommendationRequestLog.created_at.asc(), RecommendationRequestLog.id.asc()
+        )
     ).all()
     total_requests = len(requests)
     if total_requests == 0:
@@ -333,10 +328,7 @@ def build_experiment_dashboard(db: Session) -> dict[str, object]:
         )
         if action_type is not None:
             query = query.where(model.action_type == action_type)
-        return {
-            str(request_id): int(total)
-            for request_id, total in db.execute(query).all()
-        }
+        return {str(request_id): int(total) for request_id, total in db.execute(query).all()}
 
     impression_counts = build_count_map(RecommendationImpressionLog)
     click_counts = build_count_map(RecommendationClickLog, action_type="click")
@@ -595,8 +587,7 @@ def build_experiment_payload(
             name="hybrid_rerank",
             strategy="qdrant_hybrid_colbert",
             description=(
-                "在 hybrid 基础上增加 ColBERT late interaction 重排，"
-                "用于答辩展示高级搜索链路。"
+                "在 hybrid 基础上增加 ColBERT late interaction 重排，用于答辩展示高级搜索链路。"
             ),
             default_pipeline_version=vector_runtime.recommendation_pipeline_version,
             default_model_version="dense_sparse_colbert",
@@ -715,9 +706,7 @@ def build_experiment_item(
         "is_active": is_active,
         "capabilities": list(capabilities),
         "config_json": (
-            dict(db_row.config_json or config_json)
-            if db_row is not None
-            else config_json
+            dict(db_row.config_json or config_json) if db_row is not None else config_json
         ),
         "artifact_json": dict(db_row.artifact_json or {}) if db_row is not None else {},
         "description": db_row.description if db_row and db_row.description else description,
@@ -837,9 +826,7 @@ def build_recommendation_artifact_catalog() -> list[dict[str, object]]:
     for item in docs:
         summary_path = ROOT_DIR / item["path"]
         generated_path = (
-            ROOT_DIR / str(item["generated_path"])
-            if item["generated_path"] is not None
-            else None
+            ROOT_DIR / str(item["generated_path"]) if item["generated_path"] is not None else None
         )
         items.append(
             {
@@ -857,9 +844,7 @@ def build_recommendation_artifact_summary(
     items: list[dict[str, object]],
 ) -> dict[str, object]:
     curated_updates = [
-        item["updated_at"]
-        for item in items
-        if isinstance(item.get("updated_at"), str)
+        item["updated_at"] for item in items if isinstance(item.get("updated_at"), str)
     ]
     generated_updates = [
         item["generated_updated_at"]
@@ -867,9 +852,7 @@ def build_recommendation_artifact_summary(
         if isinstance(item.get("generated_updated_at"), str)
     ]
     missing_generated_count = sum(
-        1
-        for item in items
-        if item.get("generated_path") and not item.get("generated_updated_at")
+        1 for item in items if item.get("generated_path") and not item.get("generated_updated_at")
     )
     return {
         "artifact_count": len(items),

@@ -109,6 +109,8 @@ def serialize_product_detail(product: Product) -> dict[str, object]:
             for sku in product.skus
         ],
     }
+
+
 @router.get("/categories")
 def list_categories(
     request: Request,
@@ -124,9 +126,7 @@ def list_categories(
         request=request,
         code=0,
         message="ok",
-        data={
-            "items": [serialize_category(category) for category in categories]
-        },
+        data={"items": [serialize_category(category) for category in categories]},
         status_code=200,
     )
 

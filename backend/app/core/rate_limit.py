@@ -10,7 +10,6 @@ from fastapi import FastAPI, Request
 from backend.app.core.exceptions import ensure_request_id
 from backend.app.core.responses import build_response
 
-
 RATE_LIMIT_RULES = {
     ("POST", "/api/v1/auth/login"): (5, 60),
     ("POST", "/api/v1/admin/auth/login"): (5, 60),

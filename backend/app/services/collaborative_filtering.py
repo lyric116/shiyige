@@ -377,20 +377,20 @@ def load_active_products_by_id(
     if not product_ids:
         return {}
 
-    products = db.scalars(
-        select(Product)
-        .options(
-            selectinload(Product.category),
-            selectinload(Product.tags),
-            selectinload(Product.skus).selectinload(ProductSku.inventory),
+    products = (
+        db.scalars(
+            select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.tags),
+                selectinload(Product.skus).selectinload(ProductSku.inventory),
+            )
+            .where(Product.id.in_(product_ids), Product.status == 1)
         )
-        .where(Product.id.in_(product_ids), Product.status == 1)
-    ).unique().all()
-    return {
-        product.id: product
-        for product in products
-        if product_has_available_stock(product)
-    }
+        .unique()
+        .all()
+    )
+    return {product.id: product for product in products if product_has_available_stock(product)}
 
 
 def match_product_terms(product: Product, top_terms: list[str]) -> list[str]:

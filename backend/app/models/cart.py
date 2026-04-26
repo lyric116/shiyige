@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from backend.app.models.product import Product, ProductSku
+    from backend.app.models.user import User
 
 
 class Cart(TimestampMixin, Base):
@@ -17,8 +23,8 @@ class Cart(TimestampMixin, Base):
         index=True,
     )
 
-    user: Mapped[User] = relationship(back_populates="cart")
-    items: Mapped[list[CartItem]] = relationship(
+    user: Mapped["User"] = relationship(back_populates="cart")
+    items: Mapped[list["CartItem"]] = relationship(
         back_populates="cart",
         cascade="all, delete-orphan",
     )
@@ -46,6 +52,6 @@ class CartItem(TimestampMixin, Base):
     )
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
-    cart: Mapped[Cart] = relationship(back_populates="items")
-    product: Mapped[Product] = relationship(back_populates="cart_items")
-    sku: Mapped[ProductSku] = relationship(back_populates="cart_items")
+    cart: Mapped["Cart"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship(back_populates="cart_items")
+    sku: Mapped["ProductSku"] = relationship(back_populates="cart_items")

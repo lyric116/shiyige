@@ -408,8 +408,7 @@ def test_build_experiment_dashboard_aggregates_variant_traffic_and_effectiveness
     assert dashboard["top_variants"][0]["slot_count"] == 2
     assert dashboard["items"][0]["traffic_share"] == 0.3333
     assert any(
-        item["pipeline_version"] == "baseline"
-        and item["fallback_rate"] == 1.0
+        item["pipeline_version"] == "baseline" and item["fallback_rate"] == 1.0
         for item in dashboard["items"]
     )
     assert dashboard["comparison_cards"][0]["baseline"]["pipeline_version"] == "baseline"

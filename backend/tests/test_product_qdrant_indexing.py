@@ -259,8 +259,7 @@ def test_failed_points_are_recorded_and_can_be_retried(seeded_session: Session) 
         assert failed_result["failed"] == 20
         assert len(failed_rows) == 20
         assert all(
-            "simulated qdrant upsert failure" in (row.index_error or "")
-            for row in failed_rows
+            "simulated qdrant upsert failure" in (row.index_error or "") for row in failed_rows
         )
 
         retry_result = retry_failed_product_indexing(

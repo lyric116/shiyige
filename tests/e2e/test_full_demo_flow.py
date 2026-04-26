@@ -202,17 +202,24 @@ def test_full_demo_flow(browser, live_server) -> None:
     page.locator("#checkout-btn").click()
     page.wait_for_url(f"{live_server}/checkout.html", wait_until="domcontentloaded", timeout=5000)
     page.wait_for_function(
-        "() => document.querySelector('#selected-address-card')?.textContent?.includes('全链路演示用户')"
-        " && document.querySelector('#order-items')?.textContent?.includes('明制襦裙')",
+        (
+            "() => document.querySelector('#selected-address-card')"
+            "?.textContent?.includes('全链路演示用户')"
+            " && document.querySelector('#order-items')?.textContent?.includes('明制襦裙')"
+        ),
         timeout=5000,
     )
     page.locator("#note").fill("完整演示链路自动下单")
     page.locator("#place-order-btn").click()
     page.locator("#orderSuccessModal").wait_for(timeout=5000)
     page.wait_for_function(
-        "() => document.querySelector('#order-success-recommendation-section')"
-        "  && !document.querySelector('#order-success-recommendation-section')?.classList.contains('d-none')"
-        "  && document.querySelector('#order-success-recommendations')?.textContent?.length > 0",
+        (
+            "() => document.querySelector('#order-success-recommendation-section')"
+            " && !document.querySelector('#order-success-recommendation-section')"
+            "?.classList.contains('d-none')"
+            " && document.querySelector('#order-success-recommendations')"
+            "?.textContent?.length > 0"
+        ),
         timeout=5000,
     )
     order_no = page.locator("#order-number").text_content()
@@ -249,11 +256,15 @@ def test_full_demo_flow(browser, live_server) -> None:
 
     page.goto(f"{live_server}/membership.html", wait_until="domcontentloaded")
     page.wait_for_function(
-        "() => {"
-        "  const card = document.querySelector('.membership-card')?.textContent || '';"
-        "  const history = document.querySelector('#points-history-body')?.textContent || '';"
-        "  return card.includes('白银会员') && card.includes('1808') && history.includes('支付获得积分');"
-        "}",
+        (
+            "() => {"
+            "  const card = document.querySelector('.membership-card')?.textContent || '';"
+            "  const history = document.querySelector('#points-history-body')?.textContent || '';"
+            "  return card.includes('白银会员')"
+            " && card.includes('1808')"
+            " && history.includes('支付获得积分');"
+            "}"
+        ),
         timeout=5000,
     )
 
@@ -276,6 +287,9 @@ def test_full_demo_flow(browser, live_server) -> None:
         arg=[updated_recommendations[0]["name"], updated_recommendations[0]["reason"]],
         timeout=5000,
     )
-    assert updated_recommendations[0]["source_label"] in page.locator("#home-featured-products").text_content()
+    assert (
+        updated_recommendations[0]["source_label"]
+        in page.locator("#home-featured-products").text_content()
+    )
 
     context.close()

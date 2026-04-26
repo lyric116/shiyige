@@ -209,9 +209,7 @@ def ensure_evaluation_user(session: Session, scenario: EvaluationScenario) -> Us
         session.flush()
 
     existing_logs = session.scalar(
-        select(func.count())
-        .select_from(UserBehaviorLog)
-        .where(UserBehaviorLog.user_id == user.id)
+        select(func.count()).select_from(UserBehaviorLog).where(UserBehaviorLog.user_id == user.id)
     )
     if existing_logs:
         return user
@@ -308,11 +306,7 @@ def build_recall_subset(
     keys: list[str],
     recall_results: dict[str, list],
 ) -> dict[str, list]:
-    return {
-        key: recall_results.get(key, [])
-        for key in keys
-        if recall_results.get(key)
-    }
+    return {key: recall_results.get(key, []) for key in keys if recall_results.get(key)}
 
 
 def run_fused_subset(
@@ -506,9 +500,7 @@ def mrr(items: list[int], relevant_ids: set[int]) -> float:
 
 def diversity_score(session: Session, items: list[int]) -> float:
     products = session.scalars(
-        select(Product)
-        .options(selectinload(Product.category))
-        .where(Product.id.in_(items))
+        select(Product).options(selectinload(Product.category)).where(Product.id.in_(items))
     ).all()
     if len(products) < 2:
         return 0.0
@@ -562,9 +554,7 @@ def evaluate_scenarios() -> dict[str, object]:
         session.expire_all()
         popularity_map = build_popularity_map(session)
         catalog_size = int(
-            session.scalar(
-                select(func.count()).select_from(Product).where(Product.status == 1)
-            )
+            session.scalar(select(func.count()).select_from(Product).where(Product.status == 1))
             or 1
         )
         aggregated: dict[str, dict[str, object]] = {
@@ -601,17 +591,13 @@ def evaluate_scenarios() -> dict[str, object]:
                 aggregated[mode.key]["precision_at_5"].append(
                     precision_at_k(items, relevant_ids, TOP_K)
                 )
-                aggregated[mode.key]["recall_at_5"].append(
-                    recall_at_k(items, relevant_ids, TOP_K)
-                )
+                aggregated[mode.key]["recall_at_5"].append(recall_at_k(items, relevant_ids, TOP_K))
                 aggregated[mode.key]["ndcg_at_5"].append(ndcg_at_k(items, relevant_ids, TOP_K))
                 aggregated[mode.key]["mrr"].append(mrr(items, relevant_ids))
                 aggregated[mode.key]["diversity"].append(diversity_score(session, items))
                 aggregated[mode.key]["novelty"].append(novelty_score(popularity_map, items))
                 aggregated[mode.key]["ctr"].append(precision_at_k(items, click_targets, TOP_K))
-                aggregated[mode.key]["cvr"].append(
-                    precision_at_k(items, conversion_targets, TOP_K)
-                )
+                aggregated[mode.key]["cvr"].append(precision_at_k(items, conversion_targets, TOP_K))
                 aggregated[mode.key]["add_to_cart_rate"].append(
                     precision_at_k(items, conversion_targets | click_targets, TOP_K)
                 )
@@ -696,9 +682,7 @@ def render_markdown(
                 "| Mode | P@5 | R@5 | NDCG@5 | MRR | Coverage | Diversity | "
                 "Novelty | CTR | CVR | Add-to-cart | p50 ms | p95 ms | p99 ms |"
             ),
-            (
-                "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
-            ),
+            ("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"),
         ]
     )
     for row in rows:

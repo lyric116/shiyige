@@ -107,7 +107,10 @@ def test_checkout_page_uses_real_cart_address_and_order_flow(browser, live_serve
 
     page.locator("#address-select").wait_for(timeout=5000)
     page.wait_for_function(
-        "() => document.querySelector('#selected-address-card')?.textContent?.includes('结算测试用户')"
+        (
+            "() => document.querySelector('#selected-address-card')"
+            "?.textContent?.includes('结算测试用户')"
+        )
     )
     page.wait_for_function(
         "() => document.querySelector('#order-items')?.textContent?.includes('点翠发簪')"
@@ -124,13 +127,17 @@ def test_checkout_page_uses_real_cart_address_and_order_flow(browser, live_serve
 
     page.locator("#orderSuccessModal").wait_for(timeout=5000)
     page.wait_for_function(
-      "() => document.querySelector('#order-number')?.textContent?.startsWith('SYG')"
+        "() => document.querySelector('#order-number')?.textContent?.startsWith('SYG')"
     )
     page.wait_for_function(
-      "() => document.querySelector('#order-success-recommendation-section')"
-      "  && !document.querySelector('#order-success-recommendation-section')?.classList.contains('d-none')"
-      "  && document.querySelector('#order-success-recommendations')?.textContent?.length > 0",
-      timeout=5000,
+        (
+            "() => document.querySelector('#order-success-recommendation-section')"
+            " && !document.querySelector('#order-success-recommendation-section')"
+            "?.classList.contains('d-none')"
+            " && document.querySelector('#order-success-recommendations')"
+            "?.textContent?.length > 0"
+        ),
+        timeout=5000,
     )
     assert "下单后推荐" in page.locator("#order-success-recommendation-section").text_content()
 

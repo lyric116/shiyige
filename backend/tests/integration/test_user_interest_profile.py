@@ -85,8 +85,12 @@ def test_user_interest_profile_differs_for_different_behavior_histories() -> Non
         )
         session.commit()
 
-        first_profile = build_user_interest_profile(session, user_id=first_user.id, provider=provider)
-        second_profile = build_user_interest_profile(session, user_id=second_user.id, provider=provider)
+        first_profile = build_user_interest_profile(
+            session, user_id=first_user.id, provider=provider
+        )
+        second_profile = build_user_interest_profile(
+            session, user_id=second_user.id, provider=provider
+        )
         first_profile_text = first_profile.profile_text
         second_profile_text = second_profile.profile_text
         first_top_terms = list(first_profile.ext_json["top_terms"])

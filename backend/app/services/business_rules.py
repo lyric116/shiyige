@@ -207,9 +207,7 @@ def inject_exploration_candidates(
     exploration_ratio: float,
 ) -> None:
     available_exploration = [
-        candidate
-        for candidate in ordered
-        if candidate.business_rules.exploration_candidate
+        candidate for candidate in ordered if candidate.business_rules.exploration_candidate
     ]
     if not available_exploration or not selected:
         return
