@@ -116,6 +116,19 @@ docker compose logs -f api nginx
 
 启动后访问入口：
 
+**在线访问**
+
+| 功能入口 | 访问地址 |
+|---|---|
+| 前台商城 | https://shiyige.vercel.app/  (国内直连：https://mage.cc.cd/)|
+| 后台管理端 | https://shiyige.vercel.app/admin/ (国内直连：https://mage.cc.cd/admin)|
+| API 健康检查 | https://shiyige.vercel.app/api/v1/health (国内直连：https://mage.cc.cd/api/v1/health)|
+
+
+
+## 本地开发地址
+
+使用 Docker Compose 在本地启动后，可以访问：
 * 前台：`http://127.0.0.1/`
 * 后台：`http://127.0.0.1/admin/`
 * API 健康检查：`http://127.0.0.1/api/v1/health`
