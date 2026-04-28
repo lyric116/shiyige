@@ -116,13 +116,23 @@ docker compose logs -f api nginx
 
 启动后访问入口：
 
-**在线访问**
+### 在线访问
 
-| 功能入口 | 访问地址 |
+> 面向中国大陆访问，推荐使用阿里云服务器入口。Vercel 在中国大陆可能访问不稳定。
+
+| 功能入口 | 国内推荐地址 |
 |---|---|
-| 前台商城 | https://shiyige.vercel.app/  (国内直连：https://mage.cc.cd/)|
-| 后台管理端 | https://shiyige.vercel.app/admin/ (国内直连：https://mage.cc.cd/admin)|
-| API 健康检查 | https://shiyige.vercel.app/api/v1/health (国内直连：https://mage.cc.cd/api/v1/health)|
+| 前台商城 | http://39.106.117.134/ (或 https://mage.cc.cd/)|
+| 后台管理端 | http://39.106.117.134/admin/ (或 https://mage.cc.cd/admin/)|
+| API 健康检查 | http://39.106.117.134/api/v1/health (或 https://mage.cc.cd/api/v1/health) |
+
+**备用访问地址**
+> 备用地址部署在境外平台，中国大陆访问可能出现打不开或加载慢的情况。
+
+| 功能入口 | 地址 |
+|---|---|
+| Vercel 前台 | https://shiyige.vercel.app/ |
+| Vercel 后台 | https://shiyige.vercel.app/admin/ |
 
 
 
